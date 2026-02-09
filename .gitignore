@@ -1,41 +1,81 @@
-# Prerequisites
-*.d
+####################################
+# OS / System
+####################################
+.DS_Store
+Thumbs.db
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+####################################
+# Build folders (JUCE / CMake / VS)
+####################################
+Builds/
+build/
+cmake-build-*/
+out/
+bin/
+obj/
 
-# Precompiled Headers
-*.gch
-*.pch
+####################################
+# Visual Studio
+####################################
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.opendb
+*.ipch
 
-# Linker files
-*.ilk
+####################################
+# Xcode (на будущее)
+####################################
+*.xcworkspace
+*.xcuserdata
+DerivedData/
 
-# Debugger Files
-*.pdb
+####################################
+# JUCE specific
+####################################
+JuceLibraryCode/
+*.jucer
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
+####################################
+# Plugin binaries
+####################################
+*.vst3
 *.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
 *.exe
-*.out
-*.app
 
-# debug information files
-*.dwo
+####################################
+# Presets / Cache
+####################################
+Presets/User/
+*.preset
+*.cache
+
+####################################
+# Logs / Temp
+####################################
+*.log
+*.tmp
+
+####################################
+# IDEs
+####################################
+.idea/
+.vscode/
+
+####################################
+# CMake
+####################################
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+####################################
+# Audio test files
+####################################
+*.wav
+*.aiff
+*.mp3
