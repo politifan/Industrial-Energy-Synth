@@ -49,6 +49,9 @@ target_sources(IndustrialEnergySynth PRIVATE
   Source/engine/MonoSynthEngine.cpp
   Source/engine/MonoSynthEngine.h
   Source/engine/NoteStackMono.h
+  Source/ui/I18n.h
+  Source/ui/ParamComponents.cpp
+  Source/ui/ParamComponents.h
 )
 
 target_compile_definitions(IndustrialEnergySynth PRIVATE

@@ -13,6 +13,9 @@ cmake-build-*/
 out/
 bin/
 obj/
+build-*/
+build-win/
+build-release/
 
 ####################################
 # Visual Studio

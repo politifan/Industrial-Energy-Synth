@@ -13,6 +13,9 @@ public:
     IndustrialEnergySynthAudioProcessor();
     ~IndustrialEnergySynthAudioProcessor() override;
 
+    APVTS& getAPVTS() noexcept { return apvts; }
+    const APVTS& getAPVTS() const noexcept { return apvts; }
+
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
 

@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "PluginEditor.h"
 
 IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -188,7 +189,7 @@ bool IndustrialEnergySynthAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* IndustrialEnergySynthAudioProcessor::createEditor()
 {
-    return new juce::GenericAudioProcessorEditor (*this);
+    return new IndustrialEnergySynthAudioProcessorEditor (*this);
 }
 
 void IndustrialEnergySynthAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
@@ -220,6 +221,14 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynthAudioProcessor::createParameterLayout()
 {
     APVTS::ParameterLayout layout;
+
+    // --- UI ---
+    auto uiGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("ui", "UI", "|");
+    uiGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::ui::language),
+                                                                     "Language",
+                                                                     juce::StringArray { "English", "Russian" },
+                                                                     (int) params::ui::en));
+    layout.add (std::move (uiGroup));
 
     // --- Mono ---
     auto monoGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("mono", "Mono", "|");

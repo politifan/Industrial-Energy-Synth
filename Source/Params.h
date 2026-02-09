@@ -70,6 +70,17 @@ namespace out
 inline constexpr const char* gainDb = "out.gainDb";
 }
 
+namespace ui
+{
+inline constexpr const char* language = "ui.language"; // choice: EN, RU
+
+enum Language
+{
+    en = 0,
+    ru = 1
+};
+}
+
 inline constexpr int versionHint = 1;
 
 inline juce::ParameterID makeID (const char* id) { return { id, versionHint }; }
