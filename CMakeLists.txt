@@ -39,10 +39,16 @@ juce_add_plugin(IndustrialEnergySynth
 )
 
 target_sources(IndustrialEnergySynth PRIVATE
+  Source/Params.h
   Source/PluginEditor.cpp
   Source/PluginEditor.h
   Source/PluginProcessor.cpp
   Source/PluginProcessor.h
+  Source/Util/Math.h
+  Source/dsp/PolyBlepOscillator.h
+  Source/engine/MonoSynthEngine.cpp
+  Source/engine/MonoSynthEngine.h
+  Source/engine/NoteStackMono.h
 )
 
 target_compile_definitions(IndustrialEnergySynth PRIVATE
@@ -60,4 +66,3 @@ target_link_libraries(IndustrialEnergySynth PRIVATE
 )
 
 juce_generate_juce_header(IndustrialEnergySynth)
-

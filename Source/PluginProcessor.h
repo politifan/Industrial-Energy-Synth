@@ -2,9 +2,14 @@
 
 #include <JuceHeader.h>
 
+#include "Params.h"
+#include "engine/MonoSynthEngine.h"
+
 class IndustrialEnergySynthAudioProcessor final : public juce::AudioProcessor
 {
 public:
+    using APVTS = juce::AudioProcessorValueTreeState;
+
     IndustrialEnergySynthAudioProcessor();
     ~IndustrialEnergySynthAudioProcessor() override;
 
@@ -38,5 +43,11 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
 private:
+    static APVTS::ParameterLayout createParameterLayout();
+
+    APVTS apvts;
+    ies::engine::MonoSynthEngine engine;
+    ies::engine::MonoSynthEngine::ParamPointers paramPointers;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (IndustrialEnergySynthAudioProcessor)
 };
