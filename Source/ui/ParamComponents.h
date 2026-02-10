@@ -26,9 +26,17 @@ private:
 class ComboWithLabel final : public juce::Component
 {
 public:
+    enum class Layout
+    {
+        labelLeft,
+        labelTop
+    };
+
     ComboWithLabel();
 
     void setLabelText (const juce::String& text);
+    void setLayout (Layout newLayout);
+
     juce::ComboBox& getCombo() noexcept { return combo; }
     const juce::ComboBox& getCombo() const noexcept { return combo; }
     juce::Label& getLabel() noexcept { return label; }
@@ -39,5 +47,6 @@ public:
 private:
     juce::ComboBox combo;
     juce::Label label;
+    Layout layout = Layout::labelLeft;
 };
 } // namespace ies::ui

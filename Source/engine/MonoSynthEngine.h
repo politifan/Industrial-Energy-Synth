@@ -4,7 +4,9 @@
 
 #include "../Params.h"
 #include "../Util/Math.h"
+#include "../dsp/DestroyChain.h"
 #include "../dsp/PolyBlepOscillator.h"
+#include "../dsp/SvfFilter.h"
 #include "NoteStackMono.h"
 
 namespace ies::engine
@@ -37,6 +39,35 @@ public:
         std::atomic<float>* ampDecayMs = nullptr;
         std::atomic<float>* ampSustain = nullptr;
         std::atomic<float>* ampReleaseMs = nullptr;
+
+        std::atomic<float>* foldDriveDb = nullptr;
+        std::atomic<float>* foldAmount = nullptr;
+        std::atomic<float>* foldMix = nullptr;
+
+        std::atomic<float>* clipDriveDb = nullptr;
+        std::atomic<float>* clipAmount = nullptr;
+        std::atomic<float>* clipMix = nullptr;
+
+        std::atomic<float>* modMode = nullptr;
+        std::atomic<float>* modAmount = nullptr;
+        std::atomic<float>* modMix = nullptr;
+        std::atomic<float>* modNoteSync = nullptr;
+        std::atomic<float>* modFreqHz = nullptr;
+
+        std::atomic<float>* crushBits = nullptr;
+        std::atomic<float>* crushDownsample = nullptr;
+        std::atomic<float>* crushMix = nullptr;
+
+        std::atomic<float>* filterType = nullptr;
+        std::atomic<float>* filterCutoffHz = nullptr;
+        std::atomic<float>* filterResonance = nullptr;
+        std::atomic<float>* filterKeyTrack = nullptr;
+        std::atomic<float>* filterEnvAmount = nullptr;
+
+        std::atomic<float>* filterAttackMs = nullptr;
+        std::atomic<float>* filterDecayMs = nullptr;
+        std::atomic<float>* filterSustain = nullptr;
+        std::atomic<float>* filterReleaseMs = nullptr;
 
         std::atomic<float>* outGainDb = nullptr;
     };
@@ -98,6 +129,7 @@ private:
     };
 
     void updateAmpEnvParams();
+    void updateFilterEnvParams();
     void applyNoteChange (int newMidiNote, bool gateWasAlreadyOn);
     void resetOscPhasesFromParams();
 
@@ -117,10 +149,35 @@ private:
     juce::ADSR ampEnv;
     juce::ADSR::Parameters ampEnvParams;
 
+    juce::ADSR filterEnv;
+    juce::ADSR::Parameters filterEnvParams;
+
+    // Parameter smoothing to avoid zipper noise under automation.
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> foldDriveDbSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> foldAmountSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> foldMixSm;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> clipDriveDbSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> clipAmountSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> clipMixSm;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> modAmountSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> modMixSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> modFreqHzSm;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> crushMixSm;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> filterCutoffHzSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> filterResKnobSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> filterEnvAmountSm;
+
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> outGain;
 
     dsp::PolyBlepOscillator osc1;
     dsp::PolyBlepOscillator osc2;
+
+    dsp::DestroyChain destroy;
+    dsp::SvfFilter filter;
 
     juce::Random driftRng1 { 0x13579bdf };
     juce::Random driftRng2 { 0x2468ace0 };
@@ -128,4 +185,3 @@ private:
     float driftState2 = 0.0f;
 };
 } // namespace ies::engine
-

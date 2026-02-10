@@ -65,6 +65,60 @@ inline constexpr const char* sustain   = "amp.sustain";
 inline constexpr const char* releaseMs = "amp.releaseMs";
 }
 
+namespace destroy
+{
+// Wavefold
+inline constexpr const char* foldDriveDb = "destroy.foldDriveDb";
+inline constexpr const char* foldAmount  = "destroy.foldAmount";
+inline constexpr const char* foldMix     = "destroy.foldMix";
+
+// Hard clip
+inline constexpr const char* clipDriveDb = "destroy.clipDriveDb";
+inline constexpr const char* clipAmount  = "destroy.clipAmount";
+inline constexpr const char* clipMix     = "destroy.clipMix";
+
+// RingMod / FM
+inline constexpr const char* modMode     = "destroy.modMode";     // choice: RingMod, FM
+inline constexpr const char* modAmount   = "destroy.modAmount";
+inline constexpr const char* modMix      = "destroy.modMix";
+inline constexpr const char* modNoteSync = "destroy.modNoteSync"; // bool
+inline constexpr const char* modFreqHz   = "destroy.modFreqHz";   // used when note-sync is off
+
+enum ModMode
+{
+    ringMod = 0,
+    fm = 1
+};
+
+// Bitcrusher / SRR
+inline constexpr const char* crushBits       = "destroy.crushBits";       // int 2..16
+inline constexpr const char* crushDownsample = "destroy.crushDownsample"; // int 1..32
+inline constexpr const char* crushMix        = "destroy.crushMix";
+}
+
+namespace filter
+{
+inline constexpr const char* type      = "filter.type";      // choice: LP, BP
+inline constexpr const char* cutoffHz  = "filter.cutoffHz";  // float Hz
+inline constexpr const char* resonance = "filter.resonance"; // float 0..1 (mapped)
+inline constexpr const char* keyTrack  = "filter.keyTrack";  // bool
+inline constexpr const char* envAmount = "filter.envAmount"; // semitones
+
+enum Type
+{
+    lp = 0,
+    bp = 1
+};
+}
+
+namespace fenv
+{
+inline constexpr const char* attackMs  = "fenv.attackMs";
+inline constexpr const char* decayMs   = "fenv.decayMs";
+inline constexpr const char* sustain   = "fenv.sustain";
+inline constexpr const char* releaseMs = "fenv.releaseMs";
+}
+
 namespace out
 {
 inline constexpr const char* gainDb = "out.gainDb";

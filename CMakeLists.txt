@@ -45,13 +45,21 @@ target_sources(IndustrialEnergySynth PRIVATE
   Source/PluginProcessor.cpp
   Source/PluginProcessor.h
   Source/Util/Math.h
+  Source/dsp/DestroyChain.h
   Source/dsp/PolyBlepOscillator.h
+  Source/dsp/SvfFilter.h
   Source/engine/MonoSynthEngine.cpp
   Source/engine/MonoSynthEngine.h
   Source/engine/NoteStackMono.h
   Source/ui/I18n.h
+  Source/ui/IndustrialLookAndFeel.cpp
+  Source/ui/IndustrialLookAndFeel.h
+  Source/ui/LevelMeter.cpp
+  Source/ui/LevelMeter.h
   Source/ui/ParamComponents.cpp
   Source/ui/ParamComponents.h
+  Source/ui/WavePreview.cpp
+  Source/ui/WavePreview.h
 )
 
 target_compile_definitions(IndustrialEnergySynth PRIVATE
