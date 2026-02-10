@@ -52,6 +52,8 @@ target_sources(IndustrialEnergySynth PRIVATE
   Source/engine/MonoSynthEngine.h
   Source/engine/NoteStackMono.h
   Source/ui/I18n.h
+  Source/ui/AdsrPreview.cpp
+  Source/ui/AdsrPreview.h
   Source/ui/IndustrialLookAndFeel.cpp
   Source/ui/IndustrialLookAndFeel.h
   Source/ui/LevelMeter.cpp

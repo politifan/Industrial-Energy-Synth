@@ -5,6 +5,7 @@
 #include "ui/ParamComponents.h"
 #include "ui/I18n.h"
 #include "ui/IndustrialLookAndFeel.h"
+#include "ui/AdsrPreview.h"
 #include "ui/LevelMeter.h"
 #include "ui/WavePreview.h"
 
@@ -31,16 +32,21 @@ private:
     void refreshLabels();
     void refreshTooltips();
     void updateEnabledStates();
+    void updateStatusFromComponent (juce::Component*);
 
     void timerCallback() override;
+    void mouseEnter (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
 
     void setupSliderDoubleClickDefault (juce::Slider&, const char* paramId);
 
     // Top bar
     juce::TextButton initButton;
+    juce::TextButton helpButton;
     ies::ui::ComboWithLabel language;
     std::unique_ptr<APVTS::ComboBoxAttachment> languageAttachment;
     ies::ui::LevelMeter outMeter;
+    juce::Label statusLabel;
 
     // Mono
     juce::GroupComponent monoGroup;
@@ -87,6 +93,10 @@ private:
 
     // Destroy / Modulation
     juce::GroupComponent destroyGroup;
+    juce::GroupComponent foldPanel;
+    juce::GroupComponent clipPanel;
+    juce::GroupComponent modPanel;
+    juce::GroupComponent crushPanel;
     ies::ui::KnobWithLabel foldDrive;
     std::unique_ptr<APVTS::SliderAttachment> foldDriveAttachment;
     ies::ui::KnobWithLabel foldAmount;
@@ -134,6 +144,7 @@ private:
 
     // Filter env
     juce::GroupComponent filterEnvGroup;
+    ies::ui::AdsrPreview filterEnvPreview;
     ies::ui::KnobWithLabel filterAttack;
     std::unique_ptr<APVTS::SliderAttachment> filterAttackAttachment;
     ies::ui::KnobWithLabel filterDecay;
@@ -145,6 +156,7 @@ private:
 
     // Amp env
     juce::GroupComponent ampGroup;
+    ies::ui::AdsrPreview ampEnvPreview;
     ies::ui::KnobWithLabel ampAttack;
     std::unique_ptr<APVTS::SliderAttachment> ampAttackAttachment;
     ies::ui::KnobWithLabel ampDecay;
@@ -161,6 +173,8 @@ private:
 
     juce::ResizableCornerComponent resizeCorner { this, nullptr };
     juce::ComponentBoundsConstrainer boundsConstrainer;
+
+    juce::Component* hovered = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (IndustrialEnergySynthAudioProcessorEditor)
 };

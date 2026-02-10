@@ -30,6 +30,42 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         }
     };
 
+    // --- Help ---
+    addAndMakeVisible (helpButton);
+    helpButton.setButtonText ("?");
+    helpButton.onClick = [this]
+    {
+        const auto isRu = (getLanguageIndex() == (int) params::ui::ru);
+        const auto text = juce::String (isRu
+            ? "Быстрые подсказки:\n"
+              "• Double-click по ручке: сброс к дефолту.\n"
+              "• Init/Сброс: сброс всех параметров (язык сохраняется).\n"
+              "• Note Sync: Mod Freq отключается.\n"
+              "• Glide Off: Glide Time отключается.\n\n"
+              "Reaper: добавь плагин на трек, включи мониторинг и подай MIDI (Virtual MIDI keyboard)."
+            : "Quick tips:\n"
+              "• Double-click knob: reset to default.\n"
+              "• Init: resets all params (keeps language).\n"
+              "• Note Sync: disables Mod Freq.\n"
+              "• Glide Off: disables Glide Time.\n\n"
+              "Reaper: insert on a track, enable monitoring, feed MIDI (Virtual MIDI keyboard).");
+
+        auto* content = new juce::TextEditor();
+        content->setMultiLine (true);
+        content->setReadOnly (true);
+        content->setScrollbarsShown (true);
+        content->setCaretVisible (false);
+        content->setPopupMenuEnabled (false);
+        content->setText (text);
+        content->setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff0f1218));
+        content->setColour (juce::TextEditor::outlineColourId, juce::Colour (0xff323846));
+        content->setColour (juce::TextEditor::textColourId, juce::Colour (0xffe8ebf1));
+
+        juce::CallOutBox::launchAsynchronously (std::unique_ptr<juce::Component> (content),
+                                               helpButton.getScreenBounds(),
+                                               nullptr);
+    };
+
     // --- Language ---
     addAndMakeVisible (language);
     language.getCombo().addItem ("English", 1);
@@ -38,6 +74,11 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     // Output meter (UI only).
     addAndMakeVisible (outMeter);
+
+    // Status line (Serum-like: hover to see what you touch).
+    addAndMakeVisible (statusLabel);
+    statusLabel.setJustificationType (juce::Justification::centredLeft);
+    statusLabel.setColour (juce::Label::textColourId, juce::Colour (0xffe8ebf1).withAlpha (0.65f));
 
     // --- Mono ---
     monoGroup.setText ("Mono");
@@ -163,6 +204,15 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     destroyGroup.setText ("Destroy");
     addAndMakeVisible (destroyGroup);
 
+    foldPanel.setText ("Fold");
+    addAndMakeVisible (foldPanel);
+    clipPanel.setText ("Clip");
+    addAndMakeVisible (clipPanel);
+    modPanel.setText ("Mod");
+    addAndMakeVisible (modPanel);
+    crushPanel.setText ("Crush");
+    addAndMakeVisible (crushPanel);
+
     addAndMakeVisible (foldDrive);
     foldDriveAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::destroy::foldDriveDb, foldDrive.getSlider());
     foldDrive.getSlider().setTextValueSuffix (" dB");
@@ -265,6 +315,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     filterEnvGroup.setText ("Filter Env");
     addAndMakeVisible (filterEnvGroup);
 
+    addAndMakeVisible (filterEnvPreview);
+
     addAndMakeVisible (filterAttack);
     filterAttackAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::fenv::attackMs, filterAttack.getSlider());
     filterAttack.getSlider().setTextValueSuffix (" ms");
@@ -286,6 +338,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     // --- Amp env ---
     ampGroup.setText ("Amp Env");
     addAndMakeVisible (ampGroup);
+
+    addAndMakeVisible (ampEnvPreview);
 
     addAndMakeVisible (ampAttack);
     ampAttackAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::amp::attackMs, ampAttack.getSlider());
@@ -332,6 +386,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     };
 
     setGroupAccent (initButton, cOut);
+    setGroupAccent (helpButton, cOut);
     setGroupAccent (glideEnable, cMono);
     setGroupAccent (osc2Sync, cOsc2);
     setGroupAccent (modNoteSync, cDestroy);
@@ -345,6 +400,11 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (filterEnvGroup, cFilter);
     setGroupAccent (ampGroup, cEnv);
     setGroupAccent (outGroup, cOut);
+
+    setGroupAccent (foldPanel, cDestroy);
+    setGroupAccent (clipPanel, cDestroy);
+    setGroupAccent (modPanel, cDestroy);
+    setGroupAccent (crushPanel, cDestroy);
 
     auto setSliderAccent = [] (juce::Slider& s, juce::Colour col)
     {
@@ -380,6 +440,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     osc1Preview.setAccentColour (cOsc1);
     osc2Preview.setAccentColour (cOsc2);
     outMeter.setAccentColour (cOut);
+    filterEnvPreview.setAccentColour (cFilter);
+    ampEnvPreview.setAccentColour (cEnv);
 
     refreshLabels();
     refreshTooltips();
@@ -394,6 +456,12 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     };
 
     startTimerHz (20);
+
+    // Hover status plumbing.
+    const bool deep = true;
+    for (auto* c : getChildren())
+        if (c != nullptr && c != &tooltipWindow)
+            c->addMouseListener (this, deep);
 
     setSize (1180, 720);
 }
@@ -467,7 +535,9 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     const auto langW = juce::jmin (320, top.getWidth() / 2);
     language.setBounds (top.removeFromRight (langW).reduced (4, 8));
     outMeter.setBounds (top.removeFromRight (120).reduced (4, 8));
+    helpButton.setBounds (top.removeFromLeft (34).reduced (4, 8));
     initButton.setBounds (top.removeFromLeft (110).reduced (4, 8));
+    statusLabel.setBounds (top.reduced (8, 8));
 
     r.removeFromTop (8);
 
@@ -626,14 +696,39 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     // Destroy internal
     {
         auto gr = destroyGroup.getBounds().reduced (10, 26);
-        modMode.setBounds (gr.removeFromTop (46));
-        gr.removeFromTop (4);
-        modNoteSync.setBounds (gr.removeFromTop (24));
-        gr.removeFromTop (6);
-        layoutKnobGrid (gr, { &foldDrive, &foldAmount, &foldMix,
-                              &clipDrive, &clipAmount, &clipMix,
-                              &modAmount, &modMix, &modFreq,
-                              &crushBits, &crushDownsample, &crushMix });
+        const int panelGap = 8;
+        auto left = gr.removeFromLeft (gr.getWidth() / 2 - panelGap / 2);
+        gr.removeFromLeft (panelGap);
+        auto right = gr;
+
+        auto topL = left.removeFromTop (left.getHeight() / 2 - panelGap / 2);
+        left.removeFromTop (panelGap);
+        auto botL = left;
+
+        auto topR = right.removeFromTop (right.getHeight() / 2 - panelGap / 2);
+        right.removeFromTop (panelGap);
+        auto botR = right;
+
+        foldPanel.setBounds (topL);
+        clipPanel.setBounds (botL);
+        modPanel.setBounds (topR);
+        crushPanel.setBounds (botR);
+
+        auto inside = [&] (juce::GroupComponent& panel) { return panel.getBounds().reduced (10, 26); };
+
+        layoutKnobGrid (inside (foldPanel), { &foldDrive, &foldAmount, &foldMix });
+        layoutKnobGrid (inside (clipPanel), { &clipDrive, &clipAmount, &clipMix });
+
+        {
+            auto m = inside (modPanel);
+            modMode.setBounds (m.removeFromTop (46));
+            m.removeFromTop (4);
+            modNoteSync.setBounds (m.removeFromTop (24));
+            m.removeFromTop (6);
+            layoutKnobGrid (m, { &modAmount, &modMix, &modFreq });
+        }
+
+        layoutKnobGrid (inside (crushPanel), { &crushBits, &crushDownsample, &crushMix });
     }
 
     // Filter internal
@@ -649,12 +744,18 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     // Filter env internal
     {
         auto gr = filterEnvGroup.getBounds().reduced (10, 26);
+        const auto prevH = juce::jlimit (56, 84, gr.getHeight() / 3);
+        filterEnvPreview.setBounds (gr.removeFromTop (prevH));
+        gr.removeFromTop (6);
         layoutKnobGrid (gr, { &filterAttack, &filterDecay, &filterSustain, &filterRelease });
     }
 
     // Amp + Output
     {
         auto gr = ampGroup.getBounds().reduced (10, 26);
+        const auto prevH = juce::jlimit (56, 84, gr.getHeight() / 3);
+        ampEnvPreview.setBounds (gr.removeFromTop (prevH));
+        gr.removeFromTop (6);
         layoutKnobGrid (gr, { &ampAttack, &ampDecay, &ampSustain, &ampRelease });
     }
 
@@ -810,6 +911,20 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
 
     osc1Preview.setWaveIndex (osc1Wave.getCombo().getSelectedItemIndex());
     osc2Preview.setWaveIndex (osc2Wave.getCombo().getSelectedItemIndex());
+
+    filterEnvPreview.setParams ((float) filterAttack.getSlider().getValue(),
+                                (float) filterDecay.getSlider().getValue(),
+                                (float) filterSustain.getSlider().getValue(),
+                                (float) filterRelease.getSlider().getValue());
+
+    ampEnvPreview.setParams ((float) ampAttack.getSlider().getValue(),
+                             (float) ampDecay.getSlider().getValue(),
+                             (float) ampSustain.getSlider().getValue(),
+                             (float) ampRelease.getSlider().getValue());
+
+    // Keep the status line live while dragging.
+    if (hovered != nullptr)
+        updateStatusFromComponent (hovered);
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::setupSliderDoubleClickDefault (juce::Slider& s, const char* paramId)
@@ -823,4 +938,70 @@ void IndustrialEnergySynthAudioProcessorEditor::setupSliderDoubleClickDefault (j
     const auto defaultValue = range.convertFrom0to1 (defaultNorm);
 
     s.setDoubleClickReturnValue (true, defaultValue);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::mouseEnter (const juce::MouseEvent& e)
+{
+    if (e.eventComponent == nullptr)
+        return;
+
+    hovered = e.eventComponent;
+    updateStatusFromComponent (hovered);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::mouseExit (const juce::MouseEvent& e)
+{
+    if (e.eventComponent == hovered)
+        hovered = nullptr;
+
+    if (hovered == nullptr)
+        statusLabel.setText ({}, juce::dontSendNotification);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::updateStatusFromComponent (juce::Component* c)
+{
+    if (c == nullptr)
+        return;
+
+    auto line = [&]() -> juce::String
+    {
+        if (auto* s = dynamic_cast<juce::Slider*> (c))
+        {
+            juce::String name;
+            if (auto* kwl = dynamic_cast<ies::ui::KnobWithLabel*> (s->getParentComponent()))
+                name = kwl->getLabel().getText();
+            else
+                name = "Value";
+
+            const auto v = s->getTextFromValue (s->getValue());
+            return name + ": " + v;
+        }
+
+        if (auto* cb = dynamic_cast<juce::ComboBox*> (c))
+        {
+            juce::String name;
+            if (auto* cwl = dynamic_cast<ies::ui::ComboWithLabel*> (cb->getParentComponent()))
+                name = cwl->getLabel().getText();
+            else
+                name = "Mode";
+
+            return name + ": " + cb->getText();
+        }
+
+        if (auto* t = dynamic_cast<juce::ToggleButton*> (c))
+        {
+            const auto isRu = (getLanguageIndex() == (int) params::ui::ru);
+            const auto on = isRu ? "Вкл" : "On";
+            const auto off = isRu ? "Выкл" : "Off";
+            return t->getButtonText() + ": " + (t->getToggleState() ? on : off);
+        }
+
+        if (auto* b = dynamic_cast<juce::Button*> (c))
+            return b->getButtonText();
+
+        return {};
+    }();
+
+    if (line.isNotEmpty())
+        statusLabel.setText (line, juce::dontSendNotification);
 }
