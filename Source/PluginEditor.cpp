@@ -2,6 +2,516 @@
 #include "PluginProcessor.h"
 #include "Params.h"
 
+namespace
+{
+struct FactoryPreset final
+{
+    const char* nameEn;
+    const char* nameRu; // UTF-8
+    std::initializer_list<std::pair<const char*, float>> values; // actual values in parameter units
+};
+
+// Keep this list stable once you ship factory content (names can change, ordering/IDs should not).
+static const FactoryPreset kFactoryPresets[] =
+{
+    {
+        "Industrial Bass 01",
+        u8"Индастриал бас 01",
+        {
+            { params::mono::envMode, (float) params::mono::retrigger },
+            { params::mono::glideEnable, 0.0f },
+            { params::mono::glideTimeMs, 60.0f },
+
+            { params::osc1::wave, (float) params::osc::saw },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, 0.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.10f },
+
+            { params::osc2::wave, (float) params::osc::square },
+            { params::osc2::level, 0.45f },
+            { params::osc2::coarse, -12.0f },
+            { params::osc2::fine, -5.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.18f },
+            { params::osc2::sync, 0.0f },
+
+            { params::amp::attackMs, 4.0f },
+            { params::amp::decayMs, 120.0f },
+            { params::amp::sustain, 0.65f },
+            { params::amp::releaseMs, 180.0f },
+
+            { params::destroy::foldDriveDb, 6.0f },
+            { params::destroy::foldAmount, 0.25f },
+            { params::destroy::foldMix, 0.80f },
+            { params::destroy::clipDriveDb, 10.0f },
+            { params::destroy::clipAmount, 0.35f },
+            { params::destroy::clipMix, 0.70f },
+            { params::destroy::modMode, (float) params::destroy::ringMod },
+            { params::destroy::modAmount, 0.10f },
+            { params::destroy::modMix, 0.15f },
+            { params::destroy::modNoteSync, 1.0f },
+            { params::destroy::modFreqHz, 60.0f },
+            { params::destroy::crushBits, 10.0f },
+            { params::destroy::crushDownsample, 2.0f },
+            { params::destroy::crushMix, 0.10f },
+
+            { params::filter::type, (float) params::filter::lp },
+            { params::filter::cutoffHz, 140.0f },
+            { params::filter::resonance, 0.25f },
+            { params::filter::keyTrack, 1.0f },
+            { params::filter::envAmount, 8.0f },
+
+            { params::fenv::attackMs, 5.0f },
+            { params::fenv::decayMs, 120.0f },
+            { params::fenv::sustain, 0.0f },
+            { params::fenv::releaseMs, 160.0f },
+
+            { params::out::gainDb, -6.0f }
+        }
+    },
+    {
+        "Industrial Bass 02 (Glide)",
+        u8"Индастриал бас 02 (глайд)",
+        {
+            { params::mono::envMode, (float) params::mono::legato },
+            { params::mono::glideEnable, 1.0f },
+            { params::mono::glideTimeMs, 220.0f },
+
+            { params::osc1::wave, (float) params::osc::square },
+            { params::osc1::level, 0.80f },
+            { params::osc1::coarse, 0.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.22f },
+
+            { params::osc2::wave, (float) params::osc::saw },
+            { params::osc2::level, 0.55f },
+            { params::osc2::coarse, -12.0f },
+            { params::osc2::fine, 3.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.30f },
+            { params::osc2::sync, 0.0f },
+
+            { params::destroy::foldDriveDb, 10.0f },
+            { params::destroy::foldAmount, 0.30f },
+            { params::destroy::foldMix, 0.85f },
+            { params::destroy::clipDriveDb, 14.0f },
+            { params::destroy::clipAmount, 0.40f },
+            { params::destroy::clipMix, 0.75f },
+            { params::destroy::modMode, (float) params::destroy::fm },
+            { params::destroy::modAmount, 0.12f },
+            { params::destroy::modMix, 0.18f },
+            { params::destroy::modNoteSync, 1.0f },
+            { params::destroy::modFreqHz, 110.0f },
+            { params::destroy::crushBits, 9.0f },
+            { params::destroy::crushDownsample, 3.0f },
+            { params::destroy::crushMix, 0.18f },
+
+            { params::filter::type, (float) params::filter::lp },
+            { params::filter::cutoffHz, 220.0f },
+            { params::filter::resonance, 0.35f },
+            { params::filter::keyTrack, 1.0f },
+            { params::filter::envAmount, 10.0f },
+
+            { params::out::gainDb, -8.0f }
+        }
+    },
+    {
+        "Aggressive Lead 01 (Sync)",
+        u8"Агрессивный лид 01 (синхр.)",
+        {
+            { params::mono::envMode, (float) params::mono::retrigger },
+            { params::mono::glideEnable, 1.0f },
+            { params::mono::glideTimeMs, 90.0f },
+
+            { params::osc1::wave, (float) params::osc::saw },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, 0.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.20f },
+
+            { params::osc2::wave, (float) params::osc::saw },
+            { params::osc2::level, 0.70f },
+            { params::osc2::coarse, 12.0f },
+            { params::osc2::fine, 2.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.25f },
+            { params::osc2::sync, 1.0f },
+
+            { params::amp::attackMs, 2.0f },
+            { params::amp::decayMs, 80.0f },
+            { params::amp::sustain, 0.75f },
+            { params::amp::releaseMs, 180.0f },
+
+            { params::destroy::foldDriveDb, 16.0f },
+            { params::destroy::foldAmount, 0.55f },
+            { params::destroy::foldMix, 0.90f },
+            { params::destroy::clipDriveDb, 18.0f },
+            { params::destroy::clipAmount, 0.60f },
+            { params::destroy::clipMix, 0.85f },
+            { params::destroy::modMode, (float) params::destroy::ringMod },
+            { params::destroy::modAmount, 0.18f },
+            { params::destroy::modMix, 0.25f },
+            { params::destroy::modNoteSync, 1.0f },
+            { params::destroy::crushBits, 8.0f },
+            { params::destroy::crushDownsample, 2.0f },
+            { params::destroy::crushMix, 0.22f },
+
+            { params::filter::type, (float) params::filter::bp },
+            { params::filter::cutoffHz, 1200.0f },
+            { params::filter::resonance, 0.45f },
+            { params::filter::keyTrack, 0.0f },
+            { params::filter::envAmount, 6.0f },
+
+            { params::out::gainDb, -10.0f }
+        }
+    },
+    {
+        "Aggressive Lead 02 (Ring)",
+        u8"Агрессивный лид 02 (рингмод)",
+        {
+            { params::mono::envMode, (float) params::mono::legato },
+            { params::mono::glideEnable, 1.0f },
+            { params::mono::glideTimeMs, 130.0f },
+
+            { params::osc1::wave, (float) params::osc::square },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, 0.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.30f },
+
+            { params::osc2::wave, (float) params::osc::triangle },
+            { params::osc2::level, 0.55f },
+            { params::osc2::coarse, 0.0f },
+            { params::osc2::fine, -7.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.35f },
+            { params::osc2::sync, 0.0f },
+
+            { params::destroy::foldDriveDb, 14.0f },
+            { params::destroy::foldAmount, 0.45f },
+            { params::destroy::foldMix, 0.85f },
+            { params::destroy::clipDriveDb, 12.0f },
+            { params::destroy::clipAmount, 0.35f },
+            { params::destroy::clipMix, 0.70f },
+            { params::destroy::modMode, (float) params::destroy::ringMod },
+            { params::destroy::modAmount, 0.45f },
+            { params::destroy::modMix, 0.55f },
+            { params::destroy::modNoteSync, 0.0f },
+            { params::destroy::modFreqHz, 420.0f },
+            { params::destroy::crushBits, 7.0f },
+            { params::destroy::crushDownsample, 3.0f },
+            { params::destroy::crushMix, 0.18f },
+
+            { params::filter::type, (float) params::filter::bp },
+            { params::filter::cutoffHz, 1800.0f },
+            { params::filter::resonance, 0.55f },
+            { params::filter::keyTrack, 0.0f },
+            { params::filter::envAmount, 8.0f },
+
+            { params::out::gainDb, -12.0f }
+        }
+    },
+    {
+        "Drone 01 (Grinding)",
+        u8"Дрон 01 (скрежет)",
+        {
+            { params::mono::envMode, (float) params::mono::legato },
+            { params::mono::glideEnable, 0.0f },
+            { params::mono::glideTimeMs, 120.0f },
+
+            { params::osc1::wave, (float) params::osc::triangle },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, -12.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.45f },
+
+            { params::osc2::wave, (float) params::osc::saw },
+            { params::osc2::level, 0.80f },
+            { params::osc2::coarse, -12.0f },
+            { params::osc2::fine, 0.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.55f },
+            { params::osc2::sync, 0.0f },
+
+            { params::amp::attackMs, 800.0f },
+            { params::amp::decayMs, 1200.0f },
+            { params::amp::sustain, 0.95f },
+            { params::amp::releaseMs, 1200.0f },
+
+            { params::destroy::foldDriveDb, 20.0f },
+            { params::destroy::foldAmount, 0.65f },
+            { params::destroy::foldMix, 0.95f },
+            { params::destroy::clipDriveDb, 10.0f },
+            { params::destroy::clipAmount, 0.25f },
+            { params::destroy::clipMix, 0.60f },
+            { params::destroy::modMode, (float) params::destroy::fm },
+            { params::destroy::modAmount, 0.20f },
+            { params::destroy::modMix, 0.25f },
+            { params::destroy::modNoteSync, 1.0f },
+            { params::destroy::crushBits, 6.0f },
+            { params::destroy::crushDownsample, 4.0f },
+            { params::destroy::crushMix, 0.28f },
+
+            { params::filter::type, (float) params::filter::lp },
+            { params::filter::cutoffHz, 480.0f },
+            { params::filter::resonance, 0.65f },
+            { params::filter::keyTrack, 0.0f },
+            { params::filter::envAmount, 4.0f },
+
+            { params::fenv::attackMs, 1200.0f },
+            { params::fenv::decayMs, 1800.0f },
+            { params::fenv::sustain, 0.4f },
+            { params::fenv::releaseMs, 1800.0f },
+
+            { params::out::gainDb, -14.0f }
+        }
+    },
+    {
+        "Drone 02 (Noise Tone)",
+        u8"Дрон 02 (шумовая нота)",
+        {
+            { params::mono::envMode, (float) params::mono::legato },
+            { params::mono::glideEnable, 0.0f },
+            { params::mono::glideTimeMs, 120.0f },
+
+            { params::osc1::wave, (float) params::osc::saw },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, -12.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.60f },
+
+            { params::osc2::wave, (float) params::osc::square },
+            { params::osc2::level, 0.65f },
+            { params::osc2::coarse, -12.0f },
+            { params::osc2::fine, 0.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.70f },
+            { params::osc2::sync, 0.0f },
+
+            { params::destroy::foldDriveDb, 22.0f },
+            { params::destroy::foldAmount, 0.70f },
+            { params::destroy::foldMix, 1.0f },
+            { params::destroy::clipDriveDb, 22.0f },
+            { params::destroy::clipAmount, 0.65f },
+            { params::destroy::clipMix, 0.95f },
+            { params::destroy::modMode, (float) params::destroy::ringMod },
+            { params::destroy::modAmount, 0.35f },
+            { params::destroy::modMix, 0.40f },
+            { params::destroy::modNoteSync, 0.0f },
+            { params::destroy::modFreqHz, 980.0f },
+            { params::destroy::crushBits, 5.0f },
+            { params::destroy::crushDownsample, 6.0f },
+            { params::destroy::crushMix, 0.45f },
+
+            { params::filter::type, (float) params::filter::bp },
+            { params::filter::cutoffHz, 900.0f },
+            { params::filter::resonance, 0.75f },
+            { params::filter::keyTrack, 0.0f },
+            { params::filter::envAmount, 0.0f },
+
+            { params::out::gainDb, -16.0f }
+        }
+    },
+    {
+        "Industrial Bass 03 (Crush)",
+        u8"Индастриал бас 03 (круш)",
+        {
+            { params::mono::envMode, (float) params::mono::retrigger },
+            { params::mono::glideEnable, 0.0f },
+            { params::mono::glideTimeMs, 80.0f },
+
+            { params::osc1::wave, (float) params::osc::square },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, 0.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.15f },
+
+            { params::osc2::wave, (float) params::osc::triangle },
+            { params::osc2::level, 0.55f },
+            { params::osc2::coarse, -12.0f },
+            { params::osc2::fine, 0.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.20f },
+            { params::osc2::sync, 0.0f },
+
+            { params::destroy::foldDriveDb, 8.0f },
+            { params::destroy::foldAmount, 0.20f },
+            { params::destroy::foldMix, 0.60f },
+            { params::destroy::clipDriveDb, 12.0f },
+            { params::destroy::clipAmount, 0.40f },
+            { params::destroy::clipMix, 0.70f },
+            { params::destroy::modMode, (float) params::destroy::fm },
+            { params::destroy::modAmount, 0.10f },
+            { params::destroy::modMix, 0.12f },
+            { params::destroy::modNoteSync, 1.0f },
+            { params::destroy::crushBits, 6.0f },
+            { params::destroy::crushDownsample, 8.0f },
+            { params::destroy::crushMix, 0.55f },
+
+            { params::filter::type, (float) params::filter::lp },
+            { params::filter::cutoffHz, 200.0f },
+            { params::filter::resonance, 0.30f },
+            { params::filter::keyTrack, 1.0f },
+            { params::filter::envAmount, 6.0f },
+
+            { params::out::gainDb, -10.0f }
+        }
+    },
+    {
+        "Aggressive Lead 03 (Scream)",
+        u8"Агрессивный лид 03 (визг)",
+        {
+            { params::mono::envMode, (float) params::mono::retrigger },
+            { params::mono::glideEnable, 1.0f },
+            { params::mono::glideTimeMs, 60.0f },
+
+            { params::osc1::wave, (float) params::osc::saw },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, 0.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.55f },
+
+            { params::osc2::wave, (float) params::osc::saw },
+            { params::osc2::level, 0.80f },
+            { params::osc2::coarse, 24.0f },
+            { params::osc2::fine, 0.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.65f },
+            { params::osc2::sync, 1.0f },
+
+            { params::destroy::foldDriveDb, 26.0f },
+            { params::destroy::foldAmount, 0.75f },
+            { params::destroy::foldMix, 1.0f },
+            { params::destroy::clipDriveDb, 28.0f },
+            { params::destroy::clipAmount, 0.75f },
+            { params::destroy::clipMix, 0.95f },
+            { params::destroy::modMode, (float) params::destroy::ringMod },
+            { params::destroy::modAmount, 0.22f },
+            { params::destroy::modMix, 0.30f },
+            { params::destroy::modNoteSync, 1.0f },
+            { params::destroy::crushBits, 7.0f },
+            { params::destroy::crushDownsample, 3.0f },
+            { params::destroy::crushMix, 0.22f },
+
+            { params::filter::type, (float) params::filter::bp },
+            { params::filter::cutoffHz, 2400.0f },
+            { params::filter::resonance, 0.75f },
+            { params::filter::keyTrack, 0.0f },
+            { params::filter::envAmount, 0.0f },
+
+            { params::out::gainDb, -16.0f }
+        }
+    },
+    {
+        "Industrial Bass 04 (Buzz)",
+        u8"Индастриал бас 04 (жужж)",
+        {
+            { params::mono::envMode, (float) params::mono::retrigger },
+            { params::mono::glideEnable, 0.0f },
+            { params::mono::glideTimeMs, 80.0f },
+
+            { params::osc1::wave, (float) params::osc::triangle },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, 0.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.25f },
+
+            { params::osc2::wave, (float) params::osc::square },
+            { params::osc2::level, 0.65f },
+            { params::osc2::coarse, 0.0f },
+            { params::osc2::fine, 0.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.35f },
+            { params::osc2::sync, 0.0f },
+
+            { params::destroy::foldDriveDb, 14.0f },
+            { params::destroy::foldAmount, 0.45f },
+            { params::destroy::foldMix, 0.75f },
+            { params::destroy::clipDriveDb, 18.0f },
+            { params::destroy::clipAmount, 0.55f },
+            { params::destroy::clipMix, 0.85f },
+            { params::destroy::modMode, (float) params::destroy::fm },
+            { params::destroy::modAmount, 0.12f },
+            { params::destroy::modMix, 0.18f },
+            { params::destroy::modNoteSync, 1.0f },
+            { params::destroy::crushBits, 9.0f },
+            { params::destroy::crushDownsample, 2.0f },
+            { params::destroy::crushMix, 0.10f },
+
+            { params::filter::type, (float) params::filter::lp },
+            { params::filter::cutoffHz, 320.0f },
+            { params::filter::resonance, 0.40f },
+            { params::filter::keyTrack, 1.0f },
+            { params::filter::envAmount, 10.0f },
+
+            { params::out::gainDb, -12.0f }
+        }
+    },
+    {
+        "Aggressive Lead 04 (Metal)",
+        u8"Агрессивный лид 04 (металл)",
+        {
+            { params::mono::envMode, (float) params::mono::retrigger },
+            { params::mono::glideEnable, 1.0f },
+            { params::mono::glideTimeMs, 70.0f },
+
+            { params::osc1::wave, (float) params::osc::square },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, 0.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.40f },
+
+            { params::osc2::wave, (float) params::osc::square },
+            { params::osc2::level, 0.85f },
+            { params::osc2::coarse, 12.0f },
+            { params::osc2::fine, 0.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.45f },
+            { params::osc2::sync, 1.0f },
+
+            { params::destroy::foldDriveDb, 18.0f },
+            { params::destroy::foldAmount, 0.55f },
+            { params::destroy::foldMix, 0.90f },
+            { params::destroy::clipDriveDb, 22.0f },
+            { params::destroy::clipAmount, 0.65f },
+            { params::destroy::clipMix, 0.95f },
+            { params::destroy::modMode, (float) params::destroy::ringMod },
+            { params::destroy::modAmount, 0.30f },
+            { params::destroy::modMix, 0.35f },
+            { params::destroy::modNoteSync, 0.0f },
+            { params::destroy::modFreqHz, 660.0f },
+            { params::destroy::crushBits, 8.0f },
+            { params::destroy::crushDownsample, 4.0f },
+            { params::destroy::crushMix, 0.20f },
+
+            { params::filter::type, (float) params::filter::bp },
+            { params::filter::cutoffHz, 1500.0f },
+            { params::filter::resonance, 0.65f },
+            { params::filter::keyTrack, 0.0f },
+            { params::filter::envAmount, 5.0f },
+
+            { params::out::gainDb, -16.0f }
+        }
+    }
+};
+
+static int getNumFactoryPresets() noexcept
+{
+    return (int) (sizeof (kFactoryPresets) / sizeof (kFactoryPresets[0]));
+}
+} // namespace
+
 IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEditor (IndustrialEnergySynthAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
@@ -16,18 +526,140 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     // --- Init / Reset ---
     addAndMakeVisible (initButton);
-    initButton.onClick = [this]
-    {
-        auto* langParam = audioProcessor.getAPVTS().getParameter (params::ui::language);
-        for (auto* param : audioProcessor.getParameters())
-        {
-            if (param == nullptr || param == langParam)
-                continue;
+    initButton.onClick = [this] { resetAllParamsKeepLanguage(); };
 
-            param->beginChangeGesture();
-            param->setValueNotifyingHost (param->getDefaultValue());
-            param->endChangeGesture();
-        }
+    // --- Panic (All Notes Off) ---
+    addAndMakeVisible (panicButton);
+    panicButton.onClick = [this]
+    {
+        audioProcessor.requestPanic();
+    };
+
+    // --- Preset bar (skeleton; full preset system is later milestone) ---
+    addAndMakeVisible (presetPrev);
+    presetPrev.setButtonText ("<");
+    presetPrev.onClick = [this]
+    {
+        auto& cb = preset.getCombo();
+        const auto idx = cb.getSelectedItemIndex();
+        if (idx <= 0)
+            return;
+
+        cb.setSelectedItemIndex (idx - 1, juce::sendNotification);
+    };
+
+    addAndMakeVisible (presetNext);
+    presetNext.setButtonText (">");
+    presetNext.onClick = [this]
+    {
+        auto& cb = preset.getCombo();
+        const auto idx = cb.getSelectedItemIndex();
+        const auto n = cb.getNumItems();
+        if (idx < 0 || idx >= n - 1)
+            return;
+
+        cb.setSelectedItemIndex (idx + 1, juce::sendNotification);
+    };
+
+    addAndMakeVisible (preset);
+    preset.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    preset.getCombo().onChange = [this] { loadPresetByComboSelection(); };
+
+    addAndMakeVisible (presetSave);
+    presetSave.onClick = [this]
+    {
+        const auto isRu = (getLanguageIndex() == (int) params::ui::ru);
+        auto* w = new juce::AlertWindow (isRu ? juce::String::fromUTF8 (u8"Сохранить пресет") : "Save Preset",
+                                         isRu ? juce::String::fromUTF8 (u8"Имя пресета:") : "Preset name:",
+                                         juce::AlertWindow::NoIcon);
+        w->addTextEditor ("name", {}, isRu ? juce::String::fromUTF8 (u8"Имя") : "Name");
+        w->addButton (isRu ? juce::String::fromUTF8 (u8"Сохранить") : "Save", 1);
+        w->addButton (isRu ? juce::String::fromUTF8 (u8"Отмена") : "Cancel", 0);
+
+        juce::Component::SafePointer<IndustrialEnergySynthAudioProcessorEditor> safeThis (this);
+        w->enterModalState (true,
+                            juce::ModalCallbackFunction::create ([safeThis, w] (int result)
+                            {
+                                std::unique_ptr<juce::AlertWindow> killer (w);
+                                if (safeThis == nullptr)
+                                    return;
+
+                                if (result != 1)
+                                    return;
+
+                                if (safeThis->presetManager == nullptr)
+                                    return;
+
+                                const auto name = w->getTextEditorContents ("name");
+
+                                juce::String error;
+                                if (! safeThis->presetManager->saveUserPreset (name, error))
+                                {
+                                    const auto isRu2 = (safeThis->getLanguageIndex() == (int) params::ui::ru);
+                                    juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon,
+                                                                           isRu2 ? juce::String::fromUTF8 (u8"Ошибка") : "Error",
+                                                                           isRu2 ? juce::String::fromUTF8 (u8"Не удалось сохранить пресет.") : "Failed to save preset.");
+                                    return;
+                                }
+
+                                safeThis->rebuildPresetMenu();
+
+                                // Select the newly saved preset if it exists in the list.
+                                auto safe = name.trim();
+                                safe = safe.replaceCharacters ("\\/:*?\"<>|", "_________");
+                                safe = safe.removeCharacters ("\r\n\t");
+                                if (safe.isEmpty())
+                                    safe = "Preset";
+
+                                const auto& list = safeThis->presetManager->getUserPresets();
+                                for (int i = 0; i < list.size(); ++i)
+                                {
+                                    if (list.getReference (i).name == safe)
+                                    {
+                                        safeThis->preset.getCombo().setSelectedId (100 + i, juce::sendNotification);
+                                        break;
+                                    }
+                                }
+                            }),
+                            true);
+    };
+
+    addAndMakeVisible (presetLoad);
+    presetLoad.onClick = [this]
+    {
+        if (presetManager == nullptr)
+            return;
+
+        const auto isRu = (getLanguageIndex() == (int) params::ui::ru);
+        presetFileChooser = std::make_unique<juce::FileChooser> (isRu ? juce::String::fromUTF8 (u8"Загрузить пресет") : "Load Preset",
+                                                                 presetManager->getUserPresetDir(),
+                                                                 "*.iespreset");
+
+        juce::Component::SafePointer<IndustrialEnergySynthAudioProcessorEditor> safeThis (this);
+        presetFileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                        [safeThis] (const juce::FileChooser& chooser)
+                                        {
+                                            if (safeThis == nullptr)
+                                                return;
+
+                                            auto file = chooser.getResult();
+                                            safeThis->presetFileChooser.reset();
+
+                                            if (safeThis->presetManager == nullptr || ! file.existsAsFile())
+                                                return;
+
+                                            juce::String error;
+                                            if (! safeThis->presetManager->loadUserPreset (file, error))
+                                            {
+                                                const auto isRu2 = (safeThis->getLanguageIndex() == (int) params::ui::ru);
+                                                juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon,
+                                                                                       isRu2 ? juce::String::fromUTF8 (u8"Ошибка") : "Error",
+                                                                                       isRu2 ? juce::String::fromUTF8 (u8"Не удалось загрузить пресет.") : "Failed to load preset.");
+                                                return;
+                                            }
+
+                                            safeThis->rebuildPresetMenu();
+                                        });
     };
 
     // --- Help ---
@@ -36,19 +668,19 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     helpButton.onClick = [this]
     {
         const auto isRu = (getLanguageIndex() == (int) params::ui::ru);
-        const auto text = juce::String (isRu
-            ? "Быстрые подсказки:\n"
-              "• Double-click по ручке: сброс к дефолту.\n"
-              "• Init/Сброс: сброс всех параметров (язык сохраняется).\n"
-              "• Note Sync: Mod Freq отключается.\n"
-              "• Glide Off: Glide Time отключается.\n\n"
-              "Reaper: добавь плагин на трек, включи мониторинг и подай MIDI (Virtual MIDI keyboard)."
-            : "Quick tips:\n"
-              "• Double-click knob: reset to default.\n"
-              "• Init: resets all params (keeps language).\n"
-              "• Note Sync: disables Mod Freq.\n"
-              "• Glide Off: disables Glide Time.\n\n"
-              "Reaper: insert on a track, enable monitoring, feed MIDI (Virtual MIDI keyboard).");
+        const auto text = isRu
+            ? juce::String::fromUTF8 (u8"Быстрые подсказки:\n"
+                                      u8"• Double-click по ручке: сброс к дефолту.\n"
+                                      u8"• Init/Сброс: сброс всех параметров (язык сохраняется).\n"
+                                      u8"• Note Sync: Mod Freq отключается.\n"
+                                      u8"• Glide Off: Glide Time отключается.\n\n"
+                                      u8"Reaper: добавь плагин на трек, включи мониторинг и подай MIDI (Virtual MIDI keyboard).")
+            : juce::String ("Quick tips:\n"
+                            "• Double-click knob: reset to default.\n"
+                            "• Init: resets all params (keeps language).\n"
+                            "• Note Sync: disables Mod Freq.\n"
+                            "• Glide Off: disables Glide Time.\n\n"
+                            "Reaper: insert on a track, enable monitoring, feed MIDI (Virtual MIDI keyboard).");
 
         auto* content = new juce::TextEditor();
         content->setMultiLine (true);
@@ -69,7 +701,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     // --- Language ---
     addAndMakeVisible (language);
     language.getCombo().addItem ("English", 1);
-    language.getCombo().addItem ("Русский", 2);
+    language.getCombo().addItem (juce::String::fromUTF8 (u8"Русский"), 2);
     languageAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::ui::language, language.getCombo());
 
     // Output meter (UI only).
@@ -379,6 +1011,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     const auto cFilter = juce::Colour (0xff5dff7a);
     const auto cEnv    = juce::Colour (0xff4aa3ff);
     const auto cOut    = juce::Colour (0xffffd166);
+    const auto cPanic  = juce::Colour (0xffff3b30);
 
     auto setGroupAccent = [] (juce::Component& c, juce::Colour col)
     {
@@ -386,7 +1019,12 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     };
 
     setGroupAccent (initButton, cOut);
+    setGroupAccent (panicButton, cPanic);
     setGroupAccent (helpButton, cOut);
+    setGroupAccent (presetPrev, cOut);
+    setGroupAccent (presetNext, cOut);
+    setGroupAccent (presetSave, cOut);
+    setGroupAccent (presetLoad, cOut);
     setGroupAccent (glideEnable, cMono);
     setGroupAccent (osc2Sync, cOsc2);
     setGroupAccent (modNoteSync, cDestroy);
@@ -443,17 +1081,26 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     filterEnvPreview.setAccentColour (cFilter);
     ampEnvPreview.setAccentColour (cEnv);
 
-    refreshLabels();
-    refreshTooltips();
-    updateEnabledStates();
-
     // Update labels when language changes.
     language.getCombo().onChange = [this]
     {
         refreshLabels();
         refreshTooltips();
+        rebuildPresetMenu(); // refresh factory RU/EN names
         resized();
     };
+
+    // Preset manager (user presets only for now).
+    presetManager = std::make_unique<ies::presets::PresetManager> (audioProcessor.getAPVTS(),
+                                                                   [this] (juce::ValueTree t)
+                                                                   {
+                                                                       audioProcessor.applyStateFromUi (t, true /*keepLanguage*/);
+                                                                   });
+    rebuildPresetMenu();
+
+    refreshLabels();
+    refreshTooltips();
+    updateEnabledStates();
 
     startTimerHz (20);
 
@@ -494,21 +1141,27 @@ void IndustrialEnergySynthAudioProcessorEditor::paint (juce::Graphics& g)
     }
 
     // Subtle grid to feel "technical" and avoid a flat background.
-    g.setColour (juce::Colour (0x08ffffff));
+    g.setColour (juce::Colour (0x05ffffff));
     const auto b = getLocalBounds();
-    for (int x = 0; x < b.getWidth(); x += 24)
+    for (int x = 0; x < b.getWidth(); x += 32)
         g.drawVerticalLine (x, 0.0f, (float) b.getHeight());
-    for (int y = 0; y < b.getHeight(); y += 24)
+    for (int y = 0; y < b.getHeight(); y += 32)
         g.drawHorizontalLine (y, 0.0f, (float) b.getWidth());
 
     g.setColour (juce::Colours::whitesmoke);
-    g.setFont (juce::Font (18.0f, juce::Font::bold));
+    g.setFont (juce::Font (juce::Font::getDefaultSansSerifFontName(), 18.0f, juce::Font::bold));
     {
         auto titleArea = juce::Rectangle<int> (16, 10, getWidth() - 32, 24);
 
         // Avoid drawing the title under the top-bar components.
         if (initButton.isVisible())
             titleArea.setX (juce::jmax (titleArea.getX(), initButton.getRight() + 8));
+        if (panicButton.isVisible())
+            titleArea.setX (juce::jmax (titleArea.getX(), panicButton.getRight() + 8));
+        if (preset.isVisible())
+            titleArea.setX (juce::jmax (titleArea.getX(), preset.getRight() + 8));
+        if (presetLoad.isVisible())
+            titleArea.setX (juce::jmax (titleArea.getX(), presetLoad.getRight() + 8));
 
         int rightLimit = getWidth() - 16;
         if (language.isVisible())
@@ -536,7 +1189,29 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     language.setBounds (top.removeFromRight (langW).reduced (4, 8));
     outMeter.setBounds (top.removeFromRight (120).reduced (4, 8));
     helpButton.setBounds (top.removeFromLeft (34).reduced (4, 8));
+    panicButton.setBounds (top.removeFromLeft (70).reduced (4, 8));
     initButton.setBounds (top.removeFromLeft (110).reduced (4, 8));
+
+    // Preset strip: tighten/hide optional buttons on narrow widths.
+    const bool narrow = (getWidth() < 980);
+    presetPrev.setVisible (! narrow);
+    presetNext.setVisible (! narrow);
+    presetSave.setVisible (! narrow);
+    presetLoad.setVisible (! narrow);
+
+    if (presetPrev.isVisible())
+        presetPrev.setBounds (top.removeFromLeft (34).reduced (4, 8));
+    if (presetNext.isVisible())
+        presetNext.setBounds (top.removeFromLeft (34).reduced (4, 8));
+
+    const auto presetW = narrow ? juce::jmin (280, top.getWidth() / 2) : 320;
+    preset.setBounds (top.removeFromLeft (presetW).reduced (4, 2));
+
+    if (presetSave.isVisible())
+        presetSave.setBounds (top.removeFromLeft (80).reduced (4, 8));
+    if (presetLoad.isVisible())
+        presetLoad.setBounds (top.removeFromLeft (90).reduced (4, 8));
+
     statusLabel.setBounds (top.reduced (8, 8));
 
     r.removeFromTop (8);
@@ -778,6 +1453,14 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     const auto langIdx = getLanguageIndex();
 
     initButton.setButtonText (ies::ui::tr (ies::ui::Key::init, langIdx));
+    panicButton.setButtonText (ies::ui::tr (ies::ui::Key::panic, langIdx));
+
+    preset.setLabelText (ies::ui::tr (ies::ui::Key::preset, langIdx));
+    presetPrev.setButtonText ("<");
+    presetNext.setButtonText (">");
+    presetSave.setButtonText (ies::ui::tr (ies::ui::Key::presetSave, langIdx));
+    presetLoad.setButtonText (ies::ui::tr (ies::ui::Key::presetLoad, langIdx));
+    preset.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::init, langIdx));
 
     language.setLabelText (ies::ui::tr (ies::ui::Key::language, langIdx));
     language.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::languageEnglish, langIdx));
@@ -814,6 +1497,10 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     osc2Sync.setButtonText (ies::ui::tr (ies::ui::Key::sync, langIdx));
 
     destroyGroup.setText (ies::ui::tr (ies::ui::Key::destroy, langIdx));
+    foldPanel.setText (ies::ui::tr (ies::ui::Key::destroyFold, langIdx));
+    clipPanel.setText (ies::ui::tr (ies::ui::Key::destroyClip, langIdx));
+    modPanel.setText (ies::ui::tr (ies::ui::Key::destroyMod, langIdx));
+    crushPanel.setText (ies::ui::tr (ies::ui::Key::destroyCrush, langIdx));
     foldDrive.setLabelText (ies::ui::tr (ies::ui::Key::foldDrive, langIdx));
     foldAmount.setLabelText (ies::ui::tr (ies::ui::Key::foldAmount, langIdx));
     foldMix.setLabelText (ies::ui::tr (ies::ui::Key::foldMix, langIdx));
@@ -859,33 +1546,45 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
 void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
 {
     const auto isRu = (getLanguageIndex() == (int) params::ui::ru);
-    const auto T = [isRu] (const char* en, const char* ru) { return juce::String (isRu ? ru : en); };
+    const auto T = [isRu] (const char* en, const char* ruUtf8)
+    {
+        return isRu ? juce::String::fromUTF8 (ruUtf8) : juce::String (en);
+    };
 
     initButton.setTooltip (T ("Reset all parameters to defaults (keeps language).",
-                              "Сброс всех параметров к значениям по умолчанию (язык сохраняется)."));
+                              u8"Сброс всех параметров к значениям по умолчанию (язык сохраняется)."));
 
-    glideEnable.setTooltip (T ("Enable portamento (glide) between notes.", "Включить портаменто (глайд) между нотами."));
+    panicButton.setTooltip (T ("All Notes Off (use if something gets stuck).",
+                               u8"Снять все ноты (если что-то зависло)."));
+
+    presetPrev.setTooltip (T ("Previous preset.", u8"Предыдущий пресет."));
+    presetNext.setTooltip (T ("Next preset.", u8"Следующий пресет."));
+    preset.getCombo().setTooltip (T ("Select a preset.", u8"Выбрать пресет."));
+    presetSave.setTooltip (T ("Save current settings as a user preset.", u8"Сохранить текущие настройки как пользовательский пресет."));
+    presetLoad.setTooltip (T ("Load a user preset from a file.", u8"Загрузить пользовательский пресет из файла."));
+
+    glideEnable.setTooltip (T ("Enable portamento (glide) between notes.", u8"Включить портаменто (глайд) между нотами."));
     {
         const auto tip = T ("Glide time in milliseconds. Applies only while the gate is already on.",
-                            "Время глайда в миллисекундах. Работает только когда нота уже удерживается.");
+                            u8"Время глайда в миллисекундах. Работает только когда нота уже удерживается.");
         glideTime.getSlider().setTooltip (tip);
         glideTime.getLabel().setTooltip (tip);
     }
 
     modNoteSync.setTooltip (T ("When ON, Mod Freq follows the played note frequency (pitch-synced).",
-                              "Если ВКЛ, частота модуляции синхронизируется с сыгранной нотой."));
+                              u8"Если ВКЛ, частота модуляции синхронизируется с сыгранной нотой."));
     {
         const auto tip = T ("Modulator frequency (Hz). Disabled when Note Sync is ON.",
-                            "Частота модуляции (Гц). Отключено при включённом синхронизаторе.");
+                            u8"Частота модуляции (Гц). Отключено при включённом синхронизаторе.");
         modFreq.getSlider().setTooltip (tip);
         modFreq.getLabel().setTooltip (tip);
     }
 
     filterKeyTrack.setTooltip (T ("When ON, cutoff follows note pitch (key tracking).",
-                                  "Если ВКЛ, срез фильтра следует высоте ноты (key tracking)."));
+                                  u8"Если ВКЛ, срез фильтра следует высоте ноты (key tracking)."));
     {
         const auto tip = T ("Filter envelope depth in semitones. Positive opens cutoff, negative closes.",
-                            "Глубина огибающей фильтра в полутонах. Плюс открывает, минус закрывает.");
+                            u8"Глубина огибающей фильтра в полутонах. Плюс открывает, минус закрывает.");
         filterEnvAmount.getSlider().setTooltip (tip);
         filterEnvAmount.getLabel().setTooltip (tip);
     }
@@ -925,6 +1624,205 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
     // Keep the status line live while dragging.
     if (hovered != nullptr)
         updateStatusFromComponent (hovered);
+
+    // Activity highlight (pure UI): blocks glow when they are actually doing work.
+    auto setActivity = [] (juce::Component& c, float a)
+    {
+        const auto next = (double) juce::jlimit (0.0f, 1.0f, a);
+        const auto prevVar = c.getProperties().getWithDefault ("activity", 0.0);
+        const auto prev = prevVar.isDouble() ? (double) prevVar : 0.0;
+
+        // Avoid repaint storms: only update when the perceived intensity changes meaningfully.
+        if (std::abs (next - prev) < 0.02)
+            return;
+
+        c.getProperties().set ("activity", next);
+        c.repaint();
+    };
+
+    const auto abs01 = [] (double v) { return (float) juce::jlimit (0.0, 1.0, std::abs (v)); };
+    const auto mix01 = [&] (ies::ui::KnobWithLabel& k) { return abs01 (k.getSlider().getValue()); };
+
+    const float monoAct = glideEnable.getToggleState() ? 0.55f : 0.0f;
+    setActivity (monoGroup, monoAct);
+
+    const float osc1Act = juce::jlimit (0.0f, 1.0f,
+                                        0.15f * abs01 (osc1Coarse.getSlider().getValue() / 24.0) +
+                                        0.15f * abs01 (osc1Fine.getSlider().getValue() / 100.0) +
+                                        0.70f * (float) osc1Detune.getSlider().getValue());
+    const float osc2Act = juce::jlimit (0.0f, 1.0f,
+                                        0.15f * abs01 (osc2Coarse.getSlider().getValue() / 24.0) +
+                                        0.15f * abs01 (osc2Fine.getSlider().getValue() / 100.0) +
+                                        0.60f * (float) osc2Detune.getSlider().getValue() +
+                                        0.25f * (osc2Sync.getToggleState() ? 1.0f : 0.0f));
+    setActivity (osc1Group, osc1Act);
+    setActivity (osc2Group, osc2Act);
+
+    const float foldAct  = juce::jlimit (0.0f, 1.0f, mix01 (foldMix)  * (0.35f + 0.65f * (float) foldAmount.getSlider().getValue()));
+    const float clipAct  = juce::jlimit (0.0f, 1.0f, mix01 (clipMix)  * (0.35f + 0.65f * (float) clipAmount.getSlider().getValue()));
+    const float modAct   = juce::jlimit (0.0f, 1.0f, mix01 (modMix)   * (0.35f + 0.65f * (float) modAmount.getSlider().getValue()));
+    const float crushAct = juce::jlimit (0.0f, 1.0f, mix01 (crushMix) * 0.95f);
+    setActivity (foldPanel, foldAct);
+    setActivity (clipPanel, clipAct);
+    setActivity (modPanel, modAct);
+    setActivity (crushPanel, crushAct);
+    setActivity (destroyGroup, juce::jmax (juce::jmax (foldAct, clipAct), juce::jmax (modAct, crushAct)));
+
+    const float filterAct = juce::jlimit (0.0f, 1.0f,
+                                          0.45f * (float) filterReso.getSlider().getValue() +
+                                          0.35f * abs01 (filterEnvAmount.getSlider().getValue() / 24.0) +
+                                          0.20f * (filterKeyTrack.getToggleState() ? 1.0f : 0.0f));
+    setActivity (filterGroup, filterAct);
+    setActivity (filterEnvGroup, abs01 ((filterAttack.getSlider().getValue() + filterDecay.getSlider().getValue() + filterRelease.getSlider().getValue()) / 3000.0));
+    setActivity (ampGroup, abs01 ((ampAttack.getSlider().getValue() + ampDecay.getSlider().getValue() + ampRelease.getSlider().getValue()) / 3000.0));
+
+    const float outAct = abs01 ((outGain.getSlider().getValue() + 24.0) / 30.0);
+    setActivity (outGroup, outAct);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::resetAllParamsKeepLanguage()
+{
+    auto* langParam = audioProcessor.getAPVTS().getParameter (params::ui::language);
+    for (auto* param : audioProcessor.getParameters())
+    {
+        if (param == nullptr || param == langParam)
+            continue;
+
+        param->beginChangeGesture();
+        param->setValueNotifyingHost (param->getDefaultValue());
+        param->endChangeGesture();
+    }
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::rebuildPresetMenu()
+{
+    if (presetManager == nullptr)
+        return;
+
+    presetMenuRebuilding = true;
+
+    presetManager->refreshUserPresets();
+    const auto& list = presetManager->getUserPresets();
+
+    auto& cb = preset.getCombo();
+    const auto prevSel = cb.getSelectedId();
+
+    cb.clear (juce::dontSendNotification);
+    cb.addItem (ies::ui::tr (ies::ui::Key::init, getLanguageIndex()), 1);
+
+    const auto ru = (getLanguageIndex() == (int) params::ui::ru);
+    for (int i = 0; i < getNumFactoryPresets(); ++i)
+    {
+        const auto nm = ru ? juce::String::fromUTF8 (kFactoryPresets[i].nameRu) : juce::String (kFactoryPresets[i].nameEn);
+        cb.addItem (nm, 10 + i);
+    }
+
+    for (int i = 0; i < list.size(); ++i)
+        cb.addItem (list.getReference (i).name, 100 + i);
+
+    // Enable/disable navigation sensibly.
+    presetPrev.setEnabled (cb.getNumItems() > 1);
+    presetNext.setEnabled (cb.getNumItems() > 1);
+    cb.setEnabled (true);
+    presetSave.setEnabled (true);
+    presetLoad.setEnabled (true);
+
+    int sel = prevSel;
+    if (sel == 0)
+        sel = 1;
+    if (sel >= 100)
+    {
+        const auto maxId = 100 + (list.size() - 1);
+        if (list.isEmpty())
+            sel = 1;
+        else if (sel > maxId)
+            sel = maxId;
+    }
+
+    // If we were on a factory preset and language/menu changed, keep the same ID.
+    if (sel >= 10 && sel < 100)
+    {
+        const auto maxFactory = 10 + getNumFactoryPresets() - 1;
+        if (sel > maxFactory)
+            sel = 1;
+    }
+
+    cb.setSelectedId (sel, juce::dontSendNotification);
+
+    presetMenuRebuilding = false;
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::loadPresetByComboSelection()
+{
+    if (presetMenuRebuilding)
+        return;
+
+    const auto sel = preset.getCombo().getSelectedId();
+    if (sel <= 0)
+        return;
+
+    if (sel == 1)
+    {
+        resetAllParamsKeepLanguage();
+        return;
+    }
+
+    if (sel >= 10 && sel < 100)
+    {
+        applyFactoryPreset (sel - 10);
+        return;
+    }
+
+    if (presetManager == nullptr)
+        return;
+
+    const auto& list = presetManager->getUserPresets();
+    const int idx = sel - 100;
+    if (idx < 0 || idx >= list.size())
+        return;
+
+    juce::String error;
+    if (! presetManager->loadUserPreset (list.getReference (idx).file, error))
+    {
+        const auto isRu = (getLanguageIndex() == (int) params::ui::ru);
+        juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon,
+                                               isRu ? juce::String::fromUTF8 (u8"Ошибка") : "Error",
+                                               isRu ? juce::String::fromUTF8 (u8"Не удалось загрузить пресет.") : "Failed to load preset.");
+    }
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::setParamValue (const char* paramId, float actualValue)
+{
+    auto* p = audioProcessor.getAPVTS().getParameter (paramId);
+    auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p);
+    if (rp == nullptr)
+        return;
+
+    const auto norm = rp->convertTo0to1 (actualValue);
+
+    rp->beginChangeGesture();
+    rp->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, norm));
+    rp->endChangeGesture();
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::applyFactoryPreset (int factoryIndex)
+{
+    if (factoryIndex < 0 || factoryIndex >= getNumFactoryPresets())
+        return;
+
+    // Keep current UI language stable while applying preset.
+    auto* langParam = audioProcessor.getAPVTS().getParameter (params::ui::language);
+    const float langNorm = (langParam != nullptr) ? langParam->getValue() : 0.0f;
+
+    for (const auto& kv : kFactoryPresets[factoryIndex].values)
+        setParamValue (kv.first, kv.second);
+
+    if (langParam != nullptr)
+    {
+        langParam->beginChangeGesture();
+        langParam->setValueNotifyingHost (langNorm);
+        langParam->endChangeGesture();
+    }
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::setupSliderDoubleClickDefault (juce::Slider& s, const char* paramId)
@@ -965,6 +1863,10 @@ void IndustrialEnergySynthAudioProcessorEditor::updateStatusFromComponent (juce:
 
     auto line = [&]() -> juce::String
     {
+        juce::String tip;
+        if (auto* tc = dynamic_cast<juce::TooltipClient*> (c))
+            tip = tc->getTooltip();
+
         if (auto* s = dynamic_cast<juce::Slider*> (c))
         {
             juce::String name;
@@ -974,7 +1876,10 @@ void IndustrialEnergySynthAudioProcessorEditor::updateStatusFromComponent (juce:
                 name = "Value";
 
             const auto v = s->getTextFromValue (s->getValue());
-            return name + ": " + v;
+            auto out = name + ": " + v;
+            if (tip.isNotEmpty())
+                out << "  |  " << tip;
+            return out;
         }
 
         if (auto* cb = dynamic_cast<juce::ComboBox*> (c))
@@ -985,19 +1890,31 @@ void IndustrialEnergySynthAudioProcessorEditor::updateStatusFromComponent (juce:
             else
                 name = "Mode";
 
-            return name + ": " + cb->getText();
+            auto out = name + ": " + cb->getText();
+            if (tip.isNotEmpty())
+                out << "  |  " << tip;
+            return out;
         }
 
         if (auto* t = dynamic_cast<juce::ToggleButton*> (c))
         {
             const auto isRu = (getLanguageIndex() == (int) params::ui::ru);
-            const auto on = isRu ? "Вкл" : "On";
-            const auto off = isRu ? "Выкл" : "Off";
-            return t->getButtonText() + ": " + (t->getToggleState() ? on : off);
+            const auto on = isRu ? juce::String::fromUTF8 (u8"Вкл") : juce::String ("On");
+            const auto off = isRu ? juce::String::fromUTF8 (u8"Выкл") : juce::String ("Off");
+
+            auto out = t->getButtonText() + ": " + (t->getToggleState() ? on : off);
+            if (tip.isNotEmpty())
+                out << "  |  " << tip;
+            return out;
         }
 
         if (auto* b = dynamic_cast<juce::Button*> (c))
-            return b->getButtonText();
+        {
+            auto out = b->getButtonText();
+            if (tip.isNotEmpty())
+                out << "  |  " << tip;
+            return out;
+        }
 
         return {};
     }();

@@ -74,6 +74,29 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
 
 IndustrialEnergySynthAudioProcessor::~IndustrialEnergySynthAudioProcessor() = default;
 
+void IndustrialEnergySynthAudioProcessor::applyStateFromUi (juce::ValueTree state, bool keepLanguage)
+{
+    if (! state.isValid())
+        return;
+
+    if (state.getType() != apvts.state.getType())
+        return;
+
+    auto* langParam = apvts.getParameter (params::ui::language);
+    const float langNorm = (langParam != nullptr) ? langParam->getValue() : 0.0f;
+
+    apvts.replaceState (state);
+
+    if (keepLanguage && langParam != nullptr)
+    {
+        langParam->beginChangeGesture();
+        langParam->setValueNotifyingHost (langNorm);
+        langParam->endChangeGesture();
+    }
+
+    engine.reset();
+}
+
 const juce::String IndustrialEnergySynthAudioProcessor::getName() const
 {
     return JucePlugin_Name;
@@ -174,6 +197,9 @@ void IndustrialEnergySynthAudioProcessor::processBlock (juce::AudioBuffer<float>
     juce::ScopedNoDenormals noDenormals;
 
     buffer.clear();
+
+    if (uiPanicRequested.exchange (false, std::memory_order_acq_rel))
+        engine.allNotesOff();
 
     const auto totalSamples = buffer.getNumSamples();
     int cursor = 0;

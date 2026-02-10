@@ -17,6 +17,8 @@ public:
     const APVTS& getAPVTS() const noexcept { return apvts; }
 
     float getUiOutputPeak() const noexcept { return uiOutputPeak.load (std::memory_order_relaxed); }
+    void requestPanic() noexcept { uiPanicRequested.store (true, std::memory_order_release); }
+    void applyStateFromUi (juce::ValueTree state, bool keepLanguage);
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -54,6 +56,7 @@ private:
     ies::engine::MonoSynthEngine engine;
     ies::engine::MonoSynthEngine::ParamPointers paramPointers;
     std::atomic<float> uiOutputPeak { 0.0f };
+    std::atomic<bool> uiPanicRequested { false };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (IndustrialEnergySynthAudioProcessor)
 };

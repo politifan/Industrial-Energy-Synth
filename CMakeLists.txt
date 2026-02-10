@@ -51,6 +51,8 @@ target_sources(IndustrialEnergySynth PRIVATE
   Source/engine/MonoSynthEngine.cpp
   Source/engine/MonoSynthEngine.h
   Source/engine/NoteStackMono.h
+  Source/presets/PresetManager.cpp
+  Source/presets/PresetManager.h
   Source/ui/I18n.h
   Source/ui/AdsrPreview.cpp
   Source/ui/AdsrPreview.h
@@ -68,6 +70,10 @@ target_compile_definitions(IndustrialEnergySynth PRIVATE
   JUCE_WEB_BROWSER=0
   JUCE_USE_CURL=0
   JUCE_VST3_CAN_REPLACE_VST2=0
+)
+
+target_compile_options(IndustrialEnergySynth PRIVATE
+  $<$<CXX_COMPILER_ID:MSVC>:/utf-8>
 )
 
 target_link_libraries(IndustrialEnergySynth PRIVATE

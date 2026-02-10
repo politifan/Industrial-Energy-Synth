@@ -8,6 +8,7 @@
 #include "ui/AdsrPreview.h"
 #include "ui/LevelMeter.h"
 #include "ui/WavePreview.h"
+#include "presets/PresetManager.h"
 
 class IndustrialEnergySynthAudioProcessor;
 
@@ -33,6 +34,12 @@ private:
     void refreshTooltips();
     void updateEnabledStates();
     void updateStatusFromComponent (juce::Component*);
+    void resetAllParamsKeepLanguage();
+    void rebuildPresetMenu();
+    void loadPresetByComboSelection();
+    void applyFactoryPreset (int factoryIndex);
+    void setParamValue (const char* paramId, float actualValue);
+    bool isRussian() const { return getLanguageIndex() == (int) params::ui::ru; }
 
     void timerCallback() override;
     void mouseEnter (const juce::MouseEvent&) override;
@@ -42,11 +49,21 @@ private:
 
     // Top bar
     juce::TextButton initButton;
+    juce::TextButton panicButton;
     juce::TextButton helpButton;
+    juce::TextButton presetPrev;
+    juce::TextButton presetNext;
+    ies::ui::ComboWithLabel preset;
+    juce::TextButton presetSave;
+    juce::TextButton presetLoad;
     ies::ui::ComboWithLabel language;
     std::unique_ptr<APVTS::ComboBoxAttachment> languageAttachment;
     ies::ui::LevelMeter outMeter;
     juce::Label statusLabel;
+    std::unique_ptr<ies::presets::PresetManager> presetManager;
+    juce::Array<juce::File> presetFilesByItem;
+    bool presetMenuRebuilding = false;
+    std::unique_ptr<juce::FileChooser> presetFileChooser;
 
     // Mono
     juce::GroupComponent monoGroup;

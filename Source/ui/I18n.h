@@ -9,6 +9,12 @@ namespace ies::ui
 enum class Key
 {
     title,
+    preset,
+    presetPrev,
+    presetNext,
+    presetSave,
+    presetLoad,
+    panic,
     language,
     languageEnglish,
     languageRussian,
@@ -35,6 +41,10 @@ enum class Key
     sync,
 
     destroy,
+    destroyFold,
+    destroyClip,
+    destroyMod,
+    destroyCrush,
     foldDrive,
     foldAmount,
     foldMix,
@@ -74,74 +84,85 @@ enum class Key
 
 inline juce::String tr (Key key, int languageChoiceIndex)
 {
+    auto u8 = [] (const char* s) { return juce::String::fromUTF8 (s); };
     const auto lang = (languageChoiceIndex == (int) params::ui::ru) ? params::ui::ru : params::ui::en;
 
     if (lang == params::ui::ru)
     {
         switch (key)
         {
-            case Key::title:        return "Industrial Energy Synth";
-            case Key::language:     return "Язык";
-            case Key::languageEnglish: return "Английский";
-            case Key::languageRussian: return "Русский";
-            case Key::init:         return "Сброс";
+            case Key::title:        return u8 (u8"Industrial Energy Synth");
+            case Key::preset:       return u8 (u8"Пресет");
+            case Key::presetPrev:   return u8 (u8"Пред.");
+            case Key::presetNext:   return u8 (u8"След.");
+            case Key::presetSave:   return u8 (u8"Сохранить");
+            case Key::presetLoad:   return u8 (u8"Загрузить");
+            case Key::panic:        return u8 (u8"Стоп");
+            case Key::language:     return u8 (u8"Язык");
+            case Key::languageEnglish: return u8 (u8"Английский");
+            case Key::languageRussian: return u8 (u8"Русский");
+            case Key::init:         return u8 (u8"Сброс");
 
-            case Key::mono:         return "Моно";
-            case Key::envMode:      return "Режим огибающей";
-            case Key::envModeRetrigger: return "Перезапуск";
-            case Key::envModeLegato:    return "Легато";
-            case Key::glideEnable:  return "Глайд";
-            case Key::glideTime:    return "Время глайда";
+            case Key::mono:         return u8 (u8"Моно");
+            case Key::envMode:      return u8 (u8"Режим огибающей");
+            case Key::envModeRetrigger: return u8 (u8"Перезапуск");
+            case Key::envModeLegato:    return u8 (u8"Легато");
+            case Key::glideEnable:  return u8 (u8"Глайд");
+            case Key::glideTime:    return u8 (u8"Время глайда");
 
-            case Key::osc1:         return "Осц 1";
-            case Key::osc2:         return "Осц 2";
-            case Key::wave:         return "Волна";
-            case Key::waveSaw:      return "Пила";
-            case Key::waveSquare:   return "Квадрат";
-            case Key::waveTriangle: return "Треугольник";
-            case Key::level:        return "Уровень";
-            case Key::coarse:       return "Грубо";
-            case Key::fine:         return "Точно";
-            case Key::phase:        return "Фаза";
-            case Key::detune:       return "Детюн (нестаб.)";
-            case Key::sync:         return "Синхр. с Осц1";
+            case Key::osc1:         return u8 (u8"Осц 1");
+            case Key::osc2:         return u8 (u8"Осц 2");
+            case Key::wave:         return u8 (u8"Волна");
+            case Key::waveSaw:      return u8 (u8"Пила");
+            case Key::waveSquare:   return u8 (u8"Квадрат");
+            case Key::waveTriangle: return u8 (u8"Треугольник");
+            case Key::level:        return u8 (u8"Уровень");
+            case Key::coarse:       return u8 (u8"Грубо");
+            case Key::fine:         return u8 (u8"Точно");
+            case Key::phase:        return u8 (u8"Фаза");
+            case Key::detune:       return u8 (u8"Детюн (нестаб.)");
+            case Key::sync:         return u8 (u8"Синхр. с Осц1");
 
-            case Key::destroy:      return "Разрушение";
-            case Key::foldDrive:    return "Фолд драйв";
-            case Key::foldAmount:   return "Фолд amount";
-            case Key::foldMix:      return "Фолд mix";
-            case Key::clipDrive:    return "Клип драйв";
-            case Key::clipAmount:   return "Клип amount";
-            case Key::clipMix:      return "Клип mix";
-            case Key::modMode:      return "Режим";
-            case Key::modModeRing:  return "Рингмод";
-            case Key::modModeFm:    return "FM";
-            case Key::modAmount:    return "Мод amount";
-            case Key::modMix:       return "Мод mix";
-            case Key::modNoteSync:  return "Синхр. к ноте";
-            case Key::modFreq:      return "Мод частота";
-            case Key::crushBits:    return "Краш bits";
-            case Key::crushDownsample: return "Краш DS";
-            case Key::crushMix:     return "Краш mix";
+            case Key::destroy:      return u8 (u8"Разрушение");
+            case Key::destroyFold:  return u8 (u8"Фолд");
+            case Key::destroyClip:  return u8 (u8"Клип");
+            case Key::destroyMod:   return u8 (u8"Мод");
+            case Key::destroyCrush: return u8 (u8"Краш");
+            case Key::foldDrive:    return u8 (u8"Драйв (fold)");
+            case Key::foldAmount:   return u8 (u8"Amount (fold)");
+            case Key::foldMix:      return u8 (u8"Mix (fold)");
+            case Key::clipDrive:    return u8 (u8"Драйв (clip)");
+            case Key::clipAmount:   return u8 (u8"Amount (clip)");
+            case Key::clipMix:      return u8 (u8"Mix (clip)");
+            case Key::modMode:      return u8 (u8"Режим");
+            case Key::modModeRing:  return u8 (u8"Рингмод");
+            case Key::modModeFm:    return u8 (u8"FM");
+            case Key::modAmount:    return u8 (u8"Amount (mod)");
+            case Key::modMix:       return u8 (u8"Mix (mod)");
+            case Key::modNoteSync:  return u8 (u8"Синхр. к ноте");
+            case Key::modFreq:      return u8 (u8"Частота (mod)");
+            case Key::crushBits:    return u8 (u8"Bits (crush)");
+            case Key::crushDownsample: return u8 (u8"Downsample");
+            case Key::crushMix:     return u8 (u8"Mix (crush)");
 
-            case Key::filter:       return "Фильтр";
-            case Key::filterEnv:    return "Огиб. фильтра";
-            case Key::filterType:   return "Тип";
-            case Key::filterTypeLp: return "НЧ (LP)";
-            case Key::filterTypeBp: return "ПП (BP)";
-            case Key::cutoff:       return "Срез";
-            case Key::resonance:    return "Резонанс";
-            case Key::keyTrack:     return "Кей-трек";
-            case Key::envAmount:    return "Глубина env";
+            case Key::filter:       return u8 (u8"Фильтр");
+            case Key::filterEnv:    return u8 (u8"Огиб. фильтра");
+            case Key::filterType:   return u8 (u8"Тип");
+            case Key::filterTypeLp: return u8 (u8"НЧ (LP)");
+            case Key::filterTypeBp: return u8 (u8"ПП (BP)");
+            case Key::cutoff:       return u8 (u8"Срез");
+            case Key::resonance:    return u8 (u8"Резонанс");
+            case Key::keyTrack:     return u8 (u8"Кей-трек");
+            case Key::envAmount:    return u8 (u8"Глубина env");
 
-            case Key::ampEnv:       return "Огибающая амплитуды";
-            case Key::attack:       return "Атака";
-            case Key::decay:        return "Спад";
-            case Key::sustain:      return "Сустейн";
-            case Key::release:      return "Релиз";
+            case Key::ampEnv:       return u8 (u8"Огибающая амплитуды");
+            case Key::attack:       return u8 (u8"Атака");
+            case Key::decay:        return u8 (u8"Спад");
+            case Key::sustain:      return u8 (u8"Сустейн");
+            case Key::release:      return u8 (u8"Релиз");
 
-            case Key::output:       return "Выход";
-            case Key::gain:         return "Громкость";
+            case Key::output:       return u8 (u8"Выход");
+            case Key::gain:         return u8 (u8"Громкость");
         }
     }
     else
@@ -149,6 +170,12 @@ inline juce::String tr (Key key, int languageChoiceIndex)
         switch (key)
         {
             case Key::title:        return "Industrial Energy Synth";
+            case Key::preset:       return "Preset";
+            case Key::presetPrev:   return "Prev";
+            case Key::presetNext:   return "Next";
+            case Key::presetSave:   return "Save";
+            case Key::presetLoad:   return "Load";
+            case Key::panic:        return "Panic";
             case Key::language:     return "Language";
             case Key::languageEnglish: return "English";
             case Key::languageRussian: return "Russian";
@@ -175,6 +202,10 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::sync:         return "Sync to Osc1";
 
             case Key::destroy:      return "Destroy";
+            case Key::destroyFold:  return "Fold";
+            case Key::destroyClip:  return "Clip";
+            case Key::destroyMod:   return "Mod";
+            case Key::destroyCrush: return "Crush";
             case Key::foldDrive:    return "Fold Drive";
             case Key::foldAmount:   return "Fold Amount";
             case Key::foldMix:      return "Fold Mix";

@@ -10,6 +10,14 @@ static juce::Colour colourFromProperty (const juce::Component& c, const juce::Id
     return fallback;
 }
 
+static float floatFromProperty (const juce::Component& c, const juce::Identifier& key, float fallback)
+{
+    const auto v = c.getProperties().getWithDefault (key, {});
+    if (v.isDouble() || v.isInt() || v.isInt64())
+        return (float) v;
+    return fallback;
+}
+
 IndustrialLookAndFeel::IndustrialLookAndFeel()
 {
     // "Serum-ish" palette: dark, clean, neon accents.
@@ -43,7 +51,8 @@ IndustrialLookAndFeel::IndustrialLookAndFeel()
 
 juce::Font IndustrialLookAndFeel::getTextButtonFont (juce::TextButton&, int buttonHeight)
 {
-    return juce::Font ((float) juce::jlimit (12, 15, buttonHeight - 8), juce::Font::bold);
+    const auto size = (float) juce::jlimit (12, 15, buttonHeight - 8);
+    return juce::Font (juce::Font::getDefaultSansSerifFontName(), size, juce::Font::bold);
 }
 
 void IndustrialLookAndFeel::drawButtonBackground (juce::Graphics& g,
@@ -103,7 +112,7 @@ void IndustrialLookAndFeel::drawButtonText (juce::Graphics& g,
 juce::Font IndustrialLookAndFeel::getLabelFont (juce::Label&)
 {
     // Serum-like small labels.
-    return juce::Font (13.0f, juce::Font::plain);
+    return juce::Font (juce::Font::getDefaultSansSerifFontName(), 13.0f, juce::Font::plain);
 }
 
 void IndustrialLookAndFeel::drawRotarySlider (juce::Graphics& g,
@@ -224,7 +233,7 @@ void IndustrialLookAndFeel::drawToggleButton (juce::Graphics& g,
     }
 
     g.setColour (enabled ? text : text.withAlpha (0.35f));
-    g.setFont (juce::Font (13.0f, juce::Font::plain));
+    g.setFont (juce::Font (juce::Font::getDefaultSansSerifFontName(), 13.0f, juce::Font::plain));
     g.drawFittedText (button.getButtonText(), r, juce::Justification::centredLeft, 1);
 }
 
@@ -268,6 +277,7 @@ void IndustrialLookAndFeel::drawGroupComponentOutline (juce::Graphics& g,
 
     const auto enabled = group.isEnabled();
     const auto a = colourFromProperty (group, "accentColour", accent);
+    const auto activity = juce::jlimit (0.0f, 1.0f, floatFromProperty (group, "activity", 0.0f));
 
     const auto fill = enabled ? panel.withAlpha (0.72f) : panel.withAlpha (0.25f);
     const auto brd  = enabled ? border.withAlpha (0.95f) : border.withAlpha (0.25f);
@@ -280,17 +290,27 @@ void IndustrialLookAndFeel::drawGroupComponentOutline (juce::Graphics& g,
 
     // Header bar
     auto header = bounds.withHeight (28.0f).reduced (1.0f, 1.0f);
-    g.setColour (panel2.withAlpha (enabled ? 0.85f : 0.22f));
+    const auto headerBoost = enabled ? (0.85f + 0.10f * activity) : 0.22f;
+    g.setColour (panel2.withAlpha (headerBoost));
     g.fillRoundedRectangle (header, 9.0f);
 
     // Accent stripe
     auto stripe = header.removeFromLeft (6.0f).reduced (0.0f, 5.0f);
-    g.setColour (a.withAlpha (enabled ? 0.9f : 0.25f));
+    const auto stripeAlpha = enabled ? (0.35f + 0.65f * activity) : 0.25f;
+    g.setColour (a.withAlpha (stripeAlpha));
     g.fillRoundedRectangle (stripe, 3.0f);
+
+    if (enabled && activity > 0.001f)
+    {
+        // A light "Serum-ish" glow hint when the block is actively shaping sound.
+        const auto glow = a.withAlpha (0.10f + 0.18f * activity);
+        g.setColour (glow);
+        g.drawRoundedRectangle (bounds.reduced (1.0f), 10.0f, 2.0f);
+    }
 
     // Title
     g.setColour (enabled ? text : text.withAlpha (0.35f));
-    g.setFont (juce::Font (14.5f, juce::Font::bold));
+    g.setFont (juce::Font (juce::Font::getDefaultSansSerifFontName(), 14.5f, juce::Font::bold));
     g.drawFittedText (textStr,
                       header.toNearestInt().reduced (10, 4),
                       juce::Justification::centredLeft,
