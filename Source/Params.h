@@ -111,6 +111,17 @@ enum Type
 };
 }
 
+namespace tone
+{
+// Post EQ (Serum-like): low/high cut + peak.
+inline constexpr const char* enable      = "tone.enable";      // bool
+inline constexpr const char* lowCutHz    = "tone.lowCutHz";    // float Hz
+inline constexpr const char* highCutHz   = "tone.highCutHz";   // float Hz
+inline constexpr const char* peakFreqHz  = "tone.peakFreqHz";  // float Hz
+inline constexpr const char* peakGainDb  = "tone.peakGainDb";  // float dB
+inline constexpr const char* peakQ       = "tone.peakQ";       // float Q
+}
+
 namespace fenv
 {
 inline constexpr const char* attackMs  = "fenv.attackMs";

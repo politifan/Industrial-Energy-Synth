@@ -67,6 +67,13 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
     paramPointers.filterSustain   = apvts.getRawParameterValue (params::fenv::sustain);
     paramPointers.filterReleaseMs = apvts.getRawParameterValue (params::fenv::releaseMs);
 
+    paramPointers.toneEnable     = apvts.getRawParameterValue (params::tone::enable);
+    paramPointers.toneLowCutHz   = apvts.getRawParameterValue (params::tone::lowCutHz);
+    paramPointers.toneHighCutHz  = apvts.getRawParameterValue (params::tone::highCutHz);
+    paramPointers.tonePeakFreqHz = apvts.getRawParameterValue (params::tone::peakFreqHz);
+    paramPointers.tonePeakGainDb = apvts.getRawParameterValue (params::tone::peakGainDb);
+    paramPointers.tonePeakQ      = apvts.getRawParameterValue (params::tone::peakQ);
+
     paramPointers.outGainDb     = apvts.getRawParameterValue (params::out::gainDb);
 
     engine.setParamPointers (&paramPointers);
@@ -95,6 +102,30 @@ void IndustrialEnergySynthAudioProcessor::applyStateFromUi (juce::ValueTree stat
     }
 
     engine.reset();
+}
+
+void IndustrialEnergySynthAudioProcessor::copyUiAudio (float* dest, int numSamples) const noexcept
+{
+    if (dest == nullptr || numSamples <= 0)
+        return;
+
+    const auto cap = (int) uiAudioRing.size();
+    const auto n = juce::jlimit (1, cap, numSamples);
+
+    const auto w = uiAudioWritePos.load (std::memory_order_relaxed);
+    auto start = w - n;
+    if (start < 0)
+        start += cap;
+
+    for (int i = 0; i < n; ++i)
+    {
+        const int idx = (start + i) % cap;
+        dest[i] = uiAudioRing[(size_t) idx];
+    }
+
+    // If the caller asked for more than we have, zero-fill the rest.
+    for (int i = n; i < numSamples; ++i)
+        dest[i] = 0.0f;
 }
 
 const juce::String IndustrialEnergySynthAudioProcessor::getName() const
@@ -240,8 +271,18 @@ void IndustrialEnergySynthAudioProcessor::processBlock (juce::AudioBuffer<float>
         if (buffer.getNumChannels() > 0)
         {
             const auto* d = buffer.getReadPointer (0);
+            auto w = uiAudioWritePos.load (std::memory_order_relaxed);
+            const auto cap = (int) uiAudioRing.size();
             for (int i = 0; i < totalSamples; ++i)
+            {
                 peak = juce::jmax (peak, std::abs (d[i]));
+                uiAudioRing[(size_t) w] = d[i];
+                ++w;
+                if (w >= cap)
+                    w = 0;
+            }
+
+            uiAudioWritePos.store (w, std::memory_order_relaxed);
         }
 
         uiOutputPeak.store (peak, std::memory_order_relaxed);
@@ -431,6 +472,37 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
     ampGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::amp::sustain), "Sustain",
                                                                      juce::NormalisableRange<float> (0.0f, 1.0f), 0.80f));
     layout.add (std::move (ampGroup));
+
+    // --- Tone EQ (post) ---
+    auto toneGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("tone", "Tone EQ", "|");
+    toneGroup->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::tone::enable), "Enable", false));
+    {
+        juce::NormalisableRange<float> range (20.0f, 4000.0f);
+        range.setSkewForCentre (200.0f);
+        toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::tone::lowCutHz), "Low Cut",
+                                                                          range, 20.0f, "Hz"));
+    }
+    {
+        juce::NormalisableRange<float> range (200.0f, 20000.0f);
+        range.setSkewForCentre (5000.0f);
+        toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::tone::highCutHz), "High Cut",
+                                                                          range, 20000.0f, "Hz"));
+    }
+    {
+        juce::NormalisableRange<float> range (40.0f, 12000.0f);
+        range.setSkewForCentre (1000.0f);
+        toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::tone::peakFreqHz), "Peak Freq",
+                                                                          range, 1000.0f, "Hz"));
+    }
+    toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::tone::peakGainDb), "Peak Gain",
+                                                                      juce::NormalisableRange<float> (-24.0f, 24.0f), 0.0f, "dB"));
+    {
+        juce::NormalisableRange<float> range (0.2f, 18.0f);
+        range.setSkewForCentre (1.0f);
+        toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::tone::peakQ), "Peak Q",
+                                                                          range, 0.7071f));
+    }
+    layout.add (std::move (toneGroup));
 
     // --- Output ---
     auto outGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("out", "Output", "|");

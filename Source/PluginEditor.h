@@ -7,6 +7,7 @@
 #include "ui/IndustrialLookAndFeel.h"
 #include "ui/AdsrPreview.h"
 #include "ui/LevelMeter.h"
+#include "ui/SpectrumEditor.h"
 #include "ui/WavePreview.h"
 #include "presets/PresetManager.h"
 
@@ -183,13 +184,20 @@ private:
     ies::ui::KnobWithLabel ampRelease;
     std::unique_ptr<APVTS::SliderAttachment> ampReleaseAttachment;
 
+    // Tone EQ / Spectrum (interactive)
+    juce::GroupComponent toneGroup;
+    juce::ToggleButton toneEnable;
+    std::unique_ptr<APVTS::ButtonAttachment> toneEnableAttachment;
+    ies::ui::SpectrumEditor spectrumEditor;
+
     // Output
     juce::GroupComponent outGroup;
     ies::ui::KnobWithLabel outGain;
     std::unique_ptr<APVTS::SliderAttachment> outGainAttachment;
 
-    juce::ResizableCornerComponent resizeCorner { this, nullptr };
     juce::ComponentBoundsConstrainer boundsConstrainer;
+    juce::ResizableBorderComponent resizeBorder { this, &boundsConstrainer };
+    juce::ResizableCornerComponent resizeCorner { this, &boundsConstrainer };
 
     juce::Component* hovered = nullptr;
 

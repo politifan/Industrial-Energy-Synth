@@ -78,6 +78,9 @@ enum class Key
     sustain,
     release,
 
+    tone,
+    toneEnable,
+
     output,
     gain
 };
@@ -161,6 +164,9 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::sustain:      return u8 (u8"Сустейн");
             case Key::release:      return u8 (u8"Релиз");
 
+            case Key::tone:         return u8 (u8"Тон EQ");
+            case Key::toneEnable:   return u8 (u8"Вкл");
+
             case Key::output:       return u8 (u8"Выход");
             case Key::gain:         return u8 (u8"Громкость");
         }
@@ -238,6 +244,9 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::decay:        return "Decay";
             case Key::sustain:      return "Sustain";
             case Key::release:      return "Release";
+
+            case Key::tone:         return "Tone EQ";
+            case Key::toneEnable:   return "Enable";
 
             case Key::output:       return "Output";
             case Key::gain:         return "Gain";

@@ -26,6 +26,7 @@ void MonoSynthEngine::prepare (double sr, int /*maxBlockSize*/)
 
     destroy.prepare (sampleRateHz);
     filter.prepare (sampleRateHz);
+    toneEq.prepare (sampleRateHz);
 
     // Smoothing for automation-heavy params (cutoff/drive/mix).
     constexpr double smoothSeconds = 0.02;
@@ -65,6 +66,17 @@ void MonoSynthEngine::prepare (double sr, int /*maxBlockSize*/)
     filterEnvAmountSm.reset (sampleRateHz, smoothSeconds);
     filterEnvAmountSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->filterEnvAmount : nullptr, 0.0f));
 
+    toneLowCutHzSm.reset (sampleRateHz, smoothSeconds);
+    toneLowCutHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->toneLowCutHz : nullptr, 20.0f));
+    toneHighCutHzSm.reset (sampleRateHz, smoothSeconds);
+    toneHighCutHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->toneHighCutHz : nullptr, 20000.0f));
+    tonePeakFreqHzSm.reset (sampleRateHz, smoothSeconds);
+    tonePeakFreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeakFreqHz : nullptr, 1000.0f));
+    tonePeakGainDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeakGainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeakGainDb : nullptr, 0.0f));
+    tonePeakQSm.reset (sampleRateHz, smoothSeconds);
+    tonePeakQSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeakQ : nullptr, 0.7071f));
+
     reset();
 }
 
@@ -80,6 +92,9 @@ void MonoSynthEngine::reset()
 
     destroy.reset();
     filter.reset();
+    toneEq.reset();
+    toneCoeffCountdown = 0;
+    toneEnabledPrev = false;
 
     // Snap smoothed params to the current parameter values on transport/state resets.
     auto loadParam = [&](std::atomic<float>* p, float def) noexcept
@@ -104,6 +119,12 @@ void MonoSynthEngine::reset()
     filterCutoffHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->filterCutoffHz : nullptr, 2000.0f));
     filterResKnobSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->filterResonance : nullptr, 0.25f));
     filterEnvAmountSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->filterEnvAmount : nullptr, 0.0f));
+
+    toneLowCutHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->toneLowCutHz : nullptr, 20.0f));
+    toneHighCutHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->toneHighCutHz : nullptr, 20000.0f));
+    tonePeakFreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeakFreqHz : nullptr, 1000.0f));
+    tonePeakGainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeakGainDb : nullptr, 0.0f));
+    tonePeakQSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeakQ : nullptr, 0.7071f));
 
     outGain.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (loadParam (params != nullptr ? params->outGainDb : nullptr, 0.0f), -100.0f));
 
@@ -289,6 +310,12 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
     setTargetIfChanged (filterResKnobSm,  params->filterResonance != nullptr ? params->filterResonance->load() : 0.25f);
     setTargetIfChanged (filterEnvAmountSm, params->filterEnvAmount != nullptr ? params->filterEnvAmount->load() : 0.0f);
 
+    setTargetIfChanged (toneLowCutHzSm,   params->toneLowCutHz   != nullptr ? params->toneLowCutHz->load()   : 20.0f);
+    setTargetIfChanged (toneHighCutHzSm,  params->toneHighCutHz  != nullptr ? params->toneHighCutHz->load()  : 20000.0f);
+    setTargetIfChanged (tonePeakFreqHzSm, params->tonePeakFreqHz != nullptr ? params->tonePeakFreqHz->load() : 1000.0f);
+    setTargetIfChanged (tonePeakGainDbSm, params->tonePeakGainDb != nullptr ? params->tonePeakGainDb->load() : 0.0f);
+    setTargetIfChanged (tonePeakQSm,      params->tonePeakQ      != nullptr ? params->tonePeakQ->load()      : 0.7071f);
+
     // Drift cutoff ~ 1 Hz (very slow).
     const auto alpha = (float) (2.0 * juce::MathConstants<double>::pi * 1.0 / sampleRateHz);
 
@@ -303,6 +330,15 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
     const auto typeIdx  = params->filterType != nullptr ? (int) std::lround (params->filterType->load()) : (int) params::filter::lp;
     const auto keyTrack = params->filterKeyTrack != nullptr && (params->filterKeyTrack->load() >= 0.5f);
     filter.setType ((params::filter::Type) juce::jlimit (0, 1, typeIdx));
+
+    const auto toneOn = params->toneEnable != nullptr && (params->toneEnable->load() >= 0.5f);
+    toneEq.setEnabled (toneOn);
+    if (toneOn && ! toneEnabledPrev)
+    {
+        toneEq.reset();
+        toneCoeffCountdown = 0;
+    }
+    toneEnabledPrev = toneOn;
 
     for (int i = 0; i < numSamples; ++i)
     {
@@ -376,6 +412,27 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
             const auto res = minRes * std::exp (std::log (maxRes / minRes) * t);
 
             sig = filter.processSample (sig, cutoff, res);
+        }
+
+        // --- Tone EQ (post-filter, Serum-like utility EQ) ---
+        {
+            const auto lowCut = toneLowCutHzSm.getNextValue();
+            const auto highCut = toneHighCutHzSm.getNextValue();
+            const auto pkFreq = tonePeakFreqHzSm.getNextValue();
+            const auto pkGainDb = tonePeakGainDbSm.getNextValue();
+            const auto pkQ = tonePeakQSm.getNextValue();
+
+            if (toneOn)
+            {
+                if (toneCoeffCountdown-- <= 0)
+                {
+                    toneCoeffCountdown = 16;
+                    toneEq.setParams (lowCut, highCut, pkFreq, pkGainDb, pkQ);
+                    toneEq.updateCoeffs();
+                }
+
+                sig = toneEq.processSample (sig);
+            }
         }
 
         sig *= ampEnv.getNextSample();

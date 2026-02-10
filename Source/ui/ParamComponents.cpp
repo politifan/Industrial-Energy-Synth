@@ -9,6 +9,8 @@ KnobWithLabel::KnobWithLabel()
     addAndMakeVisible (slider);
 
     label.setJustificationType (juce::Justification::centred);
+    // RU labels are often longer; allow JUCE to shrink text to fit instead of truncating.
+    label.setMinimumHorizontalScale (0.70f);
     addAndMakeVisible (label);
 }
 
@@ -36,6 +38,7 @@ ComboWithLabel::ComboWithLabel()
     addAndMakeVisible (combo);
 
     label.setJustificationType (juce::Justification::centredLeft);
+    label.setMinimumHorizontalScale (0.70f);
     addAndMakeVisible (label);
 }
 

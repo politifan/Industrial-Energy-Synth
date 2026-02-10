@@ -68,6 +68,13 @@ static const FactoryPreset kFactoryPresets[] =
             { params::fenv::sustain, 0.0f },
             { params::fenv::releaseMs, 160.0f },
 
+            { params::tone::enable, 0.0f },
+            { params::tone::lowCutHz, 20.0f },
+            { params::tone::highCutHz, 20000.0f },
+            { params::tone::peakFreqHz, 1000.0f },
+            { params::tone::peakGainDb, 0.0f },
+            { params::tone::peakQ, 0.7071f },
+
             { params::out::gainDb, -6.0f }
         }
     },
@@ -114,6 +121,13 @@ static const FactoryPreset kFactoryPresets[] =
             { params::filter::resonance, 0.35f },
             { params::filter::keyTrack, 1.0f },
             { params::filter::envAmount, 10.0f },
+
+            { params::tone::enable, 0.0f },
+            { params::tone::lowCutHz, 20.0f },
+            { params::tone::highCutHz, 20000.0f },
+            { params::tone::peakFreqHz, 1000.0f },
+            { params::tone::peakGainDb, 0.0f },
+            { params::tone::peakQ, 0.7071f },
 
             { params::out::gainDb, -8.0f }
         }
@@ -166,6 +180,13 @@ static const FactoryPreset kFactoryPresets[] =
             { params::filter::keyTrack, 0.0f },
             { params::filter::envAmount, 6.0f },
 
+            { params::tone::enable, 0.0f },
+            { params::tone::lowCutHz, 20.0f },
+            { params::tone::highCutHz, 20000.0f },
+            { params::tone::peakFreqHz, 1000.0f },
+            { params::tone::peakGainDb, 0.0f },
+            { params::tone::peakQ, 0.7071f },
+
             { params::out::gainDb, -10.0f }
         }
     },
@@ -212,6 +233,13 @@ static const FactoryPreset kFactoryPresets[] =
             { params::filter::resonance, 0.55f },
             { params::filter::keyTrack, 0.0f },
             { params::filter::envAmount, 8.0f },
+
+            { params::tone::enable, 0.0f },
+            { params::tone::lowCutHz, 20.0f },
+            { params::tone::highCutHz, 20000.0f },
+            { params::tone::peakFreqHz, 1000.0f },
+            { params::tone::peakGainDb, 0.0f },
+            { params::tone::peakQ, 0.7071f },
 
             { params::out::gainDb, -12.0f }
         }
@@ -269,6 +297,13 @@ static const FactoryPreset kFactoryPresets[] =
             { params::fenv::sustain, 0.4f },
             { params::fenv::releaseMs, 1800.0f },
 
+            { params::tone::enable, 0.0f },
+            { params::tone::lowCutHz, 20.0f },
+            { params::tone::highCutHz, 20000.0f },
+            { params::tone::peakFreqHz, 1000.0f },
+            { params::tone::peakGainDb, 0.0f },
+            { params::tone::peakQ, 0.7071f },
+
             { params::out::gainDb, -14.0f }
         }
     },
@@ -316,6 +351,13 @@ static const FactoryPreset kFactoryPresets[] =
             { params::filter::keyTrack, 0.0f },
             { params::filter::envAmount, 0.0f },
 
+            { params::tone::enable, 0.0f },
+            { params::tone::lowCutHz, 20.0f },
+            { params::tone::highCutHz, 20000.0f },
+            { params::tone::peakFreqHz, 1000.0f },
+            { params::tone::peakGainDb, 0.0f },
+            { params::tone::peakQ, 0.7071f },
+
             { params::out::gainDb, -16.0f }
         }
     },
@@ -361,6 +403,13 @@ static const FactoryPreset kFactoryPresets[] =
             { params::filter::resonance, 0.30f },
             { params::filter::keyTrack, 1.0f },
             { params::filter::envAmount, 6.0f },
+
+            { params::tone::enable, 0.0f },
+            { params::tone::lowCutHz, 20.0f },
+            { params::tone::highCutHz, 20000.0f },
+            { params::tone::peakFreqHz, 1000.0f },
+            { params::tone::peakGainDb, 0.0f },
+            { params::tone::peakQ, 0.7071f },
 
             { params::out::gainDb, -10.0f }
         }
@@ -408,6 +457,13 @@ static const FactoryPreset kFactoryPresets[] =
             { params::filter::keyTrack, 0.0f },
             { params::filter::envAmount, 0.0f },
 
+            { params::tone::enable, 0.0f },
+            { params::tone::lowCutHz, 20.0f },
+            { params::tone::highCutHz, 20000.0f },
+            { params::tone::peakFreqHz, 1000.0f },
+            { params::tone::peakGainDb, 0.0f },
+            { params::tone::peakQ, 0.7071f },
+
             { params::out::gainDb, -16.0f }
         }
     },
@@ -453,6 +509,13 @@ static const FactoryPreset kFactoryPresets[] =
             { params::filter::resonance, 0.40f },
             { params::filter::keyTrack, 1.0f },
             { params::filter::envAmount, 10.0f },
+
+            { params::tone::enable, 0.0f },
+            { params::tone::lowCutHz, 20.0f },
+            { params::tone::highCutHz, 20000.0f },
+            { params::tone::peakFreqHz, 1000.0f },
+            { params::tone::peakGainDb, 0.0f },
+            { params::tone::peakQ, 0.7071f },
 
             { params::out::gainDb, -12.0f }
         }
@@ -501,6 +564,13 @@ static const FactoryPreset kFactoryPresets[] =
             { params::filter::keyTrack, 0.0f },
             { params::filter::envAmount, 5.0f },
 
+            { params::tone::enable, 0.0f },
+            { params::tone::lowCutHz, 20.0f },
+            { params::tone::highCutHz, 20000.0f },
+            { params::tone::peakFreqHz, 1000.0f },
+            { params::tone::peakGainDb, 0.0f },
+            { params::tone::peakQ, 0.7071f },
+
             { params::out::gainDb, -16.0f }
         }
     }
@@ -518,11 +588,14 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setLookAndFeel (&lnf);
 
     // Resizable + minimum constraints.
-    boundsConstrainer.setSizeLimits (640, 380, 1400, 900);
+    // Keep a sane minimum: the UI is dense (Serum-like panels) and includes a spectrum editor.
+    boundsConstrainer.setSizeLimits (840, 650, 1800, 1200);
     setConstrainer (&boundsConstrainer);
     setResizable (true, true);
 
     addAndMakeVisible (resizeCorner);
+    addAndMakeVisible (resizeBorder);
+    resizeBorder.setAlwaysOnTop (true);
 
     // --- Init / Reset ---
     addAndMakeVisible (initButton);
@@ -673,12 +746,14 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                       u8"• Double-click по ручке: сброс к дефолту.\n"
                                       u8"• Init/Сброс: сброс всех параметров (язык сохраняется).\n"
                                       u8"• Note Sync: Mod Freq отключается.\n"
+                                      u8"• Тон EQ: маркеры на спектре (Shift: Q, double-click: сброс).\n"
                                       u8"• Glide Off: Glide Time отключается.\n\n"
                                       u8"Reaper: добавь плагин на трек, включи мониторинг и подай MIDI (Virtual MIDI keyboard).")
             : juce::String ("Quick tips:\n"
                             "• Double-click knob: reset to default.\n"
                             "• Init: resets all params (keeps language).\n"
                             "• Note Sync: disables Mod Freq.\n"
+                            "• Tone EQ: drag handles in the spectrum (Shift: Q, double-click: reset).\n"
                             "• Glide Off: disables Glide Time.\n\n"
                             "Reaper: insert on a track, enable monitoring, feed MIDI (Virtual MIDI keyboard).");
 
@@ -994,6 +1069,23 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     ampRelease.getSlider().setTextValueSuffix (" ms");
     setupSliderDoubleClickDefault (ampRelease.getSlider(), params::amp::releaseMs);
 
+    // --- Tone EQ / Spectrum (interactive) ---
+    toneGroup.setText ("Tone EQ");
+    addAndMakeVisible (toneGroup);
+
+    toneEnable.setButtonText ("Enable");
+    addAndMakeVisible (toneEnable);
+    toneEnableAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(), params::tone::enable, toneEnable);
+
+    addAndMakeVisible (spectrumEditor);
+    spectrumEditor.bind (audioProcessor.getAPVTS(),
+                         params::tone::enable,
+                         params::tone::lowCutHz,
+                         params::tone::highCutHz,
+                         params::tone::peakFreqHz,
+                         params::tone::peakGainDb,
+                         params::tone::peakQ);
+
     // --- Output ---
     outGroup.setText ("Output");
     addAndMakeVisible (outGroup);
@@ -1010,6 +1102,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     const auto cDestroy= juce::Colour (0xffff5b2e);
     const auto cFilter = juce::Colour (0xff5dff7a);
     const auto cEnv    = juce::Colour (0xff4aa3ff);
+    const auto cTone   = juce::Colour (0xff00ffd5);
     const auto cOut    = juce::Colour (0xffffd166);
     const auto cPanic  = juce::Colour (0xffff3b30);
 
@@ -1037,6 +1130,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (filterGroup, cFilter);
     setGroupAccent (filterEnvGroup, cFilter);
     setGroupAccent (ampGroup, cEnv);
+    setGroupAccent (toneGroup, cTone);
+    setGroupAccent (toneEnable, cTone);
     setGroupAccent (outGroup, cOut);
 
     setGroupAccent (foldPanel, cDestroy);
@@ -1080,6 +1175,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     outMeter.setAccentColour (cOut);
     filterEnvPreview.setAccentColour (cFilter);
     ampEnvPreview.setAccentColour (cEnv);
+    spectrumEditor.setAccentColour (cTone);
 
     // Update labels when language changes.
     language.getCombo().onChange = [this]
@@ -1228,14 +1324,16 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         return { x, row.getY(), colW, row.getHeight() };
     };
 
-    const int rows = (cols == 3) ? 3 : 4;
+    // 9 panels total (mono, osc1, osc2, destroy, filter, filterEnv, amp, tone, out).
+    // 3 columns -> 3 rows; 2 columns -> 5 rows.
+    const int rows = (cols == 3) ? 3 : 5;
     const float weights3[] { 1.0f, 1.55f, 1.0f };
-    const float weights2[] { 1.0f, 1.55f, 1.0f, 1.0f };
+    const float weights2[] { 1.0f, 1.55f, 1.0f, 1.0f, 0.75f };
 
     const auto totalGapH = gap * (rows - 1);
     const auto availH = juce::jmax (1, r.getHeight() - totalGapH);
 
-    int rowH[4] { 0, 0, 0, 0 };
+    int rowH[5] { 0, 0, 0, 0, 0 };
     float sumW = 0.0f;
     for (int i = 0; i < rows; ++i)
         sumW += (cols == 3) ? weights3[i] : weights2[i];
@@ -1258,6 +1356,8 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     auto row3 = rows > 2 ? r.removeFromTop (rowH[2]) : juce::Rectangle<int>();
     if (rows > 3) r.removeFromTop (gap);
     auto row4 = rows > 3 ? r.removeFromTop (rowH[3]) : juce::Rectangle<int>();
+    if (rows > 4) r.removeFromTop (gap);
+    auto row5 = rows > 4 ? r.removeFromTop (rowH[4]) : juce::Rectangle<int>();
 
     if (cols == 3)
     {
@@ -1270,7 +1370,8 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         ampGroup.setBounds (splitRow (row2, 2));
 
         filterEnvGroup.setBounds (splitRow (row3, 0));
-        outGroup.setBounds (splitRow (row3, 1));
+        toneGroup.setBounds (splitRow (row3, 1));
+        outGroup.setBounds (splitRow (row3, 2));
     }
     else
     {
@@ -1281,10 +1382,13 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         destroyGroup.setBounds (splitRow (row2, 1));
 
         filterGroup.setBounds (splitRow (row3, 0));
-        ampGroup.setBounds (splitRow (row3, 1));
+        toneGroup.setBounds (splitRow (row3, 1));
 
         filterEnvGroup.setBounds (splitRow (row4, 0));
-        outGroup.setBounds (splitRow (row4, 1));
+        ampGroup.setBounds (splitRow (row4, 1));
+
+        // Output spans the whole last row in narrow mode.
+        outGroup.setBounds (row5);
     }
 
     auto layoutKnobGrid = [&](juce::Rectangle<int> area, std::initializer_list<juce::Component*> items)
@@ -1425,6 +1529,14 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         layoutKnobGrid (gr, { &filterAttack, &filterDecay, &filterSustain, &filterRelease });
     }
 
+    // Tone EQ / Spectrum internal
+    {
+        auto gr = toneGroup.getBounds().reduced (10, 26);
+        toneEnable.setBounds (gr.removeFromTop (24));
+        gr.removeFromTop (6);
+        spectrumEditor.setBounds (gr);
+    }
+
     // Amp + Output
     {
         auto gr = ampGroup.getBounds().reduced (10, 26);
@@ -1436,10 +1548,14 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
     {
         auto gr = outGroup.getBounds().reduced (10, 26);
-        layoutKnobGrid (gr, { &outGain });
+        // Output is intentionally simple; keep the main gain knob a sane size even when the panel spans width.
+        const int maxW = juce::jmin (220, gr.getWidth());
+        const int maxH = juce::jmin (220, gr.getHeight());
+        outGain.setBounds (gr.withSizeKeepingCentre (maxW, maxH));
     }
 
     resizeCorner.setBounds (getWidth() - 18, getHeight() - 18, 18, 18);
+    resizeBorder.setBounds (getLocalBounds());
 }
 
 int IndustrialEnergySynthAudioProcessorEditor::getLanguageIndex() const
@@ -1539,6 +1655,9 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     ampSustain.setLabelText (ies::ui::tr (ies::ui::Key::sustain, langIdx));
     ampRelease.setLabelText (ies::ui::tr (ies::ui::Key::release, langIdx));
 
+    toneGroup.setText (ies::ui::tr (ies::ui::Key::tone, langIdx));
+    toneEnable.setButtonText (ies::ui::tr (ies::ui::Key::toneEnable, langIdx));
+
     outGroup.setText (ies::ui::tr (ies::ui::Key::output, langIdx));
     outGain.setLabelText (ies::ui::tr (ies::ui::Key::gain, langIdx));
 }
@@ -1588,6 +1707,11 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
         filterEnvAmount.getSlider().setTooltip (tip);
         filterEnvAmount.getLabel().setTooltip (tip);
     }
+
+    toneEnable.setTooltip (T ("Enable the post EQ (Tone).",
+                              u8"Включить пост-эквалайзер (Тон)."));
+    spectrumEditor.setTooltip (T ("Drag low/high cuts and the peak node. Shift-drag peak to change Q. Double-click handles to reset.",
+                                  u8"Таскай НЧ/ВЧ срезы и пик на графике. Shift+drag на пике меняет Q. Double-click по маркерам: сброс."));
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
@@ -1607,6 +1731,13 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
     updateEnabledStates();
 
     outMeter.pushLevelLinear (audioProcessor.getUiOutputPeak());
+
+    // Analyzer frame (UI-only). Uses a small ring buffer filled from the audio thread.
+    {
+        std::array<float, 2048> frame {};
+        audioProcessor.copyUiAudio (frame.data(), (int) frame.size());
+        spectrumEditor.setAudioFrame (frame.data(), (int) frame.size(), audioProcessor.getSampleRate());
+    }
 
     osc1Preview.setWaveIndex (osc1Wave.getCombo().getSelectedItemIndex());
     osc2Preview.setWaveIndex (osc2Wave.getCombo().getSelectedItemIndex());
@@ -1675,6 +1806,9 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
     setActivity (filterGroup, filterAct);
     setActivity (filterEnvGroup, abs01 ((filterAttack.getSlider().getValue() + filterDecay.getSlider().getValue() + filterRelease.getSlider().getValue()) / 3000.0));
     setActivity (ampGroup, abs01 ((ampAttack.getSlider().getValue() + ampDecay.getSlider().getValue() + ampRelease.getSlider().getValue()) / 3000.0));
+
+    const float toneAct = toneEnable.getToggleState() ? 0.85f : 0.0f;
+    setActivity (toneGroup, toneAct);
 
     const float outAct = abs01 ((outGain.getSlider().getValue() + 24.0) / 30.0);
     setActivity (outGroup, outAct);

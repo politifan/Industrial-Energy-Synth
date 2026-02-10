@@ -7,6 +7,7 @@
 #include "../dsp/DestroyChain.h"
 #include "../dsp/PolyBlepOscillator.h"
 #include "../dsp/SvfFilter.h"
+#include "../dsp/ToneEQ.h"
 #include "NoteStackMono.h"
 
 namespace ies::engine
@@ -68,6 +69,13 @@ public:
         std::atomic<float>* filterDecayMs = nullptr;
         std::atomic<float>* filterSustain = nullptr;
         std::atomic<float>* filterReleaseMs = nullptr;
+
+        std::atomic<float>* toneEnable = nullptr;
+        std::atomic<float>* toneLowCutHz = nullptr;
+        std::atomic<float>* toneHighCutHz = nullptr;
+        std::atomic<float>* tonePeakFreqHz = nullptr;
+        std::atomic<float>* tonePeakGainDb = nullptr;
+        std::atomic<float>* tonePeakQ = nullptr;
 
         std::atomic<float>* outGainDb = nullptr;
     };
@@ -171,6 +179,12 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> filterResKnobSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> filterEnvAmountSm;
 
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> toneLowCutHzSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> toneHighCutHzSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeakFreqHzSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeakGainDbSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeakQSm;
+
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> outGain;
 
     dsp::PolyBlepOscillator osc1;
@@ -178,6 +192,10 @@ private:
 
     dsp::DestroyChain destroy;
     dsp::SvfFilter filter;
+    dsp::ToneEQ toneEq;
+
+    int toneCoeffCountdown = 0;
+    bool toneEnabledPrev = false;
 
     juce::Random driftRng1 { 0x13579bdf };
     juce::Random driftRng2 { 0x2468ace0 };

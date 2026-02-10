@@ -19,6 +19,7 @@ public:
     float getUiOutputPeak() const noexcept { return uiOutputPeak.load (std::memory_order_relaxed); }
     void requestPanic() noexcept { uiPanicRequested.store (true, std::memory_order_release); }
     void applyStateFromUi (juce::ValueTree state, bool keepLanguage);
+    void copyUiAudio (float* dest, int numSamples) const noexcept;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -57,6 +58,10 @@ private:
     ies::engine::MonoSynthEngine::ParamPointers paramPointers;
     std::atomic<float> uiOutputPeak { 0.0f };
     std::atomic<bool> uiPanicRequested { false };
+
+    static constexpr int uiAudioRingSize = 16384;
+    std::array<float, (size_t) uiAudioRingSize> uiAudioRing {};
+    std::atomic<int> uiAudioWritePos { 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (IndustrialEnergySynthAudioProcessor)
 };
