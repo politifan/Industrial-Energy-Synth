@@ -2,9 +2,13 @@
 
 #include <JuceHeader.h>
 
+#include <array>
+#include <vector>
+
 #include "../Params.h"
 #include "../Util/Math.h"
 #include "../dsp/DestroyChain.h"
+#include "../dsp/Lfo.h"
 #include "../dsp/PolyBlepOscillator.h"
 #include "../dsp/SvfFilter.h"
 #include "../dsp/ToneEQ.h"
@@ -48,6 +52,8 @@ public:
         std::atomic<float>* clipDriveDb = nullptr;
         std::atomic<float>* clipAmount = nullptr;
         std::atomic<float>* clipMix = nullptr;
+
+        std::atomic<float>* destroyOversample = nullptr;
 
         std::atomic<float>* modMode = nullptr;
         std::atomic<float>* modAmount = nullptr;
@@ -114,6 +120,26 @@ public:
         std::atomic<float>* tonePeak8GainDb = nullptr;
         std::atomic<float>* tonePeak8Q = nullptr;
 
+        // Modulation (V1.2): 2x LFO + 2x Macros + Mod Matrix slots.
+        std::atomic<float>* lfo1Wave = nullptr;
+        std::atomic<float>* lfo1Sync = nullptr;
+        std::atomic<float>* lfo1RateHz = nullptr;
+        std::atomic<float>* lfo1SyncDiv = nullptr;
+        std::atomic<float>* lfo1Phase = nullptr;
+
+        std::atomic<float>* lfo2Wave = nullptr;
+        std::atomic<float>* lfo2Sync = nullptr;
+        std::atomic<float>* lfo2RateHz = nullptr;
+        std::atomic<float>* lfo2SyncDiv = nullptr;
+        std::atomic<float>* lfo2Phase = nullptr;
+
+        std::atomic<float>* macro1 = nullptr;
+        std::atomic<float>* macro2 = nullptr;
+
+        std::array<std::atomic<float>*, (size_t) params::mod::numSlots> modSlotSrc {};
+        std::array<std::atomic<float>*, (size_t) params::mod::numSlots> modSlotDst {};
+        std::array<std::atomic<float>*, (size_t) params::mod::numSlots> modSlotDepth {};
+
         std::atomic<float>* outGainDb = nullptr;
     };
 
@@ -124,6 +150,8 @@ public:
 
     // Render audio into buffer for [startSample, startSample+numSamples).
     void render (juce::AudioBuffer<float>& buffer, int startSample, int numSamples);
+
+    void setHostBpm (double bpm) noexcept;
 
     // MIDI handling (sample-accurate handled by caller via segmentation).
     void noteOn (int midiNote, int velocity0to127);
@@ -177,12 +205,14 @@ private:
     void updateFilterEnvParams();
     void applyNoteChange (int newMidiNote, bool gateWasAlreadyOn);
     void resetOscPhasesFromParams();
+    void resetLfoPhasesFromParams();
 
     float computeDriftCents (juce::Random& rng, float& driftState, float alpha, float detuneAmount01) noexcept;
 
     const ParamPointers* params = nullptr;
 
     double sampleRateHz = 44100.0;
+    float hostBpm = 120.0f;
 
     NoteStackMono noteStack;
     bool gateOn = false;
@@ -264,7 +294,32 @@ private:
     dsp::PolyBlepOscillator osc1;
     dsp::PolyBlepOscillator osc2;
 
-    dsp::DestroyChain destroy;
+    dsp::Lfo lfo1;
+    dsp::Lfo lfo2;
+
+    dsp::DestroyChain destroyBase;
+    dsp::DestroyChain destroyOs2;
+    dsp::DestroyChain destroyOs4;
+
+    juce::dsp::Oversampling<float> destroyOversampling2x { 1, 1, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, false };
+    juce::dsp::Oversampling<float> destroyOversampling4x { 1, 2, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, false };
+    int destroyOversamplingFactorPrev = 1;
+
+    // Scratch buffers (allocated in prepare; no allocations in render).
+    juce::AudioBuffer<float> destroyBuffer;
+    std::vector<float> destroyNoteHz;
+    std::vector<float> destroyFoldDriveDb;
+    std::vector<float> destroyFoldAmount;
+    std::vector<float> destroyFoldMix;
+    std::vector<float> destroyClipDriveDb;
+    std::vector<float> destroyClipAmount;
+    std::vector<float> destroyClipMix;
+    std::vector<float> destroyModAmount;
+    std::vector<float> destroyModMix;
+    std::vector<float> destroyModFreqHz;
+    std::vector<float> destroyCrushMix;
+    std::vector<float> filterModCutoffSemis;
+    std::vector<float> filterModResAdd;
     dsp::SvfFilter filter;
     dsp::ToneEQ toneEq;
 

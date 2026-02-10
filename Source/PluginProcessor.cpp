@@ -79,6 +79,8 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
     paramPointers.clipAmount    = apvts.getRawParameterValue (params::destroy::clipAmount);
     paramPointers.clipMix       = apvts.getRawParameterValue (params::destroy::clipMix);
 
+    paramPointers.destroyOversample = apvts.getRawParameterValue (params::destroy::oversample);
+
     paramPointers.modMode       = apvts.getRawParameterValue (params::destroy::modMode);
     paramPointers.modAmount     = apvts.getRawParameterValue (params::destroy::modAmount);
     paramPointers.modMix        = apvts.getRawParameterValue (params::destroy::modMix);
@@ -143,6 +145,45 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
     paramPointers.tonePeak8FreqHz = apvts.getRawParameterValue (params::tone::peak8FreqHz);
     paramPointers.tonePeak8GainDb = apvts.getRawParameterValue (params::tone::peak8GainDb);
     paramPointers.tonePeak8Q      = apvts.getRawParameterValue (params::tone::peak8Q);
+
+    // --- Modulation (V1.2): 2x LFO + 2x Macros + Mod Matrix ---
+    paramPointers.lfo1Wave    = apvts.getRawParameterValue (params::lfo1::wave);
+    paramPointers.lfo1Sync    = apvts.getRawParameterValue (params::lfo1::sync);
+    paramPointers.lfo1RateHz  = apvts.getRawParameterValue (params::lfo1::rateHz);
+    paramPointers.lfo1SyncDiv = apvts.getRawParameterValue (params::lfo1::syncDiv);
+    paramPointers.lfo1Phase   = apvts.getRawParameterValue (params::lfo1::phase);
+
+    paramPointers.lfo2Wave    = apvts.getRawParameterValue (params::lfo2::wave);
+    paramPointers.lfo2Sync    = apvts.getRawParameterValue (params::lfo2::sync);
+    paramPointers.lfo2RateHz  = apvts.getRawParameterValue (params::lfo2::rateHz);
+    paramPointers.lfo2SyncDiv = apvts.getRawParameterValue (params::lfo2::syncDiv);
+    paramPointers.lfo2Phase   = apvts.getRawParameterValue (params::lfo2::phase);
+
+    paramPointers.macro1 = apvts.getRawParameterValue (params::macros::m1);
+    paramPointers.macro2 = apvts.getRawParameterValue (params::macros::m2);
+
+    static constexpr const char* slotSrcIds[params::mod::numSlots] =
+    {
+        params::mod::slot1Src, params::mod::slot2Src, params::mod::slot3Src, params::mod::slot4Src,
+        params::mod::slot5Src, params::mod::slot6Src, params::mod::slot7Src, params::mod::slot8Src
+    };
+    static constexpr const char* slotDstIds[params::mod::numSlots] =
+    {
+        params::mod::slot1Dst, params::mod::slot2Dst, params::mod::slot3Dst, params::mod::slot4Dst,
+        params::mod::slot5Dst, params::mod::slot6Dst, params::mod::slot7Dst, params::mod::slot8Dst
+    };
+    static constexpr const char* slotDepthIds[params::mod::numSlots] =
+    {
+        params::mod::slot1Depth, params::mod::slot2Depth, params::mod::slot3Depth, params::mod::slot4Depth,
+        params::mod::slot5Depth, params::mod::slot6Depth, params::mod::slot7Depth, params::mod::slot8Depth
+    };
+
+    for (int i = 0; i < params::mod::numSlots; ++i)
+    {
+        paramPointers.modSlotSrc[(size_t) i]   = apvts.getRawParameterValue (slotSrcIds[i]);
+        paramPointers.modSlotDst[(size_t) i]   = apvts.getRawParameterValue (slotDstIds[i]);
+        paramPointers.modSlotDepth[(size_t) i] = apvts.getRawParameterValue (slotDepthIds[i]);
+    }
 
     paramPointers.outGainDb     = apvts.getRawParameterValue (params::out::gainDb);
 
@@ -301,6 +342,20 @@ void IndustrialEnergySynthAudioProcessor::processBlock (juce::AudioBuffer<float>
 
     buffer.clear();
 
+    // Feed host tempo for tempo-synced modulators (LFO sync).
+    {
+        double bpm = 120.0;
+        if (auto* ph = getPlayHead())
+        {
+            if (const auto pos = ph->getPosition())
+            {
+                if (const auto hostBpm = pos->getBpm())
+                    bpm = *hostBpm;
+            }
+        }
+        engine.setHostBpm (bpm);
+    }
+
     if (uiPanicRequested.exchange (false, std::memory_order_acq_rel))
         engine.allNotesOff();
 
@@ -436,6 +491,74 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
 
     layout.add (std::move (monoGroup));
 
+    // --- Macros (modulation sources) ---
+    auto macrosGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("macros", "Macros", "|");
+    macrosGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::macros::m1), "Macro 1",
+                                                                        juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+    macrosGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::macros::m2), "Macro 2",
+                                                                        juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+    layout.add (std::move (macrosGroup));
+
+    // --- LFOs ---
+    const auto lfoWaveChoices = juce::StringArray { "Sine", "Triangle", "Saw Up", "Saw Down", "Square" };
+    const auto lfoDivChoices = juce::StringArray { "1/1", "1/2", "1/4", "1/8", "1/16", "1/32",
+                                                   "1/4T", "1/8T", "1/16T",
+                                                   "1/4D", "1/8D", "1/16D" };
+
+    auto makeLfoGroup = [&] (const char* groupId, const char* groupName,
+                             const char* waveId, const char* syncId, const char* rateId, const char* divId, const char* phaseId)
+    {
+        auto g = std::make_unique<juce::AudioProcessorParameterGroup> (groupId, groupName, "|");
+        g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (waveId), "Wave", lfoWaveChoices, (int) params::lfo::sine));
+        g->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (syncId), "Sync", false));
+        {
+            juce::NormalisableRange<float> range (0.05f, 30.0f);
+            range.setSkewForCentre (2.0f);
+            g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (rateId), "Rate", range, 2.0f, "Hz"));
+        }
+        g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (divId), "Div", lfoDivChoices, (int) params::lfo::div1_4));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (phaseId), "Phase",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        return g;
+    };
+
+    layout.add (makeLfoGroup ("lfo1", "LFO 1", params::lfo1::wave, params::lfo1::sync, params::lfo1::rateHz, params::lfo1::syncDiv, params::lfo1::phase));
+    layout.add (makeLfoGroup ("lfo2", "LFO 2", params::lfo2::wave, params::lfo2::sync, params::lfo2::rateHz, params::lfo2::syncDiv, params::lfo2::phase));
+
+    // --- Mod Matrix (fixed slots; no drag/drop yet) ---
+    auto modGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("mod", "Mod Matrix", "|");
+    const auto modSrcChoices = juce::StringArray { "Off", "LFO 1", "LFO 2", "Macro 1", "Macro 2" };
+    const auto modDstChoices = juce::StringArray { "Off", "Osc1 Level", "Osc2 Level", "Filter Cutoff", "Filter Reso",
+                                                   "Fold Amount", "Clip Amount", "Mod Amount", "Crush Mix" };
+
+    auto addModSlot = [&] (const char* srcId, const char* dstId, const char* depthId, int slotIndex)
+    {
+        const auto prefix = "Slot " + juce::String (slotIndex) + " ";
+        modGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (srcId),
+                                                                          prefix + "Source",
+                                                                          modSrcChoices,
+                                                                          (int) params::mod::srcOff));
+        modGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (dstId),
+                                                                          prefix + "Destination",
+                                                                          modDstChoices,
+                                                                          (int) params::mod::dstOff));
+        modGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (depthId),
+                                                                         prefix + "Depth",
+                                                                         juce::NormalisableRange<float> (-1.0f, 1.0f),
+                                                                         0.0f));
+    };
+
+    addModSlot (params::mod::slot1Src, params::mod::slot1Dst, params::mod::slot1Depth, 1);
+    addModSlot (params::mod::slot2Src, params::mod::slot2Dst, params::mod::slot2Depth, 2);
+    addModSlot (params::mod::slot3Src, params::mod::slot3Dst, params::mod::slot3Depth, 3);
+    addModSlot (params::mod::slot4Src, params::mod::slot4Dst, params::mod::slot4Depth, 4);
+    addModSlot (params::mod::slot5Src, params::mod::slot5Dst, params::mod::slot5Depth, 5);
+    addModSlot (params::mod::slot6Src, params::mod::slot6Dst, params::mod::slot6Depth, 6);
+    addModSlot (params::mod::slot7Src, params::mod::slot7Dst, params::mod::slot7Depth, 7);
+    addModSlot (params::mod::slot8Src, params::mod::slot8Dst, params::mod::slot8Depth, 8);
+
+    layout.add (std::move (modGroup));
+
     // --- Oscillators ---
     const auto waveChoices = juce::StringArray { "Saw", "Square", "Triangle" };
 
@@ -468,6 +591,10 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
 
     // --- Destroy / Modulation ---
     auto destroyGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("destroy", "Destroy", "|");
+    destroyGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::destroy::oversample),
+                                                                          "Oversampling",
+                                                                          juce::StringArray { "Off", "2x", "4x" },
+                                                                          (int) params::destroy::osOff));
     destroyGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::destroy::foldDriveDb), "Fold Drive",
                                                                          juce::NormalisableRange<float> (-12.0f, 36.0f), 0.0f, "dB"));
     destroyGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::destroy::foldAmount), "Fold Amount",

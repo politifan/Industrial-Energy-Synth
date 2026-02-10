@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(IndustrialEnergySynth VERSION 0.1.2 LANGUAGES CXX)
+project(IndustrialEnergySynth VERSION 0.1.4 LANGUAGES CXX)
 
 option(IES_COPY_PLUGIN_AFTER_BUILD "Copy built plugin to the default VST3 folder after build" OFF)
 
@@ -46,6 +46,7 @@ target_sources(IndustrialEnergySynth PRIVATE
   Source/PluginProcessor.h
   Source/Util/Math.h
   Source/dsp/DestroyChain.h
+  Source/dsp/Lfo.h
   Source/dsp/PolyBlepOscillator.h
   Source/dsp/SvfFilter.h
   Source/dsp/ToneEQ.h

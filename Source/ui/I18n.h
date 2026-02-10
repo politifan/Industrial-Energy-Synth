@@ -45,6 +45,10 @@ enum class Key
     destroyClip,
     destroyMod,
     destroyCrush,
+    destroyOversample,
+    oversampleOff,
+    oversample2x,
+    oversample4x,
     foldDrive,
     foldAmount,
     foldMix,
@@ -80,6 +84,40 @@ enum class Key
 
     tone,
     toneEnable,
+
+    modulation,
+    macros,
+    macro1,
+    macro2,
+    lfo1,
+    lfo2,
+    lfoWave,
+    lfoWaveSine,
+    lfoWaveTriangle,
+    lfoWaveSawUp,
+    lfoWaveSawDown,
+    lfoWaveSquare,
+    lfoSync,
+    lfoRate,
+    lfoDiv,
+    modMatrix,
+    modSlot,
+    modSrc,
+    modDst,
+    modDepth,
+    modOff,
+    modSrcLfo1,
+    modSrcLfo2,
+    modSrcMacro1,
+    modSrcMacro2,
+    modDstOsc1Level,
+    modDstOsc2Level,
+    modDstFilterCutoff,
+    modDstFilterReso,
+    modDstFoldAmount,
+    modDstClipAmount,
+    modDstModAmount,
+    modDstCrushMix,
 
     output,
     gain
@@ -131,6 +169,10 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::destroyClip:  return u8 (u8"Клип");
             case Key::destroyMod:   return u8 (u8"Мод");
             case Key::destroyCrush: return u8 (u8"Краш");
+            case Key::destroyOversample: return u8 (u8"OS");
+            case Key::oversampleOff: return u8 (u8"Выкл");
+            case Key::oversample2x:  return u8 (u8"2x");
+            case Key::oversample4x:  return u8 (u8"4x");
             case Key::foldDrive:    return u8 (u8"Драйв (fold)");
             case Key::foldAmount:   return u8 (u8"Amount (fold)");
             case Key::foldMix:      return u8 (u8"Mix (fold)");
@@ -166,6 +208,40 @@ inline juce::String tr (Key key, int languageChoiceIndex)
 
             case Key::tone:         return u8 (u8"Тон EQ");
             case Key::toneEnable:   return u8 (u8"Вкл");
+
+            case Key::modulation:   return u8 (u8"Модуляция");
+            case Key::macros:       return u8 (u8"Макросы");
+            case Key::macro1:       return u8 (u8"Макро 1");
+            case Key::macro2:       return u8 (u8"Макро 2");
+            case Key::lfo1:         return u8 (u8"LFO 1");
+            case Key::lfo2:         return u8 (u8"LFO 2");
+            case Key::lfoWave:      return u8 (u8"Форма");
+            case Key::lfoWaveSine:      return u8 (u8"Синус");
+            case Key::lfoWaveTriangle:  return u8 (u8"Треугольник");
+            case Key::lfoWaveSawUp:     return u8 (u8"Пила вверх");
+            case Key::lfoWaveSawDown:   return u8 (u8"Пила вниз");
+            case Key::lfoWaveSquare:    return u8 (u8"Квадрат");
+            case Key::lfoSync:      return u8 (u8"Синхр.");
+            case Key::lfoRate:      return u8 (u8"Скорость");
+            case Key::lfoDiv:       return u8 (u8"Деление");
+            case Key::modMatrix:    return u8 (u8"Матрица модуляции");
+            case Key::modSlot:      return u8 (u8"Слот");
+            case Key::modSrc:       return u8 (u8"Источник");
+            case Key::modDst:       return u8 (u8"Цель");
+            case Key::modDepth:     return u8 (u8"Глубина");
+            case Key::modOff:       return u8 (u8"Выкл");
+            case Key::modSrcLfo1:   return u8 (u8"LFO 1");
+            case Key::modSrcLfo2:   return u8 (u8"LFO 2");
+            case Key::modSrcMacro1: return u8 (u8"Макро 1");
+            case Key::modSrcMacro2: return u8 (u8"Макро 2");
+            case Key::modDstOsc1Level:     return u8 (u8"Осц1 уровень");
+            case Key::modDstOsc2Level:     return u8 (u8"Осц2 уровень");
+            case Key::modDstFilterCutoff:  return u8 (u8"Фильтр срез");
+            case Key::modDstFilterReso:    return u8 (u8"Фильтр резонанс");
+            case Key::modDstFoldAmount:    return u8 (u8"Amount (fold)");
+            case Key::modDstClipAmount:    return u8 (u8"Amount (clip)");
+            case Key::modDstModAmount:     return u8 (u8"Amount (mod)");
+            case Key::modDstCrushMix:      return u8 (u8"Mix (crush)");
 
             case Key::output:       return u8 (u8"Выход");
             case Key::gain:         return u8 (u8"Громкость");
@@ -212,6 +288,10 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::destroyClip:  return "Clip";
             case Key::destroyMod:   return "Mod";
             case Key::destroyCrush: return "Crush";
+            case Key::destroyOversample: return "OS";
+            case Key::oversampleOff: return "Off";
+            case Key::oversample2x:  return "2x";
+            case Key::oversample4x:  return "4x";
             case Key::foldDrive:    return "Fold Drive";
             case Key::foldAmount:   return "Fold Amount";
             case Key::foldMix:      return "Fold Mix";
@@ -247,6 +327,40 @@ inline juce::String tr (Key key, int languageChoiceIndex)
 
             case Key::tone:         return "Tone EQ";
             case Key::toneEnable:   return "Enable";
+
+            case Key::modulation:   return "Modulation";
+            case Key::macros:       return "Macros";
+            case Key::macro1:       return "Macro 1";
+            case Key::macro2:       return "Macro 2";
+            case Key::lfo1:         return "LFO 1";
+            case Key::lfo2:         return "LFO 2";
+            case Key::lfoWave:      return "Wave";
+            case Key::lfoWaveSine:      return "Sine";
+            case Key::lfoWaveTriangle:  return "Triangle";
+            case Key::lfoWaveSawUp:     return "Saw Up";
+            case Key::lfoWaveSawDown:   return "Saw Down";
+            case Key::lfoWaveSquare:    return "Square";
+            case Key::lfoSync:      return "Sync";
+            case Key::lfoRate:      return "Rate";
+            case Key::lfoDiv:       return "Div";
+            case Key::modMatrix:    return "Mod Matrix";
+            case Key::modSlot:      return "Slot";
+            case Key::modSrc:       return "Src";
+            case Key::modDst:       return "Dst";
+            case Key::modDepth:     return "Depth";
+            case Key::modOff:       return "Off";
+            case Key::modSrcLfo1:   return "LFO 1";
+            case Key::modSrcLfo2:   return "LFO 2";
+            case Key::modSrcMacro1: return "Macro 1";
+            case Key::modSrcMacro2: return "Macro 2";
+            case Key::modDstOsc1Level:     return "Osc1 Level";
+            case Key::modDstOsc2Level:     return "Osc2 Level";
+            case Key::modDstFilterCutoff:  return "Filter Cutoff";
+            case Key::modDstFilterReso:    return "Filter Reso";
+            case Key::modDstFoldAmount:    return "Fold Amount";
+            case Key::modDstClipAmount:    return "Clip Amount";
+            case Key::modDstModAmount:     return "Mod Amount";
+            case Key::modDstCrushMix:      return "Crush Mix";
 
             case Key::output:       return "Output";
             case Key::gain:         return "Gain";

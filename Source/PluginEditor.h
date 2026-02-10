@@ -11,6 +11,8 @@
 #include "ui/WavePreview.h"
 #include "presets/PresetManager.h"
 
+#include <array>
+
 class IndustrialEnergySynthAudioProcessor;
 
 class IndustrialEnergySynthAudioProcessorEditor final : public juce::AudioProcessorEditor, private juce::Timer
@@ -111,6 +113,8 @@ private:
 
     // Destroy / Modulation
     juce::GroupComponent destroyGroup;
+    ies::ui::ComboWithLabel destroyOversample;
+    std::unique_ptr<APVTS::ComboBoxAttachment> destroyOversampleAttachment;
     juce::GroupComponent foldPanel;
     juce::GroupComponent clipPanel;
     juce::GroupComponent modPanel;
@@ -189,6 +193,52 @@ private:
     juce::ToggleButton toneEnable;
     std::unique_ptr<APVTS::ButtonAttachment> toneEnableAttachment;
     ies::ui::SpectrumEditor spectrumEditor;
+
+    // Modulation (V1.2): Macros + 2 LFO + Mod Matrix
+    juce::GroupComponent modGroup;
+    juce::GroupComponent macrosPanel;
+    ies::ui::KnobWithLabel macro1;
+    std::unique_ptr<APVTS::SliderAttachment> macro1Attachment;
+    ies::ui::KnobWithLabel macro2;
+    std::unique_ptr<APVTS::SliderAttachment> macro2Attachment;
+
+    juce::GroupComponent lfo1Panel;
+    ies::ui::ComboWithLabel lfo1Wave;
+    std::unique_ptr<APVTS::ComboBoxAttachment> lfo1WaveAttachment;
+    juce::ToggleButton lfo1Sync;
+    std::unique_ptr<APVTS::ButtonAttachment> lfo1SyncAttachment;
+    ies::ui::KnobWithLabel lfo1Rate;
+    std::unique_ptr<APVTS::SliderAttachment> lfo1RateAttachment;
+    ies::ui::ComboWithLabel lfo1Div;
+    std::unique_ptr<APVTS::ComboBoxAttachment> lfo1DivAttachment;
+    ies::ui::KnobWithLabel lfo1Phase;
+    std::unique_ptr<APVTS::SliderAttachment> lfo1PhaseAttachment;
+
+    juce::GroupComponent lfo2Panel;
+    ies::ui::ComboWithLabel lfo2Wave;
+    std::unique_ptr<APVTS::ComboBoxAttachment> lfo2WaveAttachment;
+    juce::ToggleButton lfo2Sync;
+    std::unique_ptr<APVTS::ButtonAttachment> lfo2SyncAttachment;
+    ies::ui::KnobWithLabel lfo2Rate;
+    std::unique_ptr<APVTS::SliderAttachment> lfo2RateAttachment;
+    ies::ui::ComboWithLabel lfo2Div;
+    std::unique_ptr<APVTS::ComboBoxAttachment> lfo2DivAttachment;
+    ies::ui::KnobWithLabel lfo2Phase;
+    std::unique_ptr<APVTS::SliderAttachment> lfo2PhaseAttachment;
+
+    juce::GroupComponent modMatrixPanel;
+    juce::Label modHeaderSlot;
+    juce::Label modHeaderSrc;
+    juce::Label modHeaderDst;
+    juce::Label modHeaderDepth;
+
+    std::array<juce::Label, (size_t) params::mod::numSlots> modSlotLabel;
+    std::array<juce::ComboBox, (size_t) params::mod::numSlots> modSlotSrc;
+    std::array<juce::ComboBox, (size_t) params::mod::numSlots> modSlotDst;
+    std::array<juce::Slider, (size_t) params::mod::numSlots> modSlotDepth;
+    std::array<std::unique_ptr<APVTS::ComboBoxAttachment>, (size_t) params::mod::numSlots> modSlotSrcAttachment;
+    std::array<std::unique_ptr<APVTS::ComboBoxAttachment>, (size_t) params::mod::numSlots> modSlotDstAttachment;
+    std::array<std::unique_ptr<APVTS::SliderAttachment>, (size_t) params::mod::numSlots> modSlotDepthAttachment;
 
     // Output
     juce::GroupComponent outGroup;

@@ -22,6 +22,24 @@ public:
         crushHeld = 0.0f;
     }
 
+    float processSamplePreCrush (float x,
+                                 float noteHz,
+                                 float foldDriveDb, float foldAmount, float foldMix,
+                                 float clipDriveDb, float clipAmount, float clipMix,
+                                 int modMode, float modAmount, float modMix, bool modNoteSync, float modFreqHz) noexcept
+    {
+        x = waveFoldStage (x, foldDriveDb, foldAmount, foldMix);
+        x = hardClipStage (x, clipDriveDb, clipAmount, clipMix);
+        x = modStage (x, noteHz, modMode, modAmount, modMix, modNoteSync, modFreqHz);
+        return x;
+    }
+
+    float processSampleCrush (float x,
+                              int crushBits, int crushDownsample, float crushMix) noexcept
+    {
+        return crushStage (x, crushBits, crushDownsample, crushMix);
+    }
+
     float processSample (float x,
                          float noteHz,
                          float foldDriveDb, float foldAmount, float foldMix,
@@ -29,10 +47,12 @@ public:
                          int modMode, float modAmount, float modMix, bool modNoteSync, float modFreqHz,
                          int crushBits, int crushDownsample, float crushMix) noexcept
     {
-        x = waveFoldStage (x, foldDriveDb, foldAmount, foldMix);
-        x = hardClipStage (x, clipDriveDb, clipAmount, clipMix);
-        x = modStage (x, noteHz, modMode, modAmount, modMix, modNoteSync, modFreqHz);
-        x = crushStage (x, crushBits, crushDownsample, crushMix);
+        x = processSamplePreCrush (x,
+                                   noteHz,
+                                   foldDriveDb, foldAmount, foldMix,
+                                   clipDriveDb, clipAmount, clipMix,
+                                   modMode, modAmount, modMix, modNoteSync, modFreqHz);
+        x = processSampleCrush (x, crushBits, crushDownsample, crushMix);
         return x;
     }
 
@@ -149,4 +169,3 @@ private:
     float crushHeld = 0.0f;
 };
 } // namespace ies::dsp
-

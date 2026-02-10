@@ -8,9 +8,10 @@ static int msToSamples (double sampleRate, float ms) noexcept
     return (int) std::lround (sampleRate * (double) clampedMs / 1000.0);
 }
 
-void MonoSynthEngine::prepare (double sr, int /*maxBlockSize*/)
+void MonoSynthEngine::prepare (double sr, int maxBlockSize)
 {
     sampleRateHz = (sr > 0.0) ? sr : 44100.0;
+    hostBpm = 120.0f;
 
     ampEnv.setSampleRate (sampleRateHz);
     updateAmpEnvParams();
@@ -24,9 +25,37 @@ void MonoSynthEngine::prepare (double sr, int /*maxBlockSize*/)
     osc1.prepare (sampleRateHz);
     osc2.prepare (sampleRateHz);
 
-    destroy.prepare (sampleRateHz);
+    lfo1.prepare (sampleRateHz);
+    lfo2.prepare (sampleRateHz);
+
+    destroyBase.prepare (sampleRateHz);
+    destroyOs2.prepare (sampleRateHz * 2.0);
+    destroyOs4.prepare (sampleRateHz * 4.0);
     filter.prepare (sampleRateHz);
     toneEq.prepare (sampleRateHz);
+
+    // Oversampling/scratch buffers are allocated up-front (no audio-thread allocations).
+    const auto maxN = juce::jmax (1, maxBlockSize);
+    destroyBuffer.setSize (1, maxN, false, false, true);
+    destroyNoteHz.resize ((size_t) maxN);
+    destroyFoldDriveDb.resize ((size_t) maxN);
+    destroyFoldAmount.resize ((size_t) maxN);
+    destroyFoldMix.resize ((size_t) maxN);
+    destroyClipDriveDb.resize ((size_t) maxN);
+    destroyClipAmount.resize ((size_t) maxN);
+    destroyClipMix.resize ((size_t) maxN);
+    destroyModAmount.resize ((size_t) maxN);
+    destroyModMix.resize ((size_t) maxN);
+    destroyModFreqHz.resize ((size_t) maxN);
+    destroyCrushMix.resize ((size_t) maxN);
+    filterModCutoffSemis.resize ((size_t) maxN);
+    filterModResAdd.resize ((size_t) maxN);
+
+    destroyOversampling2x.initProcessing ((size_t) maxN);
+    destroyOversampling4x.initProcessing ((size_t) maxN);
+    destroyOversampling2x.reset();
+    destroyOversampling4x.reset();
+    destroyOversamplingFactorPrev = 1;
 
     // Smoothing for automation-heavy params (cutoff/drive/mix).
     constexpr double smoothSeconds = 0.02;
@@ -148,11 +177,19 @@ void MonoSynthEngine::reset()
     ampEnv.reset();
     filterEnv.reset();
 
-    destroy.reset();
+    destroyBase.reset();
+    destroyOs2.reset();
+    destroyOs4.reset();
+    destroyOversampling2x.reset();
+    destroyOversampling4x.reset();
+    destroyOversamplingFactorPrev = 1;
     filter.reset();
     toneEq.reset();
     toneCoeffCountdown = 0;
     toneEnabledPrev = false;
+
+    // Reset modulators to their configured start phases.
+    resetLfoPhasesFromParams();
 
     // Snap smoothed params to the current parameter values on transport/state resets.
     auto loadParam = [&](std::atomic<float>* p, float def) noexcept
@@ -228,6 +265,15 @@ void MonoSynthEngine::reset()
     driftState2 = 0.0f;
 }
 
+void MonoSynthEngine::setHostBpm (double bpm) noexcept
+{
+    // Hosts may return 0 or nonsense when stopped; keep a sane default.
+    if (! std::isfinite (bpm) || bpm <= 0.0)
+        hostBpm = 120.0f;
+    else
+        hostBpm = (float) juce::jlimit (10.0, 480.0, bpm);
+}
+
 void MonoSynthEngine::updateAmpEnvParams()
 {
     if (params == nullptr)
@@ -288,6 +334,18 @@ void MonoSynthEngine::resetOscPhasesFromParams()
     osc2.setPhase (p2);
 }
 
+void MonoSynthEngine::resetLfoPhasesFromParams()
+{
+    if (params == nullptr)
+        return;
+
+    const auto p1 = params->lfo1Phase != nullptr ? params->lfo1Phase->load() : 0.0f;
+    const auto p2 = params->lfo2Phase != nullptr ? params->lfo2Phase->load() : 0.0f;
+
+    lfo1.resetPhase (p1);
+    lfo2.resetPhase (p2);
+}
+
 void MonoSynthEngine::applyNoteChange (int newMidiNote, bool gateWasAlreadyOn)
 {
     if (params == nullptr)
@@ -328,6 +386,7 @@ void MonoSynthEngine::noteOn (int midiNote, int velocity0to127)
     if (doRetrigger)
     {
         resetOscPhasesFromParams();
+        resetLfoPhasesFromParams();
         ampEnv.noteOn();
         filterEnv.noteOn();
         velocityGain = juce::jlimit (0.0f, 1.0f, (float) velocity0to127 / 127.0f);
@@ -472,16 +531,174 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
     }
     toneEnabledPrev = toneOn;
 
+    // Oversampling selection (Destroy only).
+    const auto osChoice = params->destroyOversample != nullptr
+        ? (int) std::lround (params->destroyOversample->load())
+        : (int) params::destroy::osOff;
+    const auto osChoiceClamped = juce::jlimit ((int) params::destroy::osOff, (int) params::destroy::os4x, osChoice);
+    const int osFactor = (osChoiceClamped == (int) params::destroy::os2x) ? 2
+                       : (osChoiceClamped == (int) params::destroy::os4x) ? 4
+                       : 1;
+
+    if (osFactor != destroyOversamplingFactorPrev)
+    {
+        // Avoid nasty transients when switching oversampling during playback.
+        destroyOversampling2x.reset();
+        destroyOversampling4x.reset();
+        destroyOs2.reset();
+        destroyOs4.reset();
+        destroyOversamplingFactorPrev = osFactor;
+    }
+
+    // Defensive: should never happen if prepare() used the host's max block size.
+    if (destroyBuffer.getNumSamples() < numSamples
+        || (int) destroyNoteHz.size() < numSamples
+        || (int) destroyFoldDriveDb.size() < numSamples
+        || (int) destroyFoldAmount.size() < numSamples
+        || (int) destroyFoldMix.size() < numSamples
+        || (int) destroyClipDriveDb.size() < numSamples
+        || (int) destroyClipAmount.size() < numSamples
+        || (int) destroyClipMix.size() < numSamples
+        || (int) destroyModAmount.size() < numSamples
+        || (int) destroyModMix.size() < numSamples
+        || (int) destroyModFreqHz.size() < numSamples
+        || (int) destroyCrushMix.size() < numSamples
+        || (int) filterModCutoffSemis.size() < numSamples
+        || (int) filterModResAdd.size() < numSamples)
+    {
+        buffer.clear (startSample, numSamples);
+        return;
+    }
+
+    auto* sigBuf = destroyBuffer.getWritePointer (0);
+
+    // --- Modulation setup (per render segment) ---
+    const auto macro1 = params->macro1 != nullptr ? juce::jlimit (0.0f, 1.0f, params->macro1->load()) : 0.0f;
+    const auto macro2 = params->macro2 != nullptr ? juce::jlimit (0.0f, 1.0f, params->macro2->load()) : 0.0f;
+
+    const auto lfo1SyncOn = params->lfo1Sync != nullptr && (params->lfo1Sync->load() >= 0.5f);
+    const auto lfo2SyncOn = params->lfo2Sync != nullptr && (params->lfo2Sync->load() >= 0.5f);
+
+    const auto lfo1Wave = params->lfo1Wave != nullptr ? (int) std::lround (params->lfo1Wave->load()) : (int) params::lfo::sine;
+    const auto lfo2Wave = params->lfo2Wave != nullptr ? (int) std::lround (params->lfo2Wave->load()) : (int) params::lfo::sine;
+
+    const auto lfo1Div = params->lfo1SyncDiv != nullptr ? (int) std::lround (params->lfo1SyncDiv->load()) : (int) params::lfo::div1_4;
+    const auto lfo2Div = params->lfo2SyncDiv != nullptr ? (int) std::lround (params->lfo2SyncDiv->load()) : (int) params::lfo::div1_4;
+
+    const auto lfo1RateHz = params->lfo1RateHz != nullptr ? params->lfo1RateHz->load() : 2.0f;
+    const auto lfo2RateHz = params->lfo2RateHz != nullptr ? params->lfo2RateHz->load() : 2.0f;
+
+    auto syncDivToBeats = [] (int divIdx) noexcept -> float
+    {
+        const auto d = (params::lfo::SyncDiv) juce::jlimit ((int) params::lfo::div1_1, (int) params::lfo::div1_16D, divIdx);
+        switch (d)
+        {
+            case params::lfo::div1_1:   return 4.0f;
+            case params::lfo::div1_2:   return 2.0f;
+            case params::lfo::div1_4:   return 1.0f;
+            case params::lfo::div1_8:   return 0.5f;
+            case params::lfo::div1_16:  return 0.25f;
+            case params::lfo::div1_32:  return 0.125f;
+            case params::lfo::div1_4T:  return 2.0f / 3.0f;
+            case params::lfo::div1_8T:  return 1.0f / 3.0f;
+            case params::lfo::div1_16T: return 1.0f / 6.0f;
+            case params::lfo::div1_4D:  return 1.5f;
+            case params::lfo::div1_8D:  return 0.75f;
+            case params::lfo::div1_16D: return 0.375f;
+        }
+        return 1.0f;
+    };
+
+    const auto beatsPerSecond = juce::jmax (0.001f, hostBpm / 60.0f);
+    const auto lfo1Hz = lfo1SyncOn ? (beatsPerSecond / syncDivToBeats (lfo1Div)) : juce::jlimit (0.01f, 200.0f, lfo1RateHz);
+    const auto lfo2Hz = lfo2SyncOn ? (beatsPerSecond / syncDivToBeats (lfo2Div)) : juce::jlimit (0.01f, 200.0f, lfo2RateHz);
+
+    lfo1.setWave ((params::lfo::Wave) juce::jlimit ((int) params::lfo::sine, (int) params::lfo::square, lfo1Wave));
+    lfo2.setWave ((params::lfo::Wave) juce::jlimit ((int) params::lfo::sine, (int) params::lfo::square, lfo2Wave));
+    lfo1.setFrequencyHz (lfo1Hz);
+    lfo2.setFrequencyHz (lfo2Hz);
+
+    struct SlotCfg final
+    {
+        int src = 0;
+        int dst = 0;
+        float depth = 0.0f;
+    };
+
+    std::array<SlotCfg, (size_t) params::mod::numSlots> slots {};
+    for (int s = 0; s < params::mod::numSlots; ++s)
+    {
+        const auto src = params->modSlotSrc[(size_t) s] != nullptr ? (int) std::lround (params->modSlotSrc[(size_t) s]->load()) : (int) params::mod::srcOff;
+        const auto dst = params->modSlotDst[(size_t) s] != nullptr ? (int) std::lround (params->modSlotDst[(size_t) s]->load()) : (int) params::mod::dstOff;
+        const auto dep = params->modSlotDepth[(size_t) s] != nullptr ? params->modSlotDepth[(size_t) s]->load() : 0.0f;
+
+        slots[(size_t) s].src = juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, src);
+        slots[(size_t) s].dst = juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstCrushMix, dst);
+        slots[(size_t) s].depth = juce::jlimit (-1.0f, 1.0f, dep);
+    }
+
+    // 1) Generate oscillator mix + per-sample params for the Destroy chain.
     for (int i = 0; i < numSamples; ++i)
     {
+        const auto l1 = lfo1.process(); // bipolar
+        const auto l2 = lfo2.process(); // bipolar
+
+        float modOsc1Level = 0.0f;
+        float modOsc2Level = 0.0f;
+        float modCutSemis  = 0.0f;
+        float modResAdd    = 0.0f;
+        float modFoldAdd   = 0.0f;
+        float modClipAdd   = 0.0f;
+        float modModAdd    = 0.0f;
+        float modCrushAdd  = 0.0f;
+
+        // Slot depths are in [-1..1]. Dest scaling is per-destination.
+        constexpr float cutoffMaxSemis = 48.0f;
+        for (const auto& slot : slots)
+        {
+            if (std::abs (slot.depth) < 1.0e-6f || slot.src == (int) params::mod::srcOff || slot.dst == (int) params::mod::dstOff)
+                continue;
+
+            float srcVal = 0.0f;
+            switch ((params::mod::Source) slot.src)
+            {
+                case params::mod::srcOff:    srcVal = 0.0f; break;
+                case params::mod::srcLfo1:   srcVal = l1; break;
+                case params::mod::srcLfo2:   srcVal = l2; break;
+                case params::mod::srcMacro1: srcVal = macro1; break; // unipolar 0..1
+                case params::mod::srcMacro2: srcVal = macro2; break; // unipolar 0..1
+            }
+
+            const auto amt = srcVal * slot.depth;
+
+            switch ((params::mod::Dest) slot.dst)
+            {
+                case params::mod::dstOff: break;
+                case params::mod::dstOsc1Level: modOsc1Level += amt; break;
+                case params::mod::dstOsc2Level: modOsc2Level += amt; break;
+                case params::mod::dstFilterCutoff: modCutSemis += (amt * cutoffMaxSemis); break;
+                case params::mod::dstFilterResonance: modResAdd += amt; break;
+                case params::mod::dstFoldAmount: modFoldAdd += amt; break;
+                case params::mod::dstClipAmount: modClipAdd += amt; break;
+                case params::mod::dstModAmount: modModAdd += amt; break;
+                case params::mod::dstCrushMix: modCrushAdd += amt; break;
+            }
+        }
+
+        filterModCutoffSemis[(size_t) i] = juce::jlimit (-96.0f, 96.0f, modCutSemis);
+        filterModResAdd[(size_t) i] = modResAdd;
+
         const auto midiNote = noteGlide.getNext();
         const auto noteHz = ies::math::midiNoteToHz (midiNote);
+        destroyNoteHz[(size_t) i] = noteHz;
 
         const auto w1 = params->osc1Wave != nullptr ? (int) std::lround (params->osc1Wave->load()) : (int) params::osc::saw;
         const auto w2 = params->osc2Wave != nullptr ? (int) std::lround (params->osc2Wave->load()) : (int) params::osc::saw;
 
-        const auto lvl1 = params->osc1Level != nullptr ? params->osc1Level->load() : 0.8f;
-        const auto lvl2 = params->osc2Level != nullptr ? params->osc2Level->load() : 0.5f;
+        auto lvl1 = params->osc1Level != nullptr ? params->osc1Level->load() : 0.8f;
+        auto lvl2 = params->osc2Level != nullptr ? params->osc2Level->load() : 0.5f;
+        lvl1 = juce::jlimit (0.0f, 1.0f, lvl1 + modOsc1Level);
+        lvl2 = juce::jlimit (0.0f, 1.0f, lvl2 + modOsc2Level);
 
         const auto coarse1 = params->osc1Coarse != nullptr ? (int) std::lround (params->osc1Coarse->load()) : 0;
         const auto coarse2 = params->osc2Coarse != nullptr ? (int) std::lround (params->osc2Coarse->load()) : 0;
@@ -512,22 +729,76 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
             osc2.setPhase (p2);
         }
 
-        auto sig = s1 * lvl1 + s2 * lvl2;
+        sigBuf[i] = s1 * lvl1 + s2 * lvl2;
 
-        // --- Destroy chain (fold -> clip -> ringmod/FM -> crush) ---
+        destroyFoldDriveDb[(size_t) i] = foldDriveDbSm.getNextValue();
+        destroyFoldAmount[(size_t) i]  = juce::jlimit (0.0f, 1.0f, foldAmountSm.getNextValue() + modFoldAdd);
+        destroyFoldMix[(size_t) i]     = foldMixSm.getNextValue();
+
+        destroyClipDriveDb[(size_t) i] = clipDriveDbSm.getNextValue();
+        destroyClipAmount[(size_t) i]  = juce::jlimit (0.0f, 1.0f, clipAmountSm.getNextValue() + modClipAdd);
+        destroyClipMix[(size_t) i]     = clipMixSm.getNextValue();
+
+        destroyModAmount[(size_t) i]   = juce::jlimit (0.0f, 1.0f, modAmountSm.getNextValue() + modModAdd);
+        destroyModMix[(size_t) i]      = modMixSm.getNextValue();
+        destroyModFreqHz[(size_t) i]   = modFreqHzSm.getNextValue();
+
+        destroyCrushMix[(size_t) i]    = juce::jlimit (0.0f, 1.0f, crushMixSm.getNextValue() + modCrushAdd);
+    }
+
+    // 2) Destroy chain (fold -> clip -> ringmod/FM), optionally oversampled.
+    if (osFactor == 1)
+    {
+        for (int i = 0; i < numSamples; ++i)
         {
-            sig = destroy.processSample (sig,
-                                         noteHz,
-                                         foldDriveDbSm.getNextValue(), foldAmountSm.getNextValue(), foldMixSm.getNextValue(),
-                                         clipDriveDbSm.getNextValue(), clipAmountSm.getNextValue(), clipMixSm.getNextValue(),
-                                         modMode, modAmountSm.getNextValue(), modMixSm.getNextValue(), modNoteSync, modFreqHzSm.getNextValue(),
-                                         crushBits, crushDownsample, crushMixSm.getNextValue());
+            sigBuf[i] = destroyBase.processSamplePreCrush (sigBuf[i],
+                                                           destroyNoteHz[(size_t) i],
+                                                           destroyFoldDriveDb[(size_t) i], destroyFoldAmount[(size_t) i], destroyFoldMix[(size_t) i],
+                                                           destroyClipDriveDb[(size_t) i], destroyClipAmount[(size_t) i], destroyClipMix[(size_t) i],
+                                                           modMode, destroyModAmount[(size_t) i], destroyModMix[(size_t) i], modNoteSync, destroyModFreqHz[(size_t) i]);
         }
+    }
+    else
+    {
+        auto& os = (osFactor == 2) ? destroyOversampling2x : destroyOversampling4x;
+        auto& dc = (osFactor == 2) ? destroyOs2 : destroyOs4;
+
+        juce::dsp::AudioBlock<float> block (destroyBuffer);
+        auto baseBlock = block.getSubBlock (0, (size_t) numSamples);
+        juce::dsp::AudioBlock<const float> constBase (baseBlock);
+
+        auto upBlock = os.processSamplesUp (constBase);
+        auto* up = upBlock.getChannelPointer (0);
+        const int upN = (int) upBlock.getNumSamples();
+        const int fac = (int) os.getOversamplingFactor(); // 2 or 4
+
+        for (int j = 0; j < upN; ++j)
+        {
+            const int i = j / fac;
+            up[j] = dc.processSamplePreCrush (up[j],
+                                              destroyNoteHz[(size_t) i],
+                                              destroyFoldDriveDb[(size_t) i], destroyFoldAmount[(size_t) i], destroyFoldMix[(size_t) i],
+                                              destroyClipDriveDb[(size_t) i], destroyClipAmount[(size_t) i], destroyClipMix[(size_t) i],
+                                              modMode, destroyModAmount[(size_t) i], destroyModMix[(size_t) i], modNoteSync, destroyModFreqHz[(size_t) i]);
+        }
+
+        os.processSamplesDown (baseBlock);
+    }
+
+    // 3) Crush always at base sample rate (keeps SRR behaviour stable).
+    for (int i = 0; i < numSamples; ++i)
+        sigBuf[i] = destroyBase.processSampleCrush (sigBuf[i], crushBits, crushDownsample, destroyCrushMix[(size_t) i]);
+
+    // 4) Post (filter -> tone -> amp -> out) and write to all channels.
+    for (int i = 0; i < numSamples; ++i)
+    {
+        auto sig = sigBuf[i];
+        const auto noteHz = destroyNoteHz[(size_t) i];
 
         // --- Filter (after distortions) ---
         {
             const auto baseCutoff = filterCutoffHzSm.getNextValue();
-            const auto resKnob    = filterResKnobSm.getNextValue();
+            auto resKnob          = filterResKnobSm.getNextValue();
             const auto envSemis   = filterEnvAmountSm.getNextValue();
             const auto envVal = filterEnv.getNextSample();
 
@@ -536,6 +807,9 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
                 cutoff *= (noteHz / 440.0f);
 
             cutoff *= std::exp2 ((envSemis * envVal) * (1.0f / 12.0f));
+            cutoff *= std::exp2 (filterModCutoffSemis[(size_t) i] * (1.0f / 12.0f));
+
+            resKnob = juce::jlimit (0.0f, 1.0f, resKnob + filterModResAdd[(size_t) i]);
 
             // Map resonance knob [0..1] to [min..max] exponentially.
             constexpr float minRes = 0.2f;

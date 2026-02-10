@@ -37,6 +37,15 @@
 - Tone EQ UX: double-click по пустому месту на спектре добавляет новый peak (если есть свободный слот), ПКМ по peak удаляет (disable).
 - UI: более спокойный фон/градиенты (меньше “шума”), сохранив технический/Serum-ish характер.
 
+### 0.1.3 (2026-02-10)
+- Destroy: добавлен Oversampling (OS) Off/2x/4x для снижения алиасинга в Fold/Clip/Mod (CPU выше).
+
+### 0.1.4 (2026-02-10)
+- Modulation v1: 2x LFO (free/sync к BPM), 2x Macros (0..1) как источники.
+- Mod Matrix (8 слотов): Source + Destination + bipolar Depth (без drag-drop пока).
+- Реальная модуляция в движке (sample-rate): Osc уровни, Filter cutoff/resonance, Destroy Amounts (fold/clip/mod) + crush mix.
+- UI: добавлен блок Modulation (Macros/LFO/Matrix), RU/EN подписи и подсказки.
+
 ## Архитектура (целевая на MVP)
 - `AudioProcessorValueTreeState` (APVTS) как единый источник параметров и состояния.
 - Моно-движок без `juce::Synthesiser` (или 1 voice), с явным note-stack и last-note priority.
@@ -180,6 +189,7 @@
 - MIDI: быстрые повторяющиеся ноты, удержание/перекрытие, All Notes Off, Panic.
 - Tone EQ/Spectrum: перетаскивание low/high cut + peak 1/2/3, Shift (Q), double-click (reset).
   - Добавление/удаление peak: double-click пусто = добавить, ПКМ по peak = удалить (до 8).
+- Destroy OS: переключение Off/2x/4x во время проигрывания (без крашей/жёстких артефактов).
 
 **Релизная сборка (Windows)**
 - Вариант A (Ninja + cl, single-config):
