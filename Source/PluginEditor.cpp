@@ -981,7 +981,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     // Resizable + minimum constraints.
     // Keep a sane minimum: the UI is dense (Serum-like panels) and includes a spectrum editor.
-    boundsConstrainer.setSizeLimits (840, 650, 1800, 1200);
+    // Allow very wide/tall layouts (users often dock/undock and resize in one dimension).
+    boundsConstrainer.setSizeLimits (820, 640, 3200, 2000);
     setConstrainer (&boundsConstrainer);
     setResizable (true, true);
 
@@ -1138,14 +1139,14 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                       u8"• Double-click по ручке: сброс к дефолту.\n"
                                       u8"• Init/Сброс: сброс всех параметров (язык сохраняется).\n"
                                       u8"• Note Sync: Mod Freq отключается.\n"
-                                      u8"• Тон EQ: маркеры на спектре (Shift: Q, double-click: сброс). Пики: 1/2/3.\n"
+                                      u8"• Тон EQ: маркеры на спектре (Shift: Q, double-click: сброс). Double-click пусто: добавить пик. ПКМ по пику: удалить.\n"
                                       u8"• Glide Off: Glide Time отключается.\n\n"
                                       u8"Reaper: добавь плагин на трек, включи мониторинг и подай MIDI (Virtual MIDI keyboard).")
             : juce::String ("Quick tips:\n"
                             "• Double-click knob: reset to default.\n"
                             "• Init: resets all params (keeps language).\n"
                             "• Note Sync: disables Mod Freq.\n"
-                            "• Tone EQ: drag handles in the spectrum (Shift: Q, double-click: reset). Peaks: 1/2/3.\n"
+                            "• Tone EQ: drag handles in the spectrum (Shift: Q, double-click: reset). Double-click empty: add peak. Right-click peak: remove.\n"
                             "• Glide Off: disables Glide Time.\n\n"
                             "Reaper: insert on a track, enable monitoring, feed MIDI (Virtual MIDI keyboard).");
 
@@ -1474,15 +1475,38 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                          params::tone::enable,
                          params::tone::lowCutHz,
                          params::tone::highCutHz,
+                         params::tone::peak1Enable,
                          params::tone::peak1FreqHz,
                          params::tone::peak1GainDb,
                          params::tone::peak1Q,
+                         params::tone::peak2Enable,
                          params::tone::peak2FreqHz,
                          params::tone::peak2GainDb,
                          params::tone::peak2Q,
+                         params::tone::peak3Enable,
                          params::tone::peak3FreqHz,
                          params::tone::peak3GainDb,
-                         params::tone::peak3Q);
+                         params::tone::peak3Q,
+                         params::tone::peak4Enable,
+                         params::tone::peak4FreqHz,
+                         params::tone::peak4GainDb,
+                         params::tone::peak4Q,
+                         params::tone::peak5Enable,
+                         params::tone::peak5FreqHz,
+                         params::tone::peak5GainDb,
+                         params::tone::peak5Q,
+                         params::tone::peak6Enable,
+                         params::tone::peak6FreqHz,
+                         params::tone::peak6GainDb,
+                         params::tone::peak6Q,
+                         params::tone::peak7Enable,
+                         params::tone::peak7FreqHz,
+                         params::tone::peak7GainDb,
+                         params::tone::peak7Q,
+                         params::tone::peak8Enable,
+                         params::tone::peak8FreqHz,
+                         params::tone::peak8GainDb,
+                         params::tone::peak8Q);
 
     // --- Output ---
     outGroup.setText ("Output");
@@ -1615,32 +1639,66 @@ IndustrialEnergySynthAudioProcessorEditor::~IndustrialEnergySynthAudioProcessorE
 
 void IndustrialEnergySynthAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff15171d));
+    // Calm, high-contrast-free background (Serum-ish: dark, technical, but not noisy).
+    const auto bgTop = juce::Colour (0xff121826);
+    const auto bgBot = juce::Colour (0xff0b0e13);
+    g.fillAll (bgBot);
 
-    // Soft gradient wash to avoid a flat panel.
     {
-        juce::ColourGradient cg (juce::Colour (0xff15171d), 0.0f, 0.0f,
-                                 juce::Colour (0xff0f1218), 0.0f, (float) getHeight(), false);
+        juce::ColourGradient cg (bgTop, 0.0f, 0.0f,
+                                 bgBot, 0.0f, (float) getHeight(), false);
         g.setGradientFill (cg);
         g.fillAll();
     }
 
-    // Top bar plate.
+    // Accent glow (subtle) near the Tone/Spectrum panel to hint at "energy".
     {
-        auto top = getLocalBounds().removeFromTop (56).toFloat();
-        g.setColour (juce::Colour (0xff0f1218).withAlpha (0.95f));
-        g.fillRect (top);
-        g.setColour (juce::Colour (0xff323846).withAlpha (0.9f));
-        g.drawLine (top.getX(), top.getBottom() - 0.5f, top.getRight(), top.getBottom() - 0.5f, 1.0f);
+        auto glowArea = toneGroup.getBounds().toFloat();
+        if (! glowArea.isEmpty())
+        {
+            glowArea = glowArea.expanded (120.0f, 80.0f);
+            const auto centre = glowArea.getCentre();
+            juce::ColourGradient glow (juce::Colour (0xff00c7ff).withAlpha (0.10f),
+                                       centre.x, centre.y,
+                                       juce::Colour (0xff00c7ff).withAlpha (0.0f),
+                                       glowArea.getRight(), glowArea.getBottom(),
+                                       true);
+            g.setGradientFill (glow);
+            g.fillEllipse (glowArea);
+        }
     }
 
-    // Subtle grid to feel "technical" and avoid a flat background.
-    g.setColour (juce::Colour (0x05ffffff));
+    // Soft vignette so panels pop without harsh borders.
+    {
+        auto r = getLocalBounds().toFloat();
+        const auto centre = r.getCentre();
+        juce::ColourGradient vg (juce::Colour (0xff000000).withAlpha (0.0f),
+                                 centre.x, centre.y,
+                                 juce::Colour (0xff000000).withAlpha (0.45f),
+                                 r.getRight(), r.getBottom(),
+                                 true);
+        g.setGradientFill (vg);
+        g.fillRect (r);
+    }
+
+    // Sparse grid (calmer than the old 32px grid).
+    g.setColour (juce::Colour (0x03ffffff));
     const auto b = getLocalBounds();
-    for (int x = 0; x < b.getWidth(); x += 32)
+    for (int x = 0; x < b.getWidth(); x += 64)
         g.drawVerticalLine (x, 0.0f, (float) b.getHeight());
-    for (int y = 0; y < b.getHeight(); y += 32)
+    for (int y = 0; y < b.getHeight(); y += 64)
         g.drawHorizontalLine (y, 0.0f, (float) b.getWidth());
+
+    // Top bar plate (slight gradient + separator).
+    {
+        auto top = getLocalBounds().removeFromTop (56).toFloat();
+        juce::ColourGradient tg (juce::Colour (0xff0f1218).withAlpha (0.98f), top.getX(), top.getY(),
+                                 juce::Colour (0xff0c0f14).withAlpha (0.98f), top.getX(), top.getBottom(), false);
+        g.setGradientFill (tg);
+        g.fillRect (top);
+        g.setColour (juce::Colour (0xff323846).withAlpha (0.85f));
+        g.drawLine (top.getX(), top.getBottom() - 0.5f, top.getRight(), top.getBottom() - 0.5f, 1.0f);
+    }
 
     g.setColour (juce::Colours::whitesmoke);
     g.setFont (juce::Font (juce::Font::getDefaultSansSerifFontName(), 18.0f, juce::Font::bold));
@@ -2109,7 +2167,7 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
     toneEnable.setTooltip (T ("Enable the post EQ (Tone).",
                               u8"Включить пост-эквалайзер (Тон)."));
     spectrumEditor.setTooltip (T ("Drag low/high cuts and the peak node. Shift-drag peak to change Q. Double-click handles to reset.",
-                                  u8"Таскай НЧ/ВЧ срезы и пики (1/2/3) на графике. Shift+drag на пике меняет Q. Double-click по маркерам: сброс."));
+                                  u8"Таскай НЧ/ВЧ срезы и пики на графике (Shift: Q, double-click: сброс). Double-click по пустому месту: добавить пик. ПКМ по пику: удалить."));
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
@@ -2345,6 +2403,9 @@ void IndustrialEnergySynthAudioProcessorEditor::applyFactoryPreset (int factoryI
     // Keep current UI language stable while applying preset.
     auto* langParam = audioProcessor.getAPVTS().getParameter (params::ui::language);
     const float langNorm = (langParam != nullptr) ? langParam->getValue() : 0.0f;
+
+    // Factory presets should be full snapshots: reset everything first so new parameters don't "leak" from previous patches.
+    resetAllParamsKeepLanguage();
 
     for (const auto& kv : kFactoryPresets[factoryIndex].values)
         setParamValue (kv.first, kv.second);

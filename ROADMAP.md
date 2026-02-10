@@ -32,6 +32,11 @@
 - Tone EQ улучшен: теперь 3 peak-узла (1/2/3) для более точного “скульптинга” спектра мышью.
 - Factory presets доведены до 15 (минимальный набор v1.0 выполнен).
 
+### 0.1.2 (2026-02-10)
+- Tone EQ: добавлены peak-узлы до 8 шт (слоты 1..8) с включением/выключением.
+- Tone EQ UX: double-click по пустому месту на спектре добавляет новый peak (если есть свободный слот), ПКМ по peak удаляет (disable).
+- UI: более спокойный фон/градиенты (меньше “шума”), сохранив технический/Serum-ish характер.
+
 ## Архитектура (целевая на MVP)
 - `AudioProcessorValueTreeState` (APVTS) как единый источник параметров и состояния.
 - Моно-движок без `juce::Synthesiser` (или 1 voice), с явным note-stack и last-note priority.
@@ -140,6 +145,7 @@
 - RU/EN: переключаемый язык (параметр `ui.language`) для подписей/тултипов/сообщений.
 - Ресайз: окно можно менять по ширине/высоте (угол + границы), верстка не ломается.
 - Интерактивный "Sculpt/Tone" блок: спектр-анализатор + drag low/high cut + peak (как быстрый Serum-подобный workflow).
+  - Дополнительно: добавление/удаление peak-узлов мышью (до 8 peak).
 
 **Критерии**
 - Все параметры доступны из UI, автомейшн работает, UI не лагает и не "прыгает" при обновлениях.
@@ -173,6 +179,23 @@
 - SR/Buffer changes: 44.1/48/96 kHz + разные buffer size во время проигрывания.
 - MIDI: быстрые повторяющиеся ноты, удержание/перекрытие, All Notes Off, Panic.
 - Tone EQ/Spectrum: перетаскивание low/high cut + peak 1/2/3, Shift (Q), double-click (reset).
+  - Добавление/удаление peak: double-click пусто = добавить, ПКМ по peak = удалить (до 8).
+
+**Релизная сборка (Windows)**
+- Вариант A (Ninja + cl, single-config):
+  - Configure: `cmake -S . -B build-win-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=cl`
+  - Build: `cmake --build build-win-release -j 8`
+  - Артефакт VST3 обычно тут: `build-win-release/IndustrialEnergySynth_artefacts/Release/VST3/Industrial Energy Synth.vst3`
+- Вариант B (Visual Studio generator, multi-config):
+  - Configure: `cmake -S . -B build-win -G "Visual Studio 17 2022" -A x64`
+  - Build Release: `cmake --build build-win --config Release -j 8`
+
+**Установка в Reaper (VST3)**
+- Создай отдельную папку, например `C:\\VST3` (без прав администратора).
+- Скопируй папку `Industrial Energy Synth.vst3` в `C:\\VST3`.
+- Reaper: `Options -> Preferences -> Plug-ins -> VST`:
+  - Добавь `C:\\VST3` в `VST plug-in paths`.
+  - Нажми `Re-scan` (или `Clear cache/re-scan`, если не подхватило).
 
 **Критерии**
 - Нет крашей/зависаний, CPU в пределах разумного для моно-синта, поведение одинаковое между хостами.
