@@ -70,12 +70,27 @@ void MonoSynthEngine::prepare (double sr, int /*maxBlockSize*/)
     toneLowCutHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->toneLowCutHz : nullptr, 20.0f));
     toneHighCutHzSm.reset (sampleRateHz, smoothSeconds);
     toneHighCutHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->toneHighCutHz : nullptr, 20000.0f));
-    tonePeakFreqHzSm.reset (sampleRateHz, smoothSeconds);
-    tonePeakFreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeakFreqHz : nullptr, 1000.0f));
-    tonePeakGainDbSm.reset (sampleRateHz, smoothSeconds);
-    tonePeakGainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeakGainDb : nullptr, 0.0f));
-    tonePeakQSm.reset (sampleRateHz, smoothSeconds);
-    tonePeakQSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeakQ : nullptr, 0.7071f));
+
+    tonePeak1FreqHzSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak1FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1FreqHz : nullptr, 220.0f));
+    tonePeak1GainDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak1GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1GainDb : nullptr, 0.0f));
+    tonePeak1QSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak1QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1Q : nullptr, 0.90f));
+
+    tonePeak2FreqHzSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak2FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2FreqHz : nullptr, 1000.0f));
+    tonePeak2GainDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak2GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2GainDb : nullptr, 0.0f));
+    tonePeak2QSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak2QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2Q : nullptr, 0.7071f));
+
+    tonePeak3FreqHzSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak3FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3FreqHz : nullptr, 4200.0f));
+    tonePeak3GainDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak3GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3GainDb : nullptr, 0.0f));
+    tonePeak3QSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak3QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3Q : nullptr, 0.90f));
 
     reset();
 }
@@ -122,9 +137,18 @@ void MonoSynthEngine::reset()
 
     toneLowCutHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->toneLowCutHz : nullptr, 20.0f));
     toneHighCutHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->toneHighCutHz : nullptr, 20000.0f));
-    tonePeakFreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeakFreqHz : nullptr, 1000.0f));
-    tonePeakGainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeakGainDb : nullptr, 0.0f));
-    tonePeakQSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeakQ : nullptr, 0.7071f));
+
+    tonePeak1FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1FreqHz : nullptr, 220.0f));
+    tonePeak1GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1GainDb : nullptr, 0.0f));
+    tonePeak1QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1Q : nullptr, 0.90f));
+
+    tonePeak2FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2FreqHz : nullptr, 1000.0f));
+    tonePeak2GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2GainDb : nullptr, 0.0f));
+    tonePeak2QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2Q : nullptr, 0.7071f));
+
+    tonePeak3FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3FreqHz : nullptr, 4200.0f));
+    tonePeak3GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3GainDb : nullptr, 0.0f));
+    tonePeak3QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3Q : nullptr, 0.90f));
 
     outGain.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (loadParam (params != nullptr ? params->outGainDb : nullptr, 0.0f), -100.0f));
 
@@ -310,11 +334,20 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
     setTargetIfChanged (filterResKnobSm,  params->filterResonance != nullptr ? params->filterResonance->load() : 0.25f);
     setTargetIfChanged (filterEnvAmountSm, params->filterEnvAmount != nullptr ? params->filterEnvAmount->load() : 0.0f);
 
-    setTargetIfChanged (toneLowCutHzSm,   params->toneLowCutHz   != nullptr ? params->toneLowCutHz->load()   : 20.0f);
-    setTargetIfChanged (toneHighCutHzSm,  params->toneHighCutHz  != nullptr ? params->toneHighCutHz->load()  : 20000.0f);
-    setTargetIfChanged (tonePeakFreqHzSm, params->tonePeakFreqHz != nullptr ? params->tonePeakFreqHz->load() : 1000.0f);
-    setTargetIfChanged (tonePeakGainDbSm, params->tonePeakGainDb != nullptr ? params->tonePeakGainDb->load() : 0.0f);
-    setTargetIfChanged (tonePeakQSm,      params->tonePeakQ      != nullptr ? params->tonePeakQ->load()      : 0.7071f);
+    setTargetIfChanged (toneLowCutHzSm,  params->toneLowCutHz  != nullptr ? params->toneLowCutHz->load()  : 20.0f);
+    setTargetIfChanged (toneHighCutHzSm, params->toneHighCutHz != nullptr ? params->toneHighCutHz->load() : 20000.0f);
+
+    setTargetIfChanged (tonePeak1FreqHzSm, params->tonePeak1FreqHz != nullptr ? params->tonePeak1FreqHz->load() : 220.0f);
+    setTargetIfChanged (tonePeak1GainDbSm, params->tonePeak1GainDb != nullptr ? params->tonePeak1GainDb->load() : 0.0f);
+    setTargetIfChanged (tonePeak1QSm,      params->tonePeak1Q      != nullptr ? params->tonePeak1Q->load()      : 0.90f);
+
+    setTargetIfChanged (tonePeak2FreqHzSm, params->tonePeak2FreqHz != nullptr ? params->tonePeak2FreqHz->load() : 1000.0f);
+    setTargetIfChanged (tonePeak2GainDbSm, params->tonePeak2GainDb != nullptr ? params->tonePeak2GainDb->load() : 0.0f);
+    setTargetIfChanged (tonePeak2QSm,      params->tonePeak2Q      != nullptr ? params->tonePeak2Q->load()      : 0.7071f);
+
+    setTargetIfChanged (tonePeak3FreqHzSm, params->tonePeak3FreqHz != nullptr ? params->tonePeak3FreqHz->load() : 4200.0f);
+    setTargetIfChanged (tonePeak3GainDbSm, params->tonePeak3GainDb != nullptr ? params->tonePeak3GainDb->load() : 0.0f);
+    setTargetIfChanged (tonePeak3QSm,      params->tonePeak3Q      != nullptr ? params->tonePeak3Q->load()      : 0.90f);
 
     // Drift cutoff ~ 1 Hz (very slow).
     const auto alpha = (float) (2.0 * juce::MathConstants<double>::pi * 1.0 / sampleRateHz);
@@ -418,16 +451,28 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         {
             const auto lowCut = toneLowCutHzSm.getNextValue();
             const auto highCut = toneHighCutHzSm.getNextValue();
-            const auto pkFreq = tonePeakFreqHzSm.getNextValue();
-            const auto pkGainDb = tonePeakGainDbSm.getNextValue();
-            const auto pkQ = tonePeakQSm.getNextValue();
+
+            const auto p1f = tonePeak1FreqHzSm.getNextValue();
+            const auto p1g = tonePeak1GainDbSm.getNextValue();
+            const auto p1q = tonePeak1QSm.getNextValue();
+
+            const auto p2f = tonePeak2FreqHzSm.getNextValue();
+            const auto p2g = tonePeak2GainDbSm.getNextValue();
+            const auto p2q = tonePeak2QSm.getNextValue();
+
+            const auto p3f = tonePeak3FreqHzSm.getNextValue();
+            const auto p3g = tonePeak3GainDbSm.getNextValue();
+            const auto p3q = tonePeak3QSm.getNextValue();
 
             if (toneOn)
             {
                 if (toneCoeffCountdown-- <= 0)
                 {
                     toneCoeffCountdown = 16;
-                    toneEq.setParams (lowCut, highCut, pkFreq, pkGainDb, pkQ);
+                    toneEq.setParams (lowCut, highCut,
+                                      p1f, p1g, p1q,
+                                      p2f, p2g, p2q,
+                                      p3f, p3g, p3q);
                     toneEq.updateCoeffs();
                 }
 

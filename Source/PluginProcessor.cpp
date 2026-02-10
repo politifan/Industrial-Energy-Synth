@@ -1,6 +1,39 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+namespace
+{
+static void migrateStateIfNeeded (juce::ValueTree& state)
+{
+    // Migrate old Tone EQ single-peak params -> new multi-peak params.
+    // Keeps older projects/user-presets working after the Tone EQ upgrade.
+    if (! state.isValid())
+        return;
+
+    const bool hasLegacy = state.hasProperty (params::tone::legacyPeakFreqHz)
+                        || state.hasProperty (params::tone::legacyPeakGainDb)
+                        || state.hasProperty (params::tone::legacyPeakQ);
+
+    if (! hasLegacy)
+        return;
+
+    const bool hasNew = state.hasProperty (params::tone::peak2FreqHz)
+                     || state.hasProperty (params::tone::peak2GainDb)
+                     || state.hasProperty (params::tone::peak2Q);
+
+    // If the new set is missing, map legacy -> Peak 2 (center node).
+    if (! hasNew)
+    {
+        if (state.hasProperty (params::tone::legacyPeakFreqHz))
+            state.setProperty (params::tone::peak2FreqHz, state.getProperty (params::tone::legacyPeakFreqHz), nullptr);
+        if (state.hasProperty (params::tone::legacyPeakGainDb))
+            state.setProperty (params::tone::peak2GainDb, state.getProperty (params::tone::legacyPeakGainDb), nullptr);
+        if (state.hasProperty (params::tone::legacyPeakQ))
+            state.setProperty (params::tone::peak2Q, state.getProperty (params::tone::legacyPeakQ), nullptr);
+    }
+}
+} // namespace
+
 IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
     : AudioProcessor (BusesProperties()
@@ -70,9 +103,18 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
     paramPointers.toneEnable     = apvts.getRawParameterValue (params::tone::enable);
     paramPointers.toneLowCutHz   = apvts.getRawParameterValue (params::tone::lowCutHz);
     paramPointers.toneHighCutHz  = apvts.getRawParameterValue (params::tone::highCutHz);
-    paramPointers.tonePeakFreqHz = apvts.getRawParameterValue (params::tone::peakFreqHz);
-    paramPointers.tonePeakGainDb = apvts.getRawParameterValue (params::tone::peakGainDb);
-    paramPointers.tonePeakQ      = apvts.getRawParameterValue (params::tone::peakQ);
+
+    paramPointers.tonePeak1FreqHz = apvts.getRawParameterValue (params::tone::peak1FreqHz);
+    paramPointers.tonePeak1GainDb = apvts.getRawParameterValue (params::tone::peak1GainDb);
+    paramPointers.tonePeak1Q      = apvts.getRawParameterValue (params::tone::peak1Q);
+
+    paramPointers.tonePeak2FreqHz = apvts.getRawParameterValue (params::tone::peak2FreqHz);
+    paramPointers.tonePeak2GainDb = apvts.getRawParameterValue (params::tone::peak2GainDb);
+    paramPointers.tonePeak2Q      = apvts.getRawParameterValue (params::tone::peak2Q);
+
+    paramPointers.tonePeak3FreqHz = apvts.getRawParameterValue (params::tone::peak3FreqHz);
+    paramPointers.tonePeak3GainDb = apvts.getRawParameterValue (params::tone::peak3GainDb);
+    paramPointers.tonePeak3Q      = apvts.getRawParameterValue (params::tone::peak3Q);
 
     paramPointers.outGainDb     = apvts.getRawParameterValue (params::out::gainDb);
 
@@ -88,6 +130,8 @@ void IndustrialEnergySynthAudioProcessor::applyStateFromUi (juce::ValueTree stat
 
     if (state.getType() != apvts.state.getType())
         return;
+
+    migrateStateIfNeeded (state);
 
     auto* langParam = apvts.getParameter (params::ui::language);
     const float langNorm = (langParam != nullptr) ? langParam->getValue() : 0.0f;
@@ -318,7 +362,9 @@ void IndustrialEnergySynthAudioProcessor::setStateInformation (const void* data,
     if (! xmlState->hasTagName (apvts.state.getType()))
         return;
 
-    apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+    auto tree = juce::ValueTree::fromXml (*xmlState);
+    migrateStateIfNeeded (tree);
+    apvts.replaceState (tree);
     engine.reset();
 }
 
@@ -488,20 +534,33 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
         toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::tone::highCutHz), "High Cut",
                                                                           range, 20000.0f, "Hz"));
     }
+
+    auto addPeak = [&] (const char* idFreq, const char* idGain, const char* idQ,
+                        const char* namePrefix, float defFreq, float defQ)
     {
-        juce::NormalisableRange<float> range (40.0f, 12000.0f);
-        range.setSkewForCentre (1000.0f);
-        toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::tone::peakFreqHz), "Peak Freq",
-                                                                          range, 1000.0f, "Hz"));
-    }
-    toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::tone::peakGainDb), "Peak Gain",
-                                                                      juce::NormalisableRange<float> (-24.0f, 24.0f), 0.0f, "dB"));
-    {
-        juce::NormalisableRange<float> range (0.2f, 18.0f);
-        range.setSkewForCentre (1.0f);
-        toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::tone::peakQ), "Peak Q",
-                                                                          range, 0.7071f));
-    }
+        {
+            juce::NormalisableRange<float> range (40.0f, 12000.0f);
+            range.setSkewForCentre (1000.0f);
+            toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (idFreq),
+                                                                              juce::String (namePrefix) + " Freq",
+                                                                              range, defFreq, "Hz"));
+        }
+        toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (idGain),
+                                                                          juce::String (namePrefix) + " Gain",
+                                                                          juce::NormalisableRange<float> (-24.0f, 24.0f), 0.0f, "dB"));
+        {
+            juce::NormalisableRange<float> range (0.2f, 18.0f);
+            range.setSkewForCentre (1.0f);
+            toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (idQ),
+                                                                              juce::String (namePrefix) + " Q",
+                                                                              range, defQ));
+        }
+    };
+
+    addPeak (params::tone::peak1FreqHz, params::tone::peak1GainDb, params::tone::peak1Q, "Peak 1", 220.0f, 0.90f);
+    addPeak (params::tone::peak2FreqHz, params::tone::peak2GainDb, params::tone::peak2Q, "Peak 2", 1000.0f, 0.7071f);
+    addPeak (params::tone::peak3FreqHz, params::tone::peak3GainDb, params::tone::peak3Q, "Peak 3", 4200.0f, 0.90f);
+
     layout.add (std::move (toneGroup));
 
     // --- Output ---

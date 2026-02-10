@@ -28,6 +28,10 @@
 - UI: Serum-ish разметка блоков, ресайз (угол + границы), hover status line, peak meter, Panic, user/factory presets.
 - Tone EQ + интерактивный спектр-анализатор: low/high cut + peak (drag), Shift-drag меняет Q, double-click сбрасывает.
 
+### 0.1.1 (2026-02-10)
+- Tone EQ улучшен: теперь 3 peak-узла (1/2/3) для более точного “скульптинга” спектра мышью.
+- Factory presets доведены до 15 (минимальный набор v1.0 выполнен).
+
 ## Архитектура (целевая на MVP)
 - `AudioProcessorValueTreeState` (APVTS) как единый источник параметров и состояния.
 - Моно-движок без `juce::Synthesiser` (или 1 voice), с явным note-stack и last-note priority.
@@ -35,6 +39,10 @@
 - Везде где нужно: сглаживание параметров (минимум cutoff/gain/drive/mix/glide), `ScopedNoDenormals`.
 
 ## Этапы / Milestones
+
+## Текущий статус (ветка разработки)
+- M0–M8: реализовано (ядро синта, destroy, фильтр+огибающие, пресеты, RU/EN UI, ресайз, Spectrum/Tone).
+- M9: осталось ручное QA/оптимизация/релизная сборка (см. чек-лист ниже).
 
 ### M0. Скелет проекта и сборка (инфраструктура)
 **Задачи**
@@ -157,6 +165,14 @@
 - Smoke-тесты в FL Studio и Cakewalk.
 - Оптимизация: исключить аллокации в аудио-потоке, денормалы, лишние ветвления, зиппер-ноиз.
 - Финальная сборка VST3 + версия + changelog.
+
+**Чек-лист QA (Reaper)**
+- Scan VST3 без ошибок; открыть/закрыть UI 50+ раз без падений.
+- Project recall: сохранить проект с изменёнными параметрами, перезапустить Reaper, убедиться что всё восстановилось.
+- Automation stress: авто-мейшн `filter.cutoffHz`, `destroy.*Mix`, `out.gainDb`, `tone.*` (в т.ч. peak1/2/3).
+- SR/Buffer changes: 44.1/48/96 kHz + разные buffer size во время проигрывания.
+- MIDI: быстрые повторяющиеся ноты, удержание/перекрытие, All Notes Off, Panic.
+- Tone EQ/Spectrum: перетаскивание low/high cut + peak 1/2/3, Shift (Q), double-click (reset).
 
 **Критерии**
 - Нет крашей/зависаний, CPU в пределах разумного для моно-синта, поведение одинаковое между хостами.

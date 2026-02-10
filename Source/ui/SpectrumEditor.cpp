@@ -15,23 +15,41 @@ void SpectrumEditor::bind (juce::AudioProcessorValueTreeState& apvts,
                            const char* enableParamId,
                            const char* lowCutParamId,
                            const char* highCutParamId,
-                           const char* peakFreqParamId,
-                           const char* peakGainParamId,
-                           const char* peakQParamId)
+                           const char* peak1FreqParamId,
+                           const char* peak1GainParamId,
+                           const char* peak1QParamId,
+                           const char* peak2FreqParamId,
+                           const char* peak2GainParamId,
+                           const char* peak2QParamId,
+                           const char* peak3FreqParamId,
+                           const char* peak3GainParamId,
+                           const char* peak3QParamId)
 {
     params.enable   = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (enableParamId));
     params.lowCut   = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (lowCutParamId));
     params.highCut  = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (highCutParamId));
-    params.peakFreq = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peakFreqParamId));
-    params.peakGain = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peakGainParamId));
-    params.peakQ    = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peakQParamId));
+    params.peak1Freq = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak1FreqParamId));
+    params.peak1Gain = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak1GainParamId));
+    params.peak1Q    = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak1QParamId));
+    params.peak2Freq = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak2FreqParamId));
+    params.peak2Gain = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak2GainParamId));
+    params.peak2Q    = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak2QParamId));
+    params.peak3Freq = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak3FreqParamId));
+    params.peak3Gain = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak3GainParamId));
+    params.peak3Q    = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak3QParamId));
 
     params.enableRaw   = apvts.getRawParameterValue (enableParamId);
     params.lowCutRaw   = apvts.getRawParameterValue (lowCutParamId);
     params.highCutRaw  = apvts.getRawParameterValue (highCutParamId);
-    params.peakFreqRaw = apvts.getRawParameterValue (peakFreqParamId);
-    params.peakGainRaw = apvts.getRawParameterValue (peakGainParamId);
-    params.peakQRaw    = apvts.getRawParameterValue (peakQParamId);
+    params.peak1FreqRaw = apvts.getRawParameterValue (peak1FreqParamId);
+    params.peak1GainRaw = apvts.getRawParameterValue (peak1GainParamId);
+    params.peak1QRaw    = apvts.getRawParameterValue (peak1QParamId);
+    params.peak2FreqRaw = apvts.getRawParameterValue (peak2FreqParamId);
+    params.peak2GainRaw = apvts.getRawParameterValue (peak2GainParamId);
+    params.peak2QRaw    = apvts.getRawParameterValue (peak2QParamId);
+    params.peak3FreqRaw = apvts.getRawParameterValue (peak3FreqParamId);
+    params.peak3GainRaw = apvts.getRawParameterValue (peak3GainParamId);
+    params.peak3QRaw    = apvts.getRawParameterValue (peak3QParamId);
 }
 
 void SpectrumEditor::setAudioFrame (const float* samples, int numSamples, double sampleRate)
@@ -218,15 +236,29 @@ void SpectrumEditor::paint (juce::Graphics& g)
 
         g.setColour (accent.withAlpha (0.20f));
         g.strokePath (p, juce::PathStrokeType (2.0f));
+
+        // Soft fill under the analyzer curve (Serum-ish energy).
+        juce::Path fill = p;
+        fill.lineTo (plot.getRight(), plot.getBottom());
+        fill.lineTo (plot.getX(), plot.getBottom());
+        fill.closeSubPath();
+        g.setColour (accent.withAlpha (0.06f));
+        g.fillPath (fill);
     }
 
     // EQ response curve
     const auto enabled = getParamValueActual (params.enable, params.enableRaw, 0.0f) >= 0.5f;
     const auto lowCutHz   = getParamValueActual (params.lowCut,   params.lowCutRaw,   20.0f);
     const auto highCutHz  = getParamValueActual (params.highCut,  params.highCutRaw,  20000.0f);
-    const auto peakFreqHz = getParamValueActual (params.peakFreq, params.peakFreqRaw, 1000.0f);
-    const auto peakGainDb = getParamValueActual (params.peakGain, params.peakGainRaw, 0.0f);
-    const auto peakQ      = getParamValueActual (params.peakQ,    params.peakQRaw,    0.7071f);
+    const auto p1f = getParamValueActual (params.peak1Freq, params.peak1FreqRaw, 220.0f);
+    const auto p1g = getParamValueActual (params.peak1Gain, params.peak1GainRaw, 0.0f);
+    const auto p1q = getParamValueActual (params.peak1Q,    params.peak1QRaw,    0.90f);
+    const auto p2f = getParamValueActual (params.peak2Freq, params.peak2FreqRaw, 1000.0f);
+    const auto p2g = getParamValueActual (params.peak2Gain, params.peak2GainRaw, 0.0f);
+    const auto p2q = getParamValueActual (params.peak2Q,    params.peak2QRaw,    0.7071f);
+    const auto p3f = getParamValueActual (params.peak3Freq, params.peak3FreqRaw, 4200.0f);
+    const auto p3g = getParamValueActual (params.peak3Gain, params.peak3GainRaw, 0.0f);
+    const auto p3q = getParamValueActual (params.peak3Q,    params.peak3QRaw,    0.90f);
 
     {
         juce::Path p;
@@ -237,7 +269,12 @@ void SpectrumEditor::paint (juce::Graphics& g)
             const auto f = 20.0f * std::pow (20000.0f / 20.0f, t);
 
             float respDb = 0.0f;
-            ies::dsp::ToneEQ::makeResponse (sr, lowCutHz, highCutHz, peakFreqHz, peakGainDb, peakQ, f, respDb);
+            ies::dsp::ToneEQ::makeResponse (sr,
+                                            lowCutHz, highCutHz,
+                                            p1f, p1g, p1q,
+                                            p2f, p2g, p2q,
+                                            p3f, p3g, p3q,
+                                            f, respDb);
 
             const auto x = plot.getX() + t * plot.getWidth();
             const auto y = dbToY (respDb);
@@ -256,8 +293,12 @@ void SpectrumEditor::paint (juce::Graphics& g)
     // Handles
     const auto lowX = freqHzToX (lowCutHz);
     const auto highX = freqHzToX (highCutHz);
-    const auto peakX = freqHzToX (peakFreqHz);
-    const auto peakY = dbToY (peakGainDb);
+    const auto p1x = freqHzToX (p1f);
+    const auto p1y = dbToY (p1g);
+    const auto p2x = freqHzToX (p2f);
+    const auto p2y = dbToY (p2g);
+    const auto p3x = freqHzToX (p3f);
+    const auto p3y = dbToY (p3g);
 
     auto drawCut = [&] (float x, bool isLow)
     {
@@ -289,15 +330,26 @@ void SpectrumEditor::paint (juce::Graphics& g)
     drawCut (lowX, true);
     drawCut (highX, false);
 
-    // Peak node
+    auto drawPeak = [&] (float x, float y, DragTarget t)
     {
-        const auto hot = (hover == DragTarget::peak) || (dragging == DragTarget::peak);
-        const auto r = hot ? 6.5f : 5.5f;
+        const auto hot = (hover == t) || (dragging == t);
+        const auto r = hot ? 7.0f : 6.0f;
         g.setColour ((hot ? accent : accent.withAlpha (0.75f)).withAlpha (enabled ? 0.95f : 0.35f));
-        g.fillEllipse (peakX - r, peakY - r, r * 2.0f, r * 2.0f);
+        g.fillEllipse (x - r, y - r, r * 2.0f, r * 2.0f);
         g.setColour (juce::Colour (0xff0f1218).withAlpha (0.85f));
-        g.drawEllipse (peakX - r, peakY - r, r * 2.0f, r * 2.0f, 1.2f);
-    }
+        g.drawEllipse (x - r, y - r, r * 2.0f, r * 2.0f, 1.2f);
+
+        const char* label = (t == DragTarget::peak1) ? "1" : (t == DragTarget::peak2) ? "2" : "3";
+        g.setColour (juce::Colour (0xff0f1218).withAlpha (enabled ? 0.9f : 0.4f));
+        g.setFont (juce::Font (11.5f, juce::Font::bold));
+        g.drawText (label,
+                    juce::Rectangle<float> (x - r, y - r, r * 2.0f, r * 2.0f).toNearestInt(),
+                    juce::Justification::centred);
+    };
+
+    drawPeak (p1x, p1y, DragTarget::peak1);
+    drawPeak (p2x, p2y, DragTarget::peak2);
+    drawPeak (p3x, p3y, DragTarget::peak3);
 }
 
 void SpectrumEditor::mouseMove (const juce::MouseEvent& e)
@@ -309,19 +361,34 @@ void SpectrumEditor::mouseMove (const juce::MouseEvent& e)
 
     const auto lowCutHz   = getParamValueActual (params.lowCut,   params.lowCutRaw,   20.0f);
     const auto highCutHz  = getParamValueActual (params.highCut,  params.highCutRaw,  20000.0f);
-    const auto peakFreqHz = getParamValueActual (params.peakFreq, params.peakFreqRaw, 1000.0f);
-    const auto peakGainDb = getParamValueActual (params.peakGain, params.peakGainRaw, 0.0f);
+    const auto p1f = getParamValueActual (params.peak1Freq, params.peak1FreqRaw, 220.0f);
+    const auto p1g = getParamValueActual (params.peak1Gain, params.peak1GainRaw, 0.0f);
+    const auto p2f = getParamValueActual (params.peak2Freq, params.peak2FreqRaw, 1000.0f);
+    const auto p2g = getParamValueActual (params.peak2Gain, params.peak2GainRaw, 0.0f);
+    const auto p3f = getParamValueActual (params.peak3Freq, params.peak3FreqRaw, 4200.0f);
+    const auto p3g = getParamValueActual (params.peak3Gain, params.peak3GainRaw, 0.0f);
 
     const auto lowX = freqHzToX (lowCutHz);
     const auto highX = freqHzToX (highCutHz);
-    const auto peakX = freqHzToX (peakFreqHz);
-    const auto peakY = dbToY (peakGainDb);
+    const auto p1x = freqHzToX (p1f);
+    const auto p1y = dbToY (p1g);
+    const auto p2x = freqHzToX (p2f);
+    const auto p2y = dbToY (p2g);
+    const auto p3x = freqHzToX (p3f);
+    const auto p3y = dbToY (p3g);
 
     if (plot.contains (pos))
     {
-        const auto dPeak = pos.getDistanceFrom (juce::Point<float> (peakX, peakY));
-        if (dPeak < 10.0f)
-            next = DragTarget::peak;
+        const auto d1 = pos.getDistanceFrom (juce::Point<float> (p1x, p1y));
+        const auto d2 = pos.getDistanceFrom (juce::Point<float> (p2x, p2y));
+        const auto d3 = pos.getDistanceFrom (juce::Point<float> (p3x, p3y));
+
+        if (d1 < 11.0f || d2 < 11.0f || d3 < 11.0f)
+        {
+            if (d1 <= d2 && d1 <= d3) next = DragTarget::peak1;
+            else if (d2 <= d1 && d2 <= d3) next = DragTarget::peak2;
+            else next = DragTarget::peak3;
+        }
         else if (std::abs (pos.x - lowX) < 8.0f)
             next = DragTarget::lowCut;
         else if (std::abs (pos.x - highX) < 8.0f)
@@ -333,7 +400,7 @@ void SpectrumEditor::mouseMove (const juce::MouseEvent& e)
         hover = next;
         if (hover == DragTarget::lowCut || hover == DragTarget::highCut)
             setMouseCursor (juce::MouseCursor::LeftRightResizeCursor);
-        else if (hover == DragTarget::peak)
+        else if (hover == DragTarget::peak1 || hover == DragTarget::peak2 || hover == DragTarget::peak3)
             setMouseCursor (juce::MouseCursor::DraggingHandCursor);
         else
             setMouseCursor (juce::MouseCursor::NormalCursor);
@@ -347,17 +414,57 @@ void SpectrumEditor::mouseDown (const juce::MouseEvent& e)
     dragging = hover;
     dragStart = e.position;
 
-    dragStartPeakQ = getParamValueActual (params.peakQ, params.peakQRaw, 0.7071f);
-    dragStartPeakGainDb = getParamValueActual (params.peakGain, params.peakGainRaw, 0.0f);
+    auto pickQ = [&]() -> float
+    {
+        switch (dragging)
+        {
+            case DragTarget::none:
+            case DragTarget::lowCut:
+            case DragTarget::highCut:
+                return 0.7071f;
+            case DragTarget::peak1: return getParamValueActual (params.peak1Q, params.peak1QRaw, 0.90f);
+            case DragTarget::peak2: return getParamValueActual (params.peak2Q, params.peak2QRaw, 0.7071f);
+            case DragTarget::peak3: return getParamValueActual (params.peak3Q, params.peak3QRaw, 0.90f);
+        }
+
+        return 0.7071f;
+    };
+    auto pickGain = [&]() -> float
+    {
+        switch (dragging)
+        {
+            case DragTarget::none:
+            case DragTarget::lowCut:
+            case DragTarget::highCut:
+                return 0.0f;
+            case DragTarget::peak1: return getParamValueActual (params.peak1Gain, params.peak1GainRaw, 0.0f);
+            case DragTarget::peak2: return getParamValueActual (params.peak2Gain, params.peak2GainRaw, 0.0f);
+            case DragTarget::peak3: return getParamValueActual (params.peak3Gain, params.peak3GainRaw, 0.0f);
+        }
+
+        return 0.0f;
+    };
+    dragStartPeakQ = pickQ();
+    dragStartPeakGainDb = pickGain();
 
     switch (dragging)
     {
         case DragTarget::lowCut:  beginGesture (params.lowCut); break;
         case DragTarget::highCut: beginGesture (params.highCut); break;
-        case DragTarget::peak:
-            beginGesture (params.peakFreq);
-            beginGesture (params.peakGain);
-            beginGesture (params.peakQ);
+        case DragTarget::peak1:
+            beginGesture (params.peak1Freq);
+            beginGesture (params.peak1Gain);
+            beginGesture (params.peak1Q);
+            break;
+        case DragTarget::peak2:
+            beginGesture (params.peak2Freq);
+            beginGesture (params.peak2Gain);
+            beginGesture (params.peak2Q);
+            break;
+        case DragTarget::peak3:
+            beginGesture (params.peak3Freq);
+            beginGesture (params.peak3Gain);
+            beginGesture (params.peak3Q);
             break;
         case DragTarget::none:
         default:
@@ -386,23 +493,32 @@ void SpectrumEditor::mouseDrag (const juce::MouseEvent& e)
         f = juce::jmax (f, lo);
         setParamActual (params.highCut, f);
     }
-    else if (dragging == DragTarget::peak)
+    else if (dragging == DragTarget::peak1 || dragging == DragTarget::peak2 || dragging == DragTarget::peak3)
     {
         const auto f = xToFreqHz (pos.x);
+        auto* pFreq = (dragging == DragTarget::peak1) ? params.peak1Freq
+                     : (dragging == DragTarget::peak2) ? params.peak2Freq
+                     : params.peak3Freq;
+        auto* pGain = (dragging == DragTarget::peak1) ? params.peak1Gain
+                     : (dragging == DragTarget::peak2) ? params.peak2Gain
+                     : params.peak3Gain;
+        auto* pQ = (dragging == DragTarget::peak1) ? params.peak1Q
+                   : (dragging == DragTarget::peak2) ? params.peak2Q
+                   : params.peak3Q;
 
         if (e.mods.isShiftDown())
         {
             const auto delta = (dragStart.y - pos.y) / 60.0f;
             const auto q = dragStartPeakQ * std::pow (2.0f, delta);
-            setParamActual (params.peakQ, juce::jlimit (0.2f, 18.0f, q));
+            setParamActual (pQ, juce::jlimit (0.2f, 18.0f, q));
         }
         else
         {
             const auto db = yToDb (pos.y);
-            setParamActual (params.peakGain, juce::jlimit (-24.0f, 24.0f, db));
+            setParamActual (pGain, juce::jlimit (-24.0f, 24.0f, db));
         }
 
-        setParamActual (params.peakFreq, f);
+        setParamActual (pFreq, f);
     }
 
     repaint();
@@ -414,10 +530,20 @@ void SpectrumEditor::mouseUp (const juce::MouseEvent&)
     {
         case DragTarget::lowCut:  endGesture (params.lowCut); break;
         case DragTarget::highCut: endGesture (params.highCut); break;
-        case DragTarget::peak:
-            endGesture (params.peakFreq);
-            endGesture (params.peakGain);
-            endGesture (params.peakQ);
+        case DragTarget::peak1:
+            endGesture (params.peak1Freq);
+            endGesture (params.peak1Gain);
+            endGesture (params.peak1Q);
+            break;
+        case DragTarget::peak2:
+            endGesture (params.peak2Freq);
+            endGesture (params.peak2Gain);
+            endGesture (params.peak2Q);
+            break;
+        case DragTarget::peak3:
+            endGesture (params.peak3Freq);
+            endGesture (params.peak3Gain);
+            endGesture (params.peak3Q);
             break;
         case DragTarget::none:
         default:
@@ -433,10 +559,20 @@ void SpectrumEditor::mouseDoubleClick (const juce::MouseEvent&)
     {
         case DragTarget::lowCut:  setParamToDefault (params.lowCut); break;
         case DragTarget::highCut: setParamToDefault (params.highCut); break;
-        case DragTarget::peak:
-            setParamToDefault (params.peakFreq);
-            setParamToDefault (params.peakGain);
-            setParamToDefault (params.peakQ);
+        case DragTarget::peak1:
+            setParamToDefault (params.peak1Freq);
+            setParamToDefault (params.peak1Gain);
+            setParamToDefault (params.peak1Q);
+            break;
+        case DragTarget::peak2:
+            setParamToDefault (params.peak2Freq);
+            setParamToDefault (params.peak2Gain);
+            setParamToDefault (params.peak2Q);
+            break;
+        case DragTarget::peak3:
+            setParamToDefault (params.peak3Freq);
+            setParamToDefault (params.peak3Gain);
+            setParamToDefault (params.peak3Q);
             break;
         case DragTarget::none:
         default:
@@ -444,4 +580,3 @@ void SpectrumEditor::mouseDoubleClick (const juce::MouseEvent&)
     }
 }
 } // namespace ies::ui
-

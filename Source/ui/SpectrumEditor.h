@@ -16,9 +16,15 @@ public:
                const char* enableParamId,
                const char* lowCutParamId,
                const char* highCutParamId,
-               const char* peakFreqParamId,
-               const char* peakGainParamId,
-               const char* peakQParamId);
+               const char* peak1FreqParamId,
+               const char* peak1GainParamId,
+               const char* peak1QParamId,
+               const char* peak2FreqParamId,
+               const char* peak2GainParamId,
+               const char* peak2QParamId,
+               const char* peak3FreqParamId,
+               const char* peak3GainParamId,
+               const char* peak3QParamId);
 
     void setAudioFrame (const float* samples, int numSamples, double sampleRate);
 
@@ -31,7 +37,9 @@ private:
         none,
         lowCut,
         highCut,
-        peak
+        peak1,
+        peak2,
+        peak3
     };
 
     struct Params final
@@ -39,16 +47,28 @@ private:
         juce::RangedAudioParameter* enable = nullptr;
         juce::RangedAudioParameter* lowCut = nullptr;
         juce::RangedAudioParameter* highCut = nullptr;
-        juce::RangedAudioParameter* peakFreq = nullptr;
-        juce::RangedAudioParameter* peakGain = nullptr;
-        juce::RangedAudioParameter* peakQ = nullptr;
+        juce::RangedAudioParameter* peak1Freq = nullptr;
+        juce::RangedAudioParameter* peak1Gain = nullptr;
+        juce::RangedAudioParameter* peak1Q = nullptr;
+        juce::RangedAudioParameter* peak2Freq = nullptr;
+        juce::RangedAudioParameter* peak2Gain = nullptr;
+        juce::RangedAudioParameter* peak2Q = nullptr;
+        juce::RangedAudioParameter* peak3Freq = nullptr;
+        juce::RangedAudioParameter* peak3Gain = nullptr;
+        juce::RangedAudioParameter* peak3Q = nullptr;
 
         std::atomic<float>* enableRaw = nullptr;
         std::atomic<float>* lowCutRaw = nullptr;
         std::atomic<float>* highCutRaw = nullptr;
-        std::atomic<float>* peakFreqRaw = nullptr;
-        std::atomic<float>* peakGainRaw = nullptr;
-        std::atomic<float>* peakQRaw = nullptr;
+        std::atomic<float>* peak1FreqRaw = nullptr;
+        std::atomic<float>* peak1GainRaw = nullptr;
+        std::atomic<float>* peak1QRaw = nullptr;
+        std::atomic<float>* peak2FreqRaw = nullptr;
+        std::atomic<float>* peak2GainRaw = nullptr;
+        std::atomic<float>* peak2QRaw = nullptr;
+        std::atomic<float>* peak3FreqRaw = nullptr;
+        std::atomic<float>* peak3GainRaw = nullptr;
+        std::atomic<float>* peak3QRaw = nullptr;
     };
 
     float getParamValueActual (juce::RangedAudioParameter* p, std::atomic<float>* raw, float fallback) const noexcept;

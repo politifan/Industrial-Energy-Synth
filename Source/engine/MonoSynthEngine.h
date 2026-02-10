@@ -73,9 +73,18 @@ public:
         std::atomic<float>* toneEnable = nullptr;
         std::atomic<float>* toneLowCutHz = nullptr;
         std::atomic<float>* toneHighCutHz = nullptr;
-        std::atomic<float>* tonePeakFreqHz = nullptr;
-        std::atomic<float>* tonePeakGainDb = nullptr;
-        std::atomic<float>* tonePeakQ = nullptr;
+
+        std::atomic<float>* tonePeak1FreqHz = nullptr;
+        std::atomic<float>* tonePeak1GainDb = nullptr;
+        std::atomic<float>* tonePeak1Q = nullptr;
+
+        std::atomic<float>* tonePeak2FreqHz = nullptr;
+        std::atomic<float>* tonePeak2GainDb = nullptr;
+        std::atomic<float>* tonePeak2Q = nullptr;
+
+        std::atomic<float>* tonePeak3FreqHz = nullptr;
+        std::atomic<float>* tonePeak3GainDb = nullptr;
+        std::atomic<float>* tonePeak3Q = nullptr;
 
         std::atomic<float>* outGainDb = nullptr;
     };
@@ -181,9 +190,18 @@ private:
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> toneLowCutHzSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> toneHighCutHzSm;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeakFreqHzSm;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeakGainDbSm;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeakQSm;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak1FreqHzSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak1GainDbSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak1QSm;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak2FreqHzSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak2GainDbSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak2QSm;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak3FreqHzSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak3GainDbSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak3QSm;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> outGain;
 

@@ -133,18 +133,32 @@ public:
     {
         hp.reset();
         lp.reset();
-        peak.reset();
+        peak1.reset();
+        peak2.reset();
+        peak3.reset();
     }
 
     void setEnabled (bool e) noexcept { enabled = e; }
 
-    void setParams (float lowCutHzIn, float highCutHzIn, float peakFreqHzIn, float peakGainDbIn, float peakQIn) noexcept
+    void setParams (float lowCutHzIn, float highCutHzIn,
+                    float peak1FreqHzIn, float peak1GainDbIn, float peak1QIn,
+                    float peak2FreqHzIn, float peak2GainDbIn, float peak2QIn,
+                    float peak3FreqHzIn, float peak3GainDbIn, float peak3QIn) noexcept
     {
         lowCutHz = lowCutHzIn;
         highCutHz = highCutHzIn;
-        peakFreqHz = peakFreqHzIn;
-        peakGainDb = peakGainDbIn;
-        peakQ = peakQIn;
+
+        peak1FreqHz = peak1FreqHzIn;
+        peak1GainDb = peak1GainDbIn;
+        peak1Q = peak1QIn;
+
+        peak2FreqHz = peak2FreqHzIn;
+        peak2GainDb = peak2GainDbIn;
+        peak2Q = peak2QIn;
+
+        peak3FreqHz = peak3FreqHzIn;
+        peak3GainDb = peak3GainDbIn;
+        peak3Q = peak3QIn;
     }
 
     void updateCoeffs() noexcept
@@ -158,7 +172,9 @@ public:
         // Q values picked to be musical and stable. Peak Q is user-controlled.
         hp.setCoeffs (Biquad::makeHighPass (sr, lo, 0.7071f));
         lp.setCoeffs (Biquad::makeLowPass  (sr, hi, 0.7071f));
-        peak.setCoeffs (Biquad::makePeak   (sr, peakFreqHz, peakGainDb, juce::jlimit (0.1f, 18.0f, peakQ)));
+        peak1.setCoeffs (Biquad::makePeak (sr, peak1FreqHz, peak1GainDb, juce::jlimit (0.1f, 18.0f, peak1Q)));
+        peak2.setCoeffs (Biquad::makePeak (sr, peak2FreqHz, peak2GainDb, juce::jlimit (0.1f, 18.0f, peak2Q)));
+        peak3.setCoeffs (Biquad::makePeak (sr, peak3FreqHz, peak3GainDb, juce::jlimit (0.1f, 18.0f, peak3Q)));
     }
 
     float processSample (float x) noexcept
@@ -168,7 +184,9 @@ public:
 
         auto y = x;
         y = hp.processSample (y);
-        y = peak.processSample (y);
+        y = peak1.processSample (y);
+        y = peak2.processSample (y);
+        y = peak3.processSample (y);
         y = lp.processSample (y);
         return y;
     }
@@ -203,7 +221,9 @@ public:
 
     static void makeResponse (double sampleRate,
                               float lowCutHz, float highCutHz,
-                              float peakFreqHz, float peakGainDb, float peakQ,
+                              float peak1FreqHz, float peak1GainDb, float peak1Q,
+                              float peak2FreqHz, float peak2GainDb, float peak2Q,
+                              float peak3FreqHz, float peak3GainDb, float peak3Q,
                               float freqHz,
                               float& outDb) noexcept
     {
@@ -214,10 +234,14 @@ public:
 
         const auto hpC = Biquad::makeHighPass (sampleRate, lo, 0.7071f);
         const auto lpC = Biquad::makeLowPass  (sampleRate, hi, 0.7071f);
-        const auto pkC = Biquad::makePeak     (sampleRate, peakFreqHz, peakGainDb, juce::jlimit (0.1f, 18.0f, peakQ));
+        const auto pk1 = Biquad::makePeak     (sampleRate, peak1FreqHz, peak1GainDb, juce::jlimit (0.1f, 18.0f, peak1Q));
+        const auto pk2 = Biquad::makePeak     (sampleRate, peak2FreqHz, peak2GainDb, juce::jlimit (0.1f, 18.0f, peak2Q));
+        const auto pk3 = Biquad::makePeak     (sampleRate, peak3FreqHz, peak3GainDb, juce::jlimit (0.1f, 18.0f, peak3Q));
 
         const auto db = biquadMagnitudeDb (hpC, sampleRate, freqHz)
-                      + biquadMagnitudeDb (pkC, sampleRate, freqHz)
+                      + biquadMagnitudeDb (pk1, sampleRate, freqHz)
+                      + biquadMagnitudeDb (pk2, sampleRate, freqHz)
+                      + biquadMagnitudeDb (pk3, sampleRate, freqHz)
                       + biquadMagnitudeDb (lpC, sampleRate, freqHz);
         outDb = db;
     }
@@ -230,13 +254,22 @@ private:
 
     float lowCutHz = 20.0f;
     float highCutHz = 20000.0f;
-    float peakFreqHz = 1000.0f;
-    float peakGainDb = 0.0f;
-    float peakQ = 0.7071f;
+    float peak1FreqHz = 220.0f;
+    float peak1GainDb = 0.0f;
+    float peak1Q = 0.90f;
+
+    float peak2FreqHz = 1000.0f;
+    float peak2GainDb = 0.0f;
+    float peak2Q = 0.7071f;
+
+    float peak3FreqHz = 4200.0f;
+    float peak3GainDb = 0.0f;
+    float peak3Q = 0.90f;
 
     Biquad hp;
     Biquad lp;
-    Biquad peak;
+    Biquad peak1;
+    Biquad peak2;
+    Biquad peak3;
 };
 } // namespace ies::dsp
-

@@ -117,9 +117,24 @@ namespace tone
 inline constexpr const char* enable      = "tone.enable";      // bool
 inline constexpr const char* lowCutHz    = "tone.lowCutHz";    // float Hz
 inline constexpr const char* highCutHz   = "tone.highCutHz";   // float Hz
-inline constexpr const char* peakFreqHz  = "tone.peakFreqHz";  // float Hz
-inline constexpr const char* peakGainDb  = "tone.peakGainDb";  // float dB
-inline constexpr const char* peakQ       = "tone.peakQ";       // float Q
+
+// Multiple peak nodes (Serum-like EQ editing). Keep IDs stable once shipped.
+inline constexpr const char* peak1FreqHz  = "tone.peak1FreqHz";
+inline constexpr const char* peak1GainDb  = "tone.peak1GainDb";
+inline constexpr const char* peak1Q       = "tone.peak1Q";
+
+inline constexpr const char* peak2FreqHz  = "tone.peak2FreqHz";
+inline constexpr const char* peak2GainDb  = "tone.peak2GainDb";
+inline constexpr const char* peak2Q       = "tone.peak2Q";
+
+inline constexpr const char* peak3FreqHz  = "tone.peak3FreqHz";
+inline constexpr const char* peak3GainDb  = "tone.peak3GainDb";
+inline constexpr const char* peak3Q       = "tone.peak3Q";
+
+// Legacy (kept for state migration). Not exposed as parameters anymore.
+inline constexpr const char* legacyPeakFreqHz = "tone.peakFreqHz";
+inline constexpr const char* legacyPeakGainDb = "tone.peakGainDb";
+inline constexpr const char* legacyPeakQ      = "tone.peakQ";
 }
 
 namespace fenv

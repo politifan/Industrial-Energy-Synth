@@ -71,9 +71,15 @@ static const FactoryPreset kFactoryPresets[] =
             { params::tone::enable, 0.0f },
             { params::tone::lowCutHz, 20.0f },
             { params::tone::highCutHz, 20000.0f },
-            { params::tone::peakFreqHz, 1000.0f },
-            { params::tone::peakGainDb, 0.0f },
-            { params::tone::peakQ, 0.7071f },
+            { params::tone::peak1FreqHz, 220.0f },
+            { params::tone::peak1GainDb, 0.0f },
+            { params::tone::peak1Q, 0.90f },
+            { params::tone::peak2FreqHz, 1000.0f },
+            { params::tone::peak2GainDb, 0.0f },
+            { params::tone::peak2Q, 0.7071f },
+            { params::tone::peak3FreqHz, 4200.0f },
+            { params::tone::peak3GainDb, 0.0f },
+            { params::tone::peak3Q, 0.90f },
 
             { params::out::gainDb, -6.0f }
         }
@@ -125,9 +131,15 @@ static const FactoryPreset kFactoryPresets[] =
             { params::tone::enable, 0.0f },
             { params::tone::lowCutHz, 20.0f },
             { params::tone::highCutHz, 20000.0f },
-            { params::tone::peakFreqHz, 1000.0f },
-            { params::tone::peakGainDb, 0.0f },
-            { params::tone::peakQ, 0.7071f },
+            { params::tone::peak1FreqHz, 220.0f },
+            { params::tone::peak1GainDb, 0.0f },
+            { params::tone::peak1Q, 0.90f },
+            { params::tone::peak2FreqHz, 1000.0f },
+            { params::tone::peak2GainDb, 0.0f },
+            { params::tone::peak2Q, 0.7071f },
+            { params::tone::peak3FreqHz, 4200.0f },
+            { params::tone::peak3GainDb, 0.0f },
+            { params::tone::peak3Q, 0.90f },
 
             { params::out::gainDb, -8.0f }
         }
@@ -183,9 +195,15 @@ static const FactoryPreset kFactoryPresets[] =
             { params::tone::enable, 0.0f },
             { params::tone::lowCutHz, 20.0f },
             { params::tone::highCutHz, 20000.0f },
-            { params::tone::peakFreqHz, 1000.0f },
-            { params::tone::peakGainDb, 0.0f },
-            { params::tone::peakQ, 0.7071f },
+            { params::tone::peak1FreqHz, 220.0f },
+            { params::tone::peak1GainDb, 0.0f },
+            { params::tone::peak1Q, 0.90f },
+            { params::tone::peak2FreqHz, 1000.0f },
+            { params::tone::peak2GainDb, 0.0f },
+            { params::tone::peak2Q, 0.7071f },
+            { params::tone::peak3FreqHz, 4200.0f },
+            { params::tone::peak3GainDb, 0.0f },
+            { params::tone::peak3Q, 0.90f },
 
             { params::out::gainDb, -10.0f }
         }
@@ -237,9 +255,15 @@ static const FactoryPreset kFactoryPresets[] =
             { params::tone::enable, 0.0f },
             { params::tone::lowCutHz, 20.0f },
             { params::tone::highCutHz, 20000.0f },
-            { params::tone::peakFreqHz, 1000.0f },
-            { params::tone::peakGainDb, 0.0f },
-            { params::tone::peakQ, 0.7071f },
+            { params::tone::peak1FreqHz, 220.0f },
+            { params::tone::peak1GainDb, 0.0f },
+            { params::tone::peak1Q, 0.90f },
+            { params::tone::peak2FreqHz, 1000.0f },
+            { params::tone::peak2GainDb, 0.0f },
+            { params::tone::peak2Q, 0.7071f },
+            { params::tone::peak3FreqHz, 4200.0f },
+            { params::tone::peak3GainDb, 0.0f },
+            { params::tone::peak3Q, 0.90f },
 
             { params::out::gainDb, -12.0f }
         }
@@ -300,9 +324,15 @@ static const FactoryPreset kFactoryPresets[] =
             { params::tone::enable, 0.0f },
             { params::tone::lowCutHz, 20.0f },
             { params::tone::highCutHz, 20000.0f },
-            { params::tone::peakFreqHz, 1000.0f },
-            { params::tone::peakGainDb, 0.0f },
-            { params::tone::peakQ, 0.7071f },
+            { params::tone::peak1FreqHz, 220.0f },
+            { params::tone::peak1GainDb, 0.0f },
+            { params::tone::peak1Q, 0.90f },
+            { params::tone::peak2FreqHz, 1000.0f },
+            { params::tone::peak2GainDb, 0.0f },
+            { params::tone::peak2Q, 0.7071f },
+            { params::tone::peak3FreqHz, 4200.0f },
+            { params::tone::peak3GainDb, 0.0f },
+            { params::tone::peak3Q, 0.90f },
 
             { params::out::gainDb, -14.0f }
         }
@@ -354,9 +384,15 @@ static const FactoryPreset kFactoryPresets[] =
             { params::tone::enable, 0.0f },
             { params::tone::lowCutHz, 20.0f },
             { params::tone::highCutHz, 20000.0f },
-            { params::tone::peakFreqHz, 1000.0f },
-            { params::tone::peakGainDb, 0.0f },
-            { params::tone::peakQ, 0.7071f },
+            { params::tone::peak1FreqHz, 220.0f },
+            { params::tone::peak1GainDb, 0.0f },
+            { params::tone::peak1Q, 0.90f },
+            { params::tone::peak2FreqHz, 1000.0f },
+            { params::tone::peak2GainDb, 0.0f },
+            { params::tone::peak2Q, 0.7071f },
+            { params::tone::peak3FreqHz, 4200.0f },
+            { params::tone::peak3GainDb, 0.0f },
+            { params::tone::peak3Q, 0.90f },
 
             { params::out::gainDb, -16.0f }
         }
@@ -407,9 +443,15 @@ static const FactoryPreset kFactoryPresets[] =
             { params::tone::enable, 0.0f },
             { params::tone::lowCutHz, 20.0f },
             { params::tone::highCutHz, 20000.0f },
-            { params::tone::peakFreqHz, 1000.0f },
-            { params::tone::peakGainDb, 0.0f },
-            { params::tone::peakQ, 0.7071f },
+            { params::tone::peak1FreqHz, 220.0f },
+            { params::tone::peak1GainDb, 0.0f },
+            { params::tone::peak1Q, 0.90f },
+            { params::tone::peak2FreqHz, 1000.0f },
+            { params::tone::peak2GainDb, 0.0f },
+            { params::tone::peak2Q, 0.7071f },
+            { params::tone::peak3FreqHz, 4200.0f },
+            { params::tone::peak3GainDb, 0.0f },
+            { params::tone::peak3Q, 0.90f },
 
             { params::out::gainDb, -10.0f }
         }
@@ -460,9 +502,15 @@ static const FactoryPreset kFactoryPresets[] =
             { params::tone::enable, 0.0f },
             { params::tone::lowCutHz, 20.0f },
             { params::tone::highCutHz, 20000.0f },
-            { params::tone::peakFreqHz, 1000.0f },
-            { params::tone::peakGainDb, 0.0f },
-            { params::tone::peakQ, 0.7071f },
+            { params::tone::peak1FreqHz, 220.0f },
+            { params::tone::peak1GainDb, 0.0f },
+            { params::tone::peak1Q, 0.90f },
+            { params::tone::peak2FreqHz, 1000.0f },
+            { params::tone::peak2GainDb, 0.0f },
+            { params::tone::peak2Q, 0.7071f },
+            { params::tone::peak3FreqHz, 4200.0f },
+            { params::tone::peak3GainDb, 0.0f },
+            { params::tone::peak3Q, 0.90f },
 
             { params::out::gainDb, -16.0f }
         }
@@ -513,9 +561,15 @@ static const FactoryPreset kFactoryPresets[] =
             { params::tone::enable, 0.0f },
             { params::tone::lowCutHz, 20.0f },
             { params::tone::highCutHz, 20000.0f },
-            { params::tone::peakFreqHz, 1000.0f },
-            { params::tone::peakGainDb, 0.0f },
-            { params::tone::peakQ, 0.7071f },
+            { params::tone::peak1FreqHz, 220.0f },
+            { params::tone::peak1GainDb, 0.0f },
+            { params::tone::peak1Q, 0.90f },
+            { params::tone::peak2FreqHz, 1000.0f },
+            { params::tone::peak2GainDb, 0.0f },
+            { params::tone::peak2Q, 0.7071f },
+            { params::tone::peak3FreqHz, 4200.0f },
+            { params::tone::peak3GainDb, 0.0f },
+            { params::tone::peak3Q, 0.90f },
 
             { params::out::gainDb, -12.0f }
         }
@@ -567,11 +621,349 @@ static const FactoryPreset kFactoryPresets[] =
             { params::tone::enable, 0.0f },
             { params::tone::lowCutHz, 20.0f },
             { params::tone::highCutHz, 20000.0f },
-            { params::tone::peakFreqHz, 1000.0f },
-            { params::tone::peakGainDb, 0.0f },
-            { params::tone::peakQ, 0.7071f },
+            { params::tone::peak1FreqHz, 220.0f },
+            { params::tone::peak1GainDb, 0.0f },
+            { params::tone::peak1Q, 0.90f },
+            { params::tone::peak2FreqHz, 1000.0f },
+            { params::tone::peak2GainDb, 0.0f },
+            { params::tone::peak2Q, 0.7071f },
+            { params::tone::peak3FreqHz, 4200.0f },
+            { params::tone::peak3GainDb, 0.0f },
+            { params::tone::peak3Q, 0.90f },
 
             { params::out::gainDb, -16.0f }
+        }
+    }
+    ,
+    {
+        "Industrial Bass 05 (Tone EQ)",
+        u8"Индастриал бас 05 (тон EQ)",
+        {
+            { params::mono::envMode, (float) params::mono::retrigger },
+            { params::mono::glideEnable, 0.0f },
+            { params::mono::glideTimeMs, 70.0f },
+
+            { params::osc1::wave, (float) params::osc::square },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, 0.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.18f },
+
+            { params::osc2::wave, (float) params::osc::saw },
+            { params::osc2::level, 0.55f },
+            { params::osc2::coarse, -12.0f },
+            { params::osc2::fine, 0.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.22f },
+            { params::osc2::sync, 0.0f },
+
+            { params::amp::attackMs, 3.0f },
+            { params::amp::decayMs, 120.0f },
+            { params::amp::sustain, 0.70f },
+            { params::amp::releaseMs, 180.0f },
+
+            { params::destroy::foldDriveDb, 10.0f },
+            { params::destroy::foldAmount, 0.30f },
+            { params::destroy::foldMix, 0.85f },
+            { params::destroy::clipDriveDb, 14.0f },
+            { params::destroy::clipAmount, 0.40f },
+            { params::destroy::clipMix, 0.80f },
+            { params::destroy::modMode, (float) params::destroy::fm },
+            { params::destroy::modAmount, 0.12f },
+            { params::destroy::modMix, 0.15f },
+            { params::destroy::modNoteSync, 1.0f },
+            { params::destroy::crushBits, 9.0f },
+            { params::destroy::crushDownsample, 3.0f },
+            { params::destroy::crushMix, 0.15f },
+
+            { params::filter::type, (float) params::filter::lp },
+            { params::filter::cutoffHz, 180.0f },
+            { params::filter::resonance, 0.35f },
+            { params::filter::keyTrack, 1.0f },
+            { params::filter::envAmount, 9.0f },
+
+            { params::fenv::attackMs, 5.0f },
+            { params::fenv::decayMs, 110.0f },
+            { params::fenv::sustain, 0.0f },
+            { params::fenv::releaseMs, 160.0f },
+
+            { params::tone::enable, 1.0f },
+            { params::tone::lowCutHz, 55.0f },
+            { params::tone::highCutHz, 9200.0f },
+            { params::tone::peak1FreqHz, 120.0f },
+            { params::tone::peak1GainDb, 6.0f },
+            { params::tone::peak1Q, 1.10f },
+            { params::tone::peak2FreqHz, 820.0f },
+            { params::tone::peak2GainDb, 3.0f },
+            { params::tone::peak2Q, 0.85f },
+            { params::tone::peak3FreqHz, 2800.0f },
+            { params::tone::peak3GainDb, -4.0f },
+            { params::tone::peak3Q, 1.10f },
+
+            { params::out::gainDb, -10.0f }
+        }
+    },
+    {
+        "Aggressive Lead 05 (EQ Screech)",
+        u8"Агрессивный лид 05 (EQ визг)",
+        {
+            { params::mono::envMode, (float) params::mono::retrigger },
+            { params::mono::glideEnable, 1.0f },
+            { params::mono::glideTimeMs, 85.0f },
+
+            { params::osc1::wave, (float) params::osc::saw },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, 0.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.45f },
+
+            { params::osc2::wave, (float) params::osc::saw },
+            { params::osc2::level, 0.78f },
+            { params::osc2::coarse, 12.0f },
+            { params::osc2::fine, 0.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.55f },
+            { params::osc2::sync, 1.0f },
+
+            { params::amp::attackMs, 2.0f },
+            { params::amp::decayMs, 90.0f },
+            { params::amp::sustain, 0.75f },
+            { params::amp::releaseMs, 200.0f },
+
+            { params::destroy::foldDriveDb, 22.0f },
+            { params::destroy::foldAmount, 0.70f },
+            { params::destroy::foldMix, 1.0f },
+            { params::destroy::clipDriveDb, 18.0f },
+            { params::destroy::clipAmount, 0.55f },
+            { params::destroy::clipMix, 0.85f },
+            { params::destroy::modMode, (float) params::destroy::ringMod },
+            { params::destroy::modAmount, 0.22f },
+            { params::destroy::modMix, 0.25f },
+            { params::destroy::modNoteSync, 1.0f },
+            { params::destroy::crushBits, 8.0f },
+            { params::destroy::crushDownsample, 2.0f },
+            { params::destroy::crushMix, 0.18f },
+
+            { params::filter::type, (float) params::filter::bp },
+            { params::filter::cutoffHz, 2400.0f },
+            { params::filter::resonance, 0.70f },
+            { params::filter::keyTrack, 0.0f },
+            { params::filter::envAmount, 0.0f },
+
+            { params::tone::enable, 1.0f },
+            { params::tone::lowCutHz, 180.0f },
+            { params::tone::highCutHz, 14000.0f },
+            { params::tone::peak1FreqHz, 650.0f },
+            { params::tone::peak1GainDb, -3.0f },
+            { params::tone::peak1Q, 1.00f },
+            { params::tone::peak2FreqHz, 3200.0f },
+            { params::tone::peak2GainDb, 7.0f },
+            { params::tone::peak2Q, 1.30f },
+            { params::tone::peak3FreqHz, 7600.0f },
+            { params::tone::peak3GainDb, 4.0f },
+            { params::tone::peak3Q, 0.90f },
+
+            { params::out::gainDb, -16.0f }
+        }
+    },
+    {
+        "Drone 03 (Sub Turbine)",
+        u8"Дрон 03 (саб турбина)",
+        {
+            { params::mono::envMode, (float) params::mono::legato },
+            { params::mono::glideEnable, 0.0f },
+            { params::mono::glideTimeMs, 120.0f },
+
+            { params::osc1::wave, (float) params::osc::triangle },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, -12.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.55f },
+
+            { params::osc2::wave, (float) params::osc::square },
+            { params::osc2::level, 0.70f },
+            { params::osc2::coarse, -12.0f },
+            { params::osc2::fine, -3.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.65f },
+            { params::osc2::sync, 0.0f },
+
+            { params::amp::attackMs, 900.0f },
+            { params::amp::decayMs, 1500.0f },
+            { params::amp::sustain, 0.95f },
+            { params::amp::releaseMs, 1500.0f },
+
+            { params::destroy::foldDriveDb, 16.0f },
+            { params::destroy::foldAmount, 0.55f },
+            { params::destroy::foldMix, 0.90f },
+            { params::destroy::clipDriveDb, 10.0f },
+            { params::destroy::clipAmount, 0.25f },
+            { params::destroy::clipMix, 0.70f },
+            { params::destroy::modMode, (float) params::destroy::fm },
+            { params::destroy::modAmount, 0.22f },
+            { params::destroy::modMix, 0.18f },
+            { params::destroy::modNoteSync, 1.0f },
+            { params::destroy::crushBits, 7.0f },
+            { params::destroy::crushDownsample, 4.0f },
+            { params::destroy::crushMix, 0.22f },
+
+            { params::filter::type, (float) params::filter::lp },
+            { params::filter::cutoffHz, 520.0f },
+            { params::filter::resonance, 0.65f },
+            { params::filter::keyTrack, 0.0f },
+            { params::filter::envAmount, 4.0f },
+
+            { params::fenv::attackMs, 1400.0f },
+            { params::fenv::decayMs, 2000.0f },
+            { params::fenv::sustain, 0.35f },
+            { params::fenv::releaseMs, 2000.0f },
+
+            { params::tone::enable, 1.0f },
+            { params::tone::lowCutHz, 32.0f },
+            { params::tone::highCutHz, 6200.0f },
+            { params::tone::peak1FreqHz, 90.0f },
+            { params::tone::peak1GainDb, 5.0f },
+            { params::tone::peak1Q, 0.90f },
+            { params::tone::peak2FreqHz, 380.0f },
+            { params::tone::peak2GainDb, -2.0f },
+            { params::tone::peak2Q, 1.10f },
+            { params::tone::peak3FreqHz, 2200.0f },
+            { params::tone::peak3GainDb, 2.0f },
+            { params::tone::peak3Q, 0.85f },
+
+            { params::out::gainDb, -14.0f }
+        }
+    },
+    {
+        "Industrial Bass 06 (Servo)",
+        u8"Индастриал бас 06 (серво)",
+        {
+            { params::mono::envMode, (float) params::mono::legato },
+            { params::mono::glideEnable, 1.0f },
+            { params::mono::glideTimeMs, 180.0f },
+
+            { params::osc1::wave, (float) params::osc::square },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, 0.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.30f },
+
+            { params::osc2::wave, (float) params::osc::triangle },
+            { params::osc2::level, 0.60f },
+            { params::osc2::coarse, -12.0f },
+            { params::osc2::fine, 6.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.35f },
+            { params::osc2::sync, 0.0f },
+
+            { params::amp::attackMs, 6.0f },
+            { params::amp::decayMs, 160.0f },
+            { params::amp::sustain, 0.55f },
+            { params::amp::releaseMs, 220.0f },
+
+            { params::destroy::foldDriveDb, 12.0f },
+            { params::destroy::foldAmount, 0.35f },
+            { params::destroy::foldMix, 0.90f },
+            { params::destroy::clipDriveDb, 16.0f },
+            { params::destroy::clipAmount, 0.45f },
+            { params::destroy::clipMix, 0.85f },
+            { params::destroy::modMode, (float) params::destroy::fm },
+            { params::destroy::modAmount, 0.18f },
+            { params::destroy::modMix, 0.20f },
+            { params::destroy::modNoteSync, 1.0f },
+            { params::destroy::crushBits, 8.0f },
+            { params::destroy::crushDownsample, 3.0f },
+            { params::destroy::crushMix, 0.25f },
+
+            { params::filter::type, (float) params::filter::lp },
+            { params::filter::cutoffHz, 240.0f },
+            { params::filter::resonance, 0.40f },
+            { params::filter::keyTrack, 1.0f },
+            { params::filter::envAmount, 8.0f },
+
+            { params::tone::enable, 1.0f },
+            { params::tone::lowCutHz, 60.0f },
+            { params::tone::highCutHz, 11000.0f },
+            { params::tone::peak1FreqHz, 140.0f },
+            { params::tone::peak1GainDb, 4.0f },
+            { params::tone::peak1Q, 0.95f },
+            { params::tone::peak2FreqHz, 900.0f },
+            { params::tone::peak2GainDb, 2.0f },
+            { params::tone::peak2Q, 0.85f },
+            { params::tone::peak3FreqHz, 4200.0f },
+            { params::tone::peak3GainDb, -2.0f },
+            { params::tone::peak3Q, 1.00f },
+
+            { params::out::gainDb, -12.0f }
+        }
+    },
+    {
+        "Drone 04 (Arc Noise)",
+        u8"Дрон 04 (дуга)",
+        {
+            { params::mono::envMode, (float) params::mono::legato },
+            { params::mono::glideEnable, 0.0f },
+            { params::mono::glideTimeMs, 120.0f },
+
+            { params::osc1::wave, (float) params::osc::saw },
+            { params::osc1::level, 0.85f },
+            { params::osc1::coarse, -12.0f },
+            { params::osc1::fine, 0.0f },
+            { params::osc1::phase, 0.0f },
+            { params::osc1::detune, 0.70f },
+
+            { params::osc2::wave, (float) params::osc::saw },
+            { params::osc2::level, 0.75f },
+            { params::osc2::coarse, -12.0f },
+            { params::osc2::fine, 0.0f },
+            { params::osc2::phase, 0.0f },
+            { params::osc2::detune, 0.80f },
+            { params::osc2::sync, 1.0f },
+
+            { params::amp::attackMs, 1200.0f },
+            { params::amp::decayMs, 2000.0f },
+            { params::amp::sustain, 0.98f },
+            { params::amp::releaseMs, 2000.0f },
+
+            { params::destroy::foldDriveDb, 26.0f },
+            { params::destroy::foldAmount, 0.80f },
+            { params::destroy::foldMix, 1.0f },
+            { params::destroy::clipDriveDb, 24.0f },
+            { params::destroy::clipAmount, 0.70f },
+            { params::destroy::clipMix, 0.95f },
+            { params::destroy::modMode, (float) params::destroy::ringMod },
+            { params::destroy::modAmount, 0.30f },
+            { params::destroy::modMix, 0.35f },
+            { params::destroy::modNoteSync, 0.0f },
+            { params::destroy::modFreqHz, 980.0f },
+            { params::destroy::crushBits, 6.0f },
+            { params::destroy::crushDownsample, 6.0f },
+            { params::destroy::crushMix, 0.32f },
+
+            { params::filter::type, (float) params::filter::bp },
+            { params::filter::cutoffHz, 1200.0f },
+            { params::filter::resonance, 0.78f },
+            { params::filter::keyTrack, 0.0f },
+            { params::filter::envAmount, 0.0f },
+
+            { params::tone::enable, 1.0f },
+            { params::tone::lowCutHz, 160.0f },
+            { params::tone::highCutHz, 16000.0f },
+            { params::tone::peak1FreqHz, 450.0f },
+            { params::tone::peak1GainDb, -4.0f },
+            { params::tone::peak1Q, 1.20f },
+            { params::tone::peak2FreqHz, 2600.0f },
+            { params::tone::peak2GainDb, 6.0f },
+            { params::tone::peak2Q, 1.25f },
+            { params::tone::peak3FreqHz, 8200.0f },
+            { params::tone::peak3GainDb, 4.0f },
+            { params::tone::peak3Q, 0.90f },
+
+            { params::out::gainDb, -18.0f }
         }
     }
 };
@@ -746,14 +1138,14 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                       u8"• Double-click по ручке: сброс к дефолту.\n"
                                       u8"• Init/Сброс: сброс всех параметров (язык сохраняется).\n"
                                       u8"• Note Sync: Mod Freq отключается.\n"
-                                      u8"• Тон EQ: маркеры на спектре (Shift: Q, double-click: сброс).\n"
+                                      u8"• Тон EQ: маркеры на спектре (Shift: Q, double-click: сброс). Пики: 1/2/3.\n"
                                       u8"• Glide Off: Glide Time отключается.\n\n"
                                       u8"Reaper: добавь плагин на трек, включи мониторинг и подай MIDI (Virtual MIDI keyboard).")
             : juce::String ("Quick tips:\n"
                             "• Double-click knob: reset to default.\n"
                             "• Init: resets all params (keeps language).\n"
                             "• Note Sync: disables Mod Freq.\n"
-                            "• Tone EQ: drag handles in the spectrum (Shift: Q, double-click: reset).\n"
+                            "• Tone EQ: drag handles in the spectrum (Shift: Q, double-click: reset). Peaks: 1/2/3.\n"
                             "• Glide Off: disables Glide Time.\n\n"
                             "Reaper: insert on a track, enable monitoring, feed MIDI (Virtual MIDI keyboard).");
 
@@ -1082,9 +1474,15 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                          params::tone::enable,
                          params::tone::lowCutHz,
                          params::tone::highCutHz,
-                         params::tone::peakFreqHz,
-                         params::tone::peakGainDb,
-                         params::tone::peakQ);
+                         params::tone::peak1FreqHz,
+                         params::tone::peak1GainDb,
+                         params::tone::peak1Q,
+                         params::tone::peak2FreqHz,
+                         params::tone::peak2GainDb,
+                         params::tone::peak2Q,
+                         params::tone::peak3FreqHz,
+                         params::tone::peak3GainDb,
+                         params::tone::peak3Q);
 
     // --- Output ---
     outGroup.setText ("Output");
@@ -1711,7 +2109,7 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
     toneEnable.setTooltip (T ("Enable the post EQ (Tone).",
                               u8"Включить пост-эквалайзер (Тон)."));
     spectrumEditor.setTooltip (T ("Drag low/high cuts and the peak node. Shift-drag peak to change Q. Double-click handles to reset.",
-                                  u8"Таскай НЧ/ВЧ срезы и пик на графике. Shift+drag на пике меняет Q. Double-click по маркерам: сброс."));
+                                  u8"Таскай НЧ/ВЧ срезы и пики (1/2/3) на графике. Shift+drag на пике меняет Q. Double-click по маркерам: сброс."));
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
