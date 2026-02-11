@@ -161,7 +161,15 @@ inline constexpr const char* crushMix        = "destroy.crushMix";
 
 // Minimal fundamental lock to keep note readability under extreme destruction.
 inline constexpr const char* pitchLockEnable = "destroy.pitchLockEnable"; // bool
+inline constexpr const char* pitchLockMode   = "destroy.pitchLockMode";   // choice
 inline constexpr const char* pitchLockAmount = "destroy.pitchLockAmount"; // 0..1
+
+enum PitchLockMode
+{
+    pitchModeFundamental = 0,
+    pitchModeHarmonic = 1,
+    pitchModeHybrid = 2
+};
 }
 
 namespace shaper
@@ -250,7 +258,9 @@ enum Dest
     dstFoldAmount = 5,
     dstClipAmount = 6,
     dstModAmount = 7,
-    dstCrushMix = 8
+    dstCrushMix = 8,
+    dstShaperDrive = 9,
+    dstShaperMix = 10
 };
 }
 

@@ -53,7 +53,7 @@ IndustrialLookAndFeel::IndustrialLookAndFeel()
 
 juce::Font IndustrialLookAndFeel::getTextButtonFont (juce::TextButton&, int buttonHeight)
 {
-    const auto size = (float) juce::jlimit (12, 15, buttonHeight - 8);
+    const auto size = (float) juce::jlimit (10, 13, buttonHeight - 9);
     return juce::Font (juce::Font::getDefaultSansSerifFontName(), size, juce::Font::bold);
 }
 
@@ -82,15 +82,15 @@ void IndustrialLookAndFeel::drawButtonBackground (juce::Graphics& g,
         base = base.brighter (0.10f);
 
     g.setColour (base);
-    g.fillRoundedRectangle (b, 6.0f);
+    g.fillRoundedRectangle (b, 5.0f);
 
     g.setColour (brd.withAlpha (0.95f));
-    g.drawRoundedRectangle (b, 6.0f, 1.1f);
+    g.drawRoundedRectangle (b, 5.0f, 1.0f);
 
     if (isHighlighted && button.isEnabled())
     {
         g.setColour (hi.withAlpha (0.15f));
-        g.drawRoundedRectangle (b.reduced (1.3f), 5.0f, 1.2f);
+        g.drawRoundedRectangle (b.reduced (1.2f), 4.0f, 1.0f);
     }
 }
 
@@ -114,7 +114,7 @@ void IndustrialLookAndFeel::drawButtonText (juce::Graphics& g,
 juce::Font IndustrialLookAndFeel::getLabelFont (juce::Label&)
 {
     // Serum-like small labels.
-    return juce::Font (juce::Font::getDefaultSansSerifFontName(), 13.0f, juce::Font::plain);
+    return juce::Font (juce::Font::getDefaultSansSerifFontName(), 12.0f, juce::Font::plain);
 }
 
 void IndustrialLookAndFeel::drawRotarySlider (juce::Graphics& g,
@@ -125,8 +125,8 @@ void IndustrialLookAndFeel::drawRotarySlider (juce::Graphics& g,
                                              juce::Slider& slider)
 {
     // Leave some room for the slider's textbox/label below.
-    auto bounds = juce::Rectangle<float> ((float) x, (float) y, (float) width, (float) height).reduced (6.0f, 4.0f);
-    bounds.removeFromBottom (18.0f);
+    auto bounds = juce::Rectangle<float> ((float) x, (float) y, (float) width, (float) height).reduced (5.0f, 3.0f);
+    bounds.removeFromBottom (14.0f);
 
     const auto enabled = slider.isEnabled();
     const auto hot = slider.isMouseOverOrDragging();
@@ -168,6 +168,17 @@ void IndustrialLookAndFeel::drawRotarySlider (juce::Graphics& g,
             g.drawEllipse (halo, 8.0f);
             g.setColour (c.withAlpha (0.20f));
             g.drawEllipse (halo, 3.0f);
+        }
+    }
+
+    // Intent Layer highlight (goal-oriented guidance).
+    {
+        const auto intentGlow = juce::jlimit (0.0f, 1.0f, floatFromProperty (slider, "intentGlow", 0.0f));
+        if (intentGlow > 0.001f && enabled)
+        {
+            auto halo = knob.expanded (3.5f + 4.0f * intentGlow);
+            g.setColour (accentCol.withAlpha (0.08f + 0.16f * intentGlow));
+            g.drawEllipse (halo, 2.0f + 1.8f * intentGlow);
         }
     }
 
@@ -285,8 +296,8 @@ void IndustrialLookAndFeel::drawToggleButton (juce::Graphics& g,
     juce::ignoreUnused (shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
 
     auto r = button.getLocalBounds();
-    auto box = r.removeFromLeft (26).reduced (2, 4);
-    r.removeFromLeft (6);
+    auto box = r.removeFromLeft (22).reduced (2, 4);
+    r.removeFromLeft (4);
 
     const bool on = button.getToggleState();
     const bool enabled = button.isEnabled();
@@ -311,7 +322,7 @@ void IndustrialLookAndFeel::drawToggleButton (juce::Graphics& g,
     }
 
     g.setColour (enabled ? text : text.withAlpha (0.35f));
-    g.setFont (juce::Font (juce::Font::getDefaultSansSerifFontName(), 13.0f, juce::Font::plain));
+    g.setFont (juce::Font (juce::Font::getDefaultSansSerifFontName(), 12.0f, juce::Font::plain));
     g.drawFittedText (button.getButtonText(), r, juce::Justification::centredLeft, 1);
 }
 
@@ -325,10 +336,10 @@ void IndustrialLookAndFeel::drawComboBox (juce::Graphics& g,
     const auto b = juce::Rectangle<int> (0, 0, width, height).toFloat().reduced (0.5f);
 
     g.setColour (box.findColour (juce::ComboBox::backgroundColourId));
-    g.fillRoundedRectangle (b, 4.0f);
+    g.fillRoundedRectangle (b, 3.5f);
 
     g.setColour (box.findColour (juce::ComboBox::outlineColourId));
-    g.drawRoundedRectangle (b, 4.0f, 1.2f);
+    g.drawRoundedRectangle (b, 3.5f, 1.0f);
 
     // Arrow region
     auto arrow = juce::Rectangle<int> (buttonX, buttonY, buttonW, buttonH).toFloat();
@@ -361,16 +372,16 @@ void IndustrialLookAndFeel::drawGroupComponentOutline (juce::Graphics& g,
     const auto brd  = enabled ? border.withAlpha (0.95f) : border.withAlpha (0.25f);
 
     g.setColour (fill);
-    g.fillRoundedRectangle (bounds, 10.0f);
+    g.fillRoundedRectangle (bounds, 8.0f);
 
     g.setColour (brd);
-    g.drawRoundedRectangle (bounds, 10.0f, 1.1f);
+    g.drawRoundedRectangle (bounds, 8.0f, 1.0f);
 
     // Header bar
-    auto header = bounds.withHeight (28.0f).reduced (1.0f, 1.0f);
+    auto header = bounds.withHeight (24.0f).reduced (1.0f, 1.0f);
     const auto headerBoost = enabled ? (0.85f + 0.10f * activity) : 0.22f;
     g.setColour (panel2.withAlpha (headerBoost));
-    g.fillRoundedRectangle (header, 9.0f);
+    g.fillRoundedRectangle (header, 7.0f);
 
     // Accent stripe
     auto stripe = header.removeFromLeft (6.0f).reduced (0.0f, 5.0f);
@@ -383,14 +394,14 @@ void IndustrialLookAndFeel::drawGroupComponentOutline (juce::Graphics& g,
         // A light "Serum-ish" glow hint when the block is actively shaping sound.
         const auto glow = a.withAlpha (0.10f + 0.18f * activity);
         g.setColour (glow);
-        g.drawRoundedRectangle (bounds.reduced (1.0f), 10.0f, 2.0f);
+        g.drawRoundedRectangle (bounds.reduced (1.0f), 8.0f, 1.6f);
     }
 
     // Title
     g.setColour (enabled ? text : text.withAlpha (0.35f));
-    g.setFont (juce::Font (juce::Font::getDefaultSansSerifFontName(), 14.5f, juce::Font::bold));
+    g.setFont (juce::Font (juce::Font::getDefaultSansSerifFontName(), 13.0f, juce::Font::bold));
     g.drawFittedText (textStr,
-                      header.toNearestInt().reduced (10, 4),
+                      header.toNearestInt().reduced (8, 3),
                       juce::Justification::centredLeft,
                       1);
 

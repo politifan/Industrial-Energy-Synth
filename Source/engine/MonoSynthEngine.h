@@ -66,6 +66,7 @@ public:
         std::atomic<float>* crushDownsample = nullptr;
         std::atomic<float>* crushMix = nullptr;
         std::atomic<float>* destroyPitchLockEnable = nullptr;
+        std::atomic<float>* destroyPitchLockMode = nullptr;
         std::atomic<float>* destroyPitchLockAmount = nullptr;
 
         std::atomic<float>* shaperEnable = nullptr;
@@ -355,5 +356,7 @@ private:
 
     float pitchLockPhase = 0.0f;
     float pitchLockFollower = 0.0f;
+    float pitchLockLowpass = 0.0f;
+    float pitchLockBrightness = 0.0f;
 };
 } // namespace ies::engine

@@ -25,6 +25,7 @@ public:
     float getUiOutputPeak() const noexcept { return uiOutputPeak.load (std::memory_order_relaxed); }
     float getUiPreClipRisk() const noexcept { return uiPreClipRisk.load (std::memory_order_relaxed); }
     float getUiOutClipRisk() const noexcept { return uiOutClipRisk.load (std::memory_order_relaxed); }
+    float getUiCpuRisk() const noexcept { return uiCpuRisk.load (std::memory_order_relaxed); }
     void requestPanic() noexcept { uiPanicRequested.store (true, std::memory_order_release); }
     void applyStateFromUi (juce::ValueTree state, bool keepLanguage);
     void copyUiAudio (float* dest, int numSamples, UiAudioTap tap = UiAudioTap::postOutput) const noexcept;
@@ -67,6 +68,7 @@ private:
     std::atomic<float> uiOutputPeak { 0.0f };
     std::atomic<float> uiPreClipRisk { 0.0f };
     std::atomic<float> uiOutClipRisk { 0.0f };
+    std::atomic<float> uiCpuRisk { 0.0f };
     std::atomic<bool> uiPanicRequested { false };
 
     static constexpr int uiAudioRingSize = 16384;

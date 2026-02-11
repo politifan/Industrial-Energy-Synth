@@ -5,7 +5,8 @@ namespace ies::ui
 KnobWithLabel::KnobWithLabel()
 {
     slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 18);
+    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 56, 14);
+    slider.setNumDecimalPlacesToDisplay (2);
     addAndMakeVisible (slider);
 
     label.setJustificationType (juce::Justification::centred);
@@ -27,7 +28,7 @@ void KnobWithLabel::setSliderStyle (juce::Slider::SliderStyle style)
 void KnobWithLabel::resized()
 {
     auto r = getLocalBounds();
-    const auto labelH = 18;
+    const auto labelH = 14;
     label.setBounds (r.removeFromBottom (labelH));
     slider.setBounds (r);
 }
@@ -59,9 +60,9 @@ void ComboWithLabel::resized()
 
     if (layout == Layout::labelTop)
     {
-        const auto labelH = 16;
+        const auto labelH = 14;
         label.setBounds (r.removeFromTop (labelH));
-        combo.setBounds (r.reduced (0, 2));
+        combo.setBounds (r.reduced (0, 1));
         label.setJustificationType (juce::Justification::centredLeft);
         return;
     }

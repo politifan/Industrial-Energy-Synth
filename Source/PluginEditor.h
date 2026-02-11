@@ -52,6 +52,8 @@ private:
     void showModulationMenu (params::mod::Dest dst, juce::Point<int> screenPos);
     void clearAllModForDest (params::mod::Dest dst);
     void clearModSlot (int slotIndex);
+    params::mod::Dest getModDestForComponent (juce::Component*) const;
+    void setLastTouchedModDest (params::mod::Dest dst, bool announce);
     void setUiPage (int newPageIndex);
     void applyUiPageVisibility();
 
@@ -67,15 +69,23 @@ private:
     juce::TextButton helpButton;
     juce::TextButton pageSynthButton;
     juce::TextButton pageModButton;
+    juce::Label lastTouchedLabel;
+    juce::TextButton quickAssignMacro1;
+    juce::TextButton quickAssignMacro2;
+    juce::TextButton quickAssignLfo1;
+    juce::TextButton quickAssignLfo2;
+    juce::TextButton quickAssignClear;
     juce::TextButton presetPrev;
     juce::TextButton presetNext;
     ies::ui::ComboWithLabel preset;
     juce::TextButton presetSave;
     juce::TextButton presetLoad;
+    ies::ui::ComboWithLabel intentMode;
     ies::ui::ComboWithLabel language;
     std::unique_ptr<APVTS::ComboBoxAttachment> languageAttachment;
     juce::Label preClipIndicator;
     juce::Label outClipIndicator;
+    juce::Label safetyBudgetLabel;
     ies::ui::LevelMeter outMeter;
     juce::Label statusLabel;
     std::unique_ptr<ies::presets::PresetManager> presetManager;
@@ -175,6 +185,8 @@ private:
     std::unique_ptr<APVTS::SliderAttachment> crushMixAttachment;
     juce::ToggleButton destroyPitchLockEnable;
     std::unique_ptr<APVTS::ButtonAttachment> destroyPitchLockEnableAttachment;
+    ies::ui::ComboWithLabel destroyPitchLockMode;
+    std::unique_ptr<APVTS::ComboBoxAttachment> destroyPitchLockModeAttachment;
     ies::ui::KnobWithLabel destroyPitchLockAmount;
     std::unique_ptr<APVTS::SliderAttachment> destroyPitchLockAmountAttachment;
 
@@ -292,7 +304,7 @@ private:
     std::array<std::unique_ptr<APVTS::SliderAttachment>, (size_t) params::mod::numSlots> modSlotDepthAttachment;
 
     // Drag-ring depth editing: we keep track of the most recently assigned slot per destination.
-    std::array<int, 9> modLastSlotByDest { { -1, -1, -1, -1, -1, -1, -1, -1, -1 } };
+    std::array<int, 11> modLastSlotByDest { { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 } };
     int modDepthDragSlot = -1;
     params::mod::Dest modDepthDragDest = params::mod::dstOff;
     float modDepthDragStart = 0.0f;
@@ -308,6 +320,15 @@ private:
     juce::ResizableCornerComponent resizeCorner { this, &boundsConstrainer };
 
     juce::Component* hovered = nullptr;
+    params::mod::Dest lastTouchedModDest = params::mod::dstOff;
+
+    enum IntentModeIndex
+    {
+        intentBass = 0,
+        intentLead = 1,
+        intentDrone = 2
+    };
+    IntentModeIndex currentIntent = intentBass;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (IndustrialEnergySynthAudioProcessorEditor)
 };

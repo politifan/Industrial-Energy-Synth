@@ -91,6 +91,7 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
     paramPointers.crushDownsample = apvts.getRawParameterValue (params::destroy::crushDownsample);
     paramPointers.crushMix        = apvts.getRawParameterValue (params::destroy::crushMix);
     paramPointers.destroyPitchLockEnable = apvts.getRawParameterValue (params::destroy::pitchLockEnable);
+    paramPointers.destroyPitchLockMode = apvts.getRawParameterValue (params::destroy::pitchLockMode);
     paramPointers.destroyPitchLockAmount = apvts.getRawParameterValue (params::destroy::pitchLockAmount);
 
     paramPointers.shaperEnable    = apvts.getRawParameterValue (params::shaper::enable);
@@ -330,6 +331,7 @@ void IndustrialEnergySynthAudioProcessor::prepareToPlay (double sampleRate, int 
     uiOutputPeak.store (0.0f, std::memory_order_relaxed);
     uiPreClipRisk.store (0.0f, std::memory_order_relaxed);
     uiOutClipRisk.store (0.0f, std::memory_order_relaxed);
+    uiCpuRisk.store (0.0f, std::memory_order_relaxed);
 }
 
 void IndustrialEnergySynthAudioProcessor::releaseResources()
@@ -362,6 +364,7 @@ bool IndustrialEnergySynthAudioProcessor::isBusesLayoutSupported (const BusesLay
 void IndustrialEnergySynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+    const auto t0 = juce::Time::getHighResolutionTicks();
 
     buffer.clear();
 
@@ -465,6 +468,25 @@ void IndustrialEnergySynthAudioProcessor::processBlock (juce::AudioBuffer<float>
 
         updateRisk (uiPreClipRisk, peakPre);
         updateRisk (uiOutClipRisk, peakOut);
+    }
+
+    // UI CPU budget estimate (safe for UI guidance; not for hard realtime decisions).
+    {
+        const auto t1 = juce::Time::getHighResolutionTicks();
+        const auto elapsedSec = juce::Time::highResolutionTicksToSeconds (t1 - t0);
+        const auto blockSec = (getSampleRate() > 0.0 && totalSamples > 0)
+            ? ((double) totalSamples / getSampleRate())
+            : 0.0;
+
+        float cpuNorm = 0.0f;
+        if (blockSec > 1.0e-6)
+            cpuNorm = (float) juce::jlimit (0.0, 2.5, elapsedSec / blockSec);
+
+        // >80% of real-time budget starts to be risky under host load.
+        const auto riskNow = juce::jlimit (0.0f, 1.0f, cpuNorm / 0.8f);
+        const auto prev = uiCpuRisk.load (std::memory_order_relaxed);
+        const auto smoothed = prev * 0.88f + riskNow * 0.12f;
+        uiCpuRisk.store (smoothed, std::memory_order_relaxed);
     }
 
     midiMessages.clear();
@@ -592,7 +614,8 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
     auto modGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("mod", "Mod Matrix", "|");
     const auto modSrcChoices = juce::StringArray { "Off", "LFO 1", "LFO 2", "Macro 1", "Macro 2" };
     const auto modDstChoices = juce::StringArray { "Off", "Osc1 Level", "Osc2 Level", "Filter Cutoff", "Filter Reso",
-                                                   "Fold Amount", "Clip Amount", "Mod Amount", "Crush Mix" };
+                                                   "Fold Amount", "Clip Amount", "Mod Amount", "Crush Mix",
+                                                   "Shaper Drive", "Shaper Mix" };
 
     auto addModSlot = [&] (const char* srcId, const char* dstId, const char* depthId, int slotIndex)
     {
@@ -692,6 +715,9 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
     destroyGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::destroy::crushMix), "Crush Mix",
                                                                          juce::NormalisableRange<float> (0.0f, 1.0f), 1.0f));
     destroyGroup->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::destroy::pitchLockEnable), "Pitch Lock Enable", false));
+    destroyGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::destroy::pitchLockMode), "Pitch Lock Mode",
+                                                                          juce::StringArray { "Fundamental", "Harmonic", "Hybrid" },
+                                                                          (int) params::destroy::pitchModeHybrid));
     destroyGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::destroy::pitchLockAmount), "Pitch Lock Amount",
                                                                          juce::NormalisableRange<float> (0.0f, 1.0f), 0.35f));
     layout.add (std::move (destroyGroup));

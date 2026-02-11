@@ -21,6 +21,10 @@ enum class Key
     pageSynth,
     pageMod,
     init,
+    intentMode,
+    intentBass,
+    intentLead,
+    intentDrone,
 
     mono,
     envMode,
@@ -68,6 +72,10 @@ enum class Key
     crushDownsample,
     crushMix,
     destroyPitchLockEnable,
+    destroyPitchLockMode,
+    destroyPitchLockModeFundamental,
+    destroyPitchLockModeHarmonic,
+    destroyPitchLockModeHybrid,
     destroyPitchLockAmount,
 
     shaper,
@@ -138,6 +146,8 @@ enum class Key
     modDstClipAmount,
     modDstModAmount,
     modDstCrushMix,
+    modDstShaperDrive,
+    modDstShaperMix,
 
     clipStatusPre,
     clipStatusOut,
@@ -171,6 +181,10 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::pageSynth:    return u8 (u8"Синт");
             case Key::pageMod:      return u8 (u8"Мод");
             case Key::init:         return u8 (u8"Сброс");
+            case Key::intentMode:   return u8 (u8"Цель");
+            case Key::intentBass:   return u8 (u8"Бас");
+            case Key::intentLead:   return u8 (u8"Лид");
+            case Key::intentDrone:  return u8 (u8"Дрон");
 
             case Key::mono:         return u8 (u8"Моно");
             case Key::envMode:      return u8 (u8"Режим огибающей");
@@ -218,6 +232,10 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::crushDownsample: return u8 (u8"Downsample");
             case Key::crushMix:     return u8 (u8"Mix (crush)");
             case Key::destroyPitchLockEnable: return u8 (u8"Pitch Lock");
+            case Key::destroyPitchLockMode: return u8 (u8"Режим Pitch Lock");
+            case Key::destroyPitchLockModeFundamental: return u8 (u8"Фундаментал");
+            case Key::destroyPitchLockModeHarmonic: return u8 (u8"Гармонический");
+            case Key::destroyPitchLockModeHybrid: return u8 (u8"Гибрид");
             case Key::destroyPitchLockAmount: return u8 (u8"Pitch Lock Amount");
 
             case Key::shaper:       return u8 (u8"Шейпер");
@@ -288,6 +306,8 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::modDstClipAmount:    return u8 (u8"Amount (clip)");
             case Key::modDstModAmount:     return u8 (u8"Amount (mod)");
             case Key::modDstCrushMix:      return u8 (u8"Mix (crush)");
+            case Key::modDstShaperDrive:   return u8 (u8"Драйв (shaper)");
+            case Key::modDstShaperMix:     return u8 (u8"Mix (shaper)");
 
             case Key::clipStatusPre:  return u8 (u8"PRE");
             case Key::clipStatusOut:  return u8 (u8"OUT");
@@ -316,6 +336,10 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::pageSynth:    return "Synth";
             case Key::pageMod:      return "Mod";
             case Key::init:         return "Init";
+            case Key::intentMode:   return "Intent";
+            case Key::intentBass:   return "Bass";
+            case Key::intentLead:   return "Lead";
+            case Key::intentDrone:  return "Drone";
 
             case Key::mono:         return "Mono";
             case Key::envMode:      return "Env Mode";
@@ -363,6 +387,10 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::crushDownsample: return "Crush DS";
             case Key::crushMix:     return "Crush Mix";
             case Key::destroyPitchLockEnable: return "Pitch Lock";
+            case Key::destroyPitchLockMode: return "Pitch Lock Mode";
+            case Key::destroyPitchLockModeFundamental: return "Fundamental";
+            case Key::destroyPitchLockModeHarmonic: return "Harmonic";
+            case Key::destroyPitchLockModeHybrid: return "Hybrid";
             case Key::destroyPitchLockAmount: return "Pitch Lock Amount";
 
             case Key::shaper:       return "Shaper";
@@ -433,6 +461,8 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::modDstClipAmount:    return "Clip Amount";
             case Key::modDstModAmount:     return "Mod Amount";
             case Key::modDstCrushMix:      return "Crush Mix";
+            case Key::modDstShaperDrive:   return "Shaper Drive";
+            case Key::modDstShaperMix:     return "Shaper Mix";
 
             case Key::clipStatusPre:  return "PRE";
             case Key::clipStatusOut:  return "OUT";

@@ -998,7 +998,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     // Resizable + minimum constraints.
     // Keep a sane minimum: the UI is dense (Serum-like panels) and includes a spectrum editor.
     // Allow very wide/tall layouts (users often dock/undock and resize in one dimension).
-    boundsConstrainer.setSizeLimits (820, 640, 3200, 2000);
+    boundsConstrainer.setSizeLimits (680, 460, 2600, 1600);
     setConstrainer (&boundsConstrainer);
     setResizable (true, true);
 
@@ -1205,6 +1205,78 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     addAndMakeVisible (pageModButton);
     pageModButton.onClick = [this] { setUiPage (pageMod); };
 
+    // --- Quick mod assign (Last Touched target) ---
+    addAndMakeVisible (lastTouchedLabel);
+    lastTouchedLabel.setJustificationType (juce::Justification::centredLeft);
+    lastTouchedLabel.setColour (juce::Label::textColourId, juce::Colour (0xffe8ebf1).withAlpha (0.72f));
+    lastTouchedLabel.setText ("Target: -", juce::dontSendNotification);
+
+    auto initQuickAssignButton = [this] (juce::TextButton& b, const juce::String& txt, params::mod::Source src)
+    {
+        addAndMakeVisible (b);
+        b.setButtonText (txt);
+        b.onClick = [this, src]
+        {
+            if (lastTouchedModDest == params::mod::dstOff)
+            {
+                const auto isRu = isRussian();
+                statusLabel.setText (isRu ? juce::String::fromUTF8 (u8"Сначала коснись ручки-цели.")
+                                          : "Touch a destination knob first.",
+                                     juce::dontSendNotification);
+                return;
+            }
+
+            assignModulation (src, lastTouchedModDest);
+        };
+    };
+
+    initQuickAssignButton (quickAssignMacro1, "M1", params::mod::srcMacro1);
+    initQuickAssignButton (quickAssignMacro2, "M2", params::mod::srcMacro2);
+    initQuickAssignButton (quickAssignLfo1, "L1", params::mod::srcLfo1);
+    initQuickAssignButton (quickAssignLfo2, "L2", params::mod::srcLfo2);
+
+    addAndMakeVisible (quickAssignClear);
+    quickAssignClear.setButtonText ("C");
+    quickAssignClear.onClick = [this]
+    {
+        if (lastTouchedModDest == params::mod::dstOff)
+            return;
+        clearAllModForDest (lastTouchedModDest);
+    };
+
+    // --- Intent Layer v1 ---
+    addAndMakeVisible (intentMode);
+    intentMode.setLayout (ies::ui::ComboWithLabel::Layout::labelLeft);
+    intentMode.getCombo().addItem ("Bass", 1);
+    intentMode.getCombo().addItem ("Lead", 2);
+    intentMode.getCombo().addItem ("Drone", 3);
+    intentMode.getCombo().setSelectedId (1, juce::dontSendNotification);
+    intentMode.getCombo().onChange = [this]
+    {
+        currentIntent = (IntentModeIndex) juce::jlimit (0, 2, intentMode.getCombo().getSelectedItemIndex());
+
+        const auto isRu = isRussian();
+        juce::String rec;
+        switch (currentIntent)
+        {
+            case intentBass:
+                rec = isRu ? juce::String::fromUTF8 (u8"Intent Bass: фокус на фундаменте, Cutoff/Drive/Mix и умеренный Release.")
+                           : juce::String ("Intent Bass: focus on low-end foundation, Cutoff/Drive/Mix, moderate Release.");
+                break;
+            case intentLead:
+                rec = isRu ? juce::String::fromUTF8 (u8"Intent Lead: акцент на яркости и пробиве, больше Resonance/Env Amount и контролируемый Glide.")
+                           : juce::String ("Intent Lead: focus on brightness and cut, more Resonance/Env Amount with controlled Glide.");
+                break;
+            case intentDrone:
+                rec = isRu ? juce::String::fromUTF8 (u8"Intent Drone: длинные огибающие, больше текстуры и тон-скульптинга.")
+                           : juce::String ("Intent Drone: long envelopes, more texture and tone sculpting.");
+                break;
+            default:
+                break;
+        }
+        statusLabel.setText (rec, juce::dontSendNotification);
+    };
+
     // --- Language ---
     addAndMakeVisible (language);
     language.getCombo().addItem ("English", 1);
@@ -1221,8 +1293,11 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     };
     setupClipIndicator (preClipIndicator);
     setupClipIndicator (outClipIndicator);
+    setupClipIndicator (safetyBudgetLabel);
     addAndMakeVisible (preClipIndicator);
     addAndMakeVisible (outClipIndicator);
+    addAndMakeVisible (safetyBudgetLabel);
+    safetyBudgetLabel.setText ("P 0  L 0  C 0  A 0", juce::dontSendNotification);
 
     // Output meter (UI only).
     addAndMakeVisible (outMeter);
@@ -1248,7 +1323,16 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     addAndMakeVisible (glideTime);
     glideTimeAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::mono::glideTimeMs, glideTime.getSlider());
-    glideTime.getSlider().setTextValueSuffix (" ms");
+    glideTime.getSlider().setSliderStyle (juce::Slider::LinearHorizontal);
+    glideTime.getSlider().setTextBoxStyle (juce::Slider::TextBoxRight, false, 72, 16);
+    glideTime.getSlider().textFromValueFunction = [] (double v)
+    {
+        return juce::String ((int) std::lround (v)) + " ms";
+    };
+    glideTime.getSlider().valueFromTextFunction = [] (const juce::String& t)
+    {
+        return t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
+    };
     setupSliderDoubleClickDefault (glideTime.getSlider(), params::mono::glideTimeMs);
 
     // --- Osc 1 ---
@@ -1448,6 +1532,15 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                                                                    params::destroy::pitchLockEnable,
                                                                                    destroyPitchLockEnable);
 
+    addAndMakeVisible (destroyPitchLockMode);
+    destroyPitchLockMode.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    destroyPitchLockMode.getCombo().addItem ("Fundamental", 1);
+    destroyPitchLockMode.getCombo().addItem ("Harmonic", 2);
+    destroyPitchLockMode.getCombo().addItem ("Hybrid", 3);
+    destroyPitchLockModeAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(),
+                                                                                   params::destroy::pitchLockMode,
+                                                                                   destroyPitchLockMode.getCombo());
+
     addAndMakeVisible (destroyPitchLockAmount);
     destroyPitchLockAmountAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(),
                                                                                    params::destroy::pitchLockAmount,
@@ -1459,7 +1552,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     // Destroy block is dense; use compact text formatting + narrower textboxes to avoid clipping.
     auto setupDestroyTextbox = [] (juce::Slider& s)
     {
-        s.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 56, 16);
+        s.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 58, 14);
     };
     auto parseNumber = [] (const juce::String& t) -> double
     {
@@ -1698,7 +1791,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     auto setupDepthSlider = [&] (juce::Slider& s)
     {
         s.setSliderStyle (juce::Slider::LinearHorizontal);
-        s.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 56, 18);
+        s.setTextBoxStyle (juce::Slider::TextBoxLeft, false, 50, 16);
         s.textFromValueFunction = [] (double v)
         {
             const int pct = (int) std::lround (v * 100.0);
@@ -1739,6 +1832,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         dst.addItem ("Clip Amount", 7);
         dst.addItem ("Mod Amount", 8);
         dst.addItem ("Crush Mix", 9);
+        dst.addItem ("Shaper Drive", 10);
+        dst.addItem ("Shaper Mix", 11);
         addAndMakeVisible (dst);
         modSlotDstAttachment[(size_t) i] = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), kModSlotDstIds[i], dst);
 
@@ -1770,7 +1865,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                                               if (s >= 0 && s < params::mod::numSlots)
                                                               {
                                                                   const auto dNow = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff,
-                                                                                                                     (int) params::mod::dstCrushMix,
+                                                                                                                     (int) params::mod::dstShaperMix,
                                                                                                                      modSlotDst[(size_t) s].getSelectedItemIndex());
                                                                   const auto srcNow = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff,
                                                                                                                           (int) params::mod::srcMacro2,
@@ -1784,7 +1879,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                                           for (int i = params::mod::numSlots - 1; i >= 0; --i)
                                                           {
                                                               const auto dNow = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff,
-                                                                                                                 (int) params::mod::dstCrushMix,
+                                                                                                                 (int) params::mod::dstShaperMix,
                                                                                                                  modSlotDst[(size_t) i].getSelectedItemIndex());
                                                               const auto srcNow = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff,
                                                                                                                       (int) params::mod::srcMacro2,
@@ -1848,6 +1943,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     bindTarget (clipAmount, params::mod::dstClipAmount);
     bindTarget (modAmount, params::mod::dstModAmount);
     bindTarget (crushMix, params::mod::dstCrushMix);
+    bindTarget (shaperDrive, params::mod::dstShaperDrive);
+    bindTarget (shaperMix, params::mod::dstShaperMix);
 
     // --- Filter ---
     filterGroup.setText ("Filter");
@@ -1865,16 +1962,41 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     addAndMakeVisible (filterCutoff);
     filterCutoffAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::filter::cutoffHz, filterCutoff.getSlider());
-    filterCutoff.getSlider().setTextValueSuffix (" Hz");
+    filterCutoff.getSlider().textFromValueFunction = [] (double v)
+    {
+        if (v >= 1000.0)
+            return juce::String (v / 1000.0, 2).trimCharactersAtEnd ("0").trimCharactersAtEnd (".") + "k";
+        return juce::String ((int) std::lround (v)) + " Hz";
+    };
+    filterCutoff.getSlider().valueFromTextFunction = [] (const juce::String& t)
+    {
+        auto s = t.trim().replaceCharacter (',', '.');
+        const bool isK = s.containsIgnoreCase ("k");
+        const auto n = s.retainCharacters ("0123456789.-").getDoubleValue();
+        return isK ? n * 1000.0 : n;
+    };
     setupSliderDoubleClickDefault (filterCutoff.getSlider(), params::filter::cutoffHz);
     addAndMakeVisible (filterReso);
     filterResoAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::filter::resonance, filterReso.getSlider());
-    filterReso.getSlider().textFromValueFunction = osc1Level.getSlider().textFromValueFunction;
-    filterReso.getSlider().valueFromTextFunction = osc1Level.getSlider().valueFromTextFunction;
+    filterReso.getSlider().textFromValueFunction = [] (double v)
+    {
+        return juce::String (v, 2).trimCharactersAtEnd ("0").trimCharactersAtEnd (".");
+    };
+    filterReso.getSlider().valueFromTextFunction = [] (const juce::String& t)
+    {
+        return t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
+    };
     setupSliderDoubleClickDefault (filterReso.getSlider(), params::filter::resonance);
     addAndMakeVisible (filterEnvAmount);
     filterEnvAmountAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::filter::envAmount, filterEnvAmount.getSlider());
-    filterEnvAmount.getSlider().setTextValueSuffix (" st");
+    filterEnvAmount.getSlider().textFromValueFunction = [] (double v)
+    {
+        return juce::String (v, 1).trimCharactersAtEnd ("0").trimCharactersAtEnd (".") + " st";
+    };
+    filterEnvAmount.getSlider().valueFromTextFunction = [] (const juce::String& t)
+    {
+        return t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
+    };
     setupSliderDoubleClickDefault (filterEnvAmount.getSlider(), params::filter::envAmount);
 
     // --- Filter env ---
@@ -1885,11 +2007,16 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     addAndMakeVisible (filterAttack);
     filterAttackAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::fenv::attackMs, filterAttack.getSlider());
-    filterAttack.getSlider().setTextValueSuffix (" ms");
+    filterAttack.getSlider().textFromValueFunction = [] (double v) { return juce::String ((int) std::lround (v)) + " ms"; };
+    filterAttack.getSlider().valueFromTextFunction = [] (const juce::String& t)
+    {
+        return t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
+    };
     setupSliderDoubleClickDefault (filterAttack.getSlider(), params::fenv::attackMs);
     addAndMakeVisible (filterDecay);
     filterDecayAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::fenv::decayMs, filterDecay.getSlider());
-    filterDecay.getSlider().setTextValueSuffix (" ms");
+    filterDecay.getSlider().textFromValueFunction = filterAttack.getSlider().textFromValueFunction;
+    filterDecay.getSlider().valueFromTextFunction = filterAttack.getSlider().valueFromTextFunction;
     setupSliderDoubleClickDefault (filterDecay.getSlider(), params::fenv::decayMs);
     addAndMakeVisible (filterSustain);
     filterSustainAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::fenv::sustain, filterSustain.getSlider());
@@ -1898,7 +2025,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setupSliderDoubleClickDefault (filterSustain.getSlider(), params::fenv::sustain);
     addAndMakeVisible (filterRelease);
     filterReleaseAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::fenv::releaseMs, filterRelease.getSlider());
-    filterRelease.getSlider().setTextValueSuffix (" ms");
+    filterRelease.getSlider().textFromValueFunction = filterAttack.getSlider().textFromValueFunction;
+    filterRelease.getSlider().valueFromTextFunction = filterAttack.getSlider().valueFromTextFunction;
     setupSliderDoubleClickDefault (filterRelease.getSlider(), params::fenv::releaseMs);
 
     // --- Amp env ---
@@ -1909,12 +2037,17 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     addAndMakeVisible (ampAttack);
     ampAttackAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::amp::attackMs, ampAttack.getSlider());
-    ampAttack.getSlider().setTextValueSuffix (" ms");
+    ampAttack.getSlider().textFromValueFunction = [] (double v) { return juce::String ((int) std::lround (v)) + " ms"; };
+    ampAttack.getSlider().valueFromTextFunction = [] (const juce::String& t)
+    {
+        return t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
+    };
     setupSliderDoubleClickDefault (ampAttack.getSlider(), params::amp::attackMs);
 
     addAndMakeVisible (ampDecay);
     ampDecayAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::amp::decayMs, ampDecay.getSlider());
-    ampDecay.getSlider().setTextValueSuffix (" ms");
+    ampDecay.getSlider().textFromValueFunction = ampAttack.getSlider().textFromValueFunction;
+    ampDecay.getSlider().valueFromTextFunction = ampAttack.getSlider().valueFromTextFunction;
     setupSliderDoubleClickDefault (ampDecay.getSlider(), params::amp::decayMs);
 
     addAndMakeVisible (ampSustain);
@@ -1925,7 +2058,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     addAndMakeVisible (ampRelease);
     ampReleaseAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::amp::releaseMs, ampRelease.getSlider());
-    ampRelease.getSlider().setTextValueSuffix (" ms");
+    ampRelease.getSlider().textFromValueFunction = ampAttack.getSlider().textFromValueFunction;
+    ampRelease.getSlider().valueFromTextFunction = ampAttack.getSlider().valueFromTextFunction;
     setupSliderDoubleClickDefault (ampRelease.getSlider(), params::amp::releaseMs);
 
     // --- Tone EQ / Spectrum (interactive) ---
@@ -2033,7 +2167,14 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     addAndMakeVisible (outGain);
     outGainAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::out::gainDb, outGain.getSlider());
-    outGain.getSlider().setTextValueSuffix (" dB");
+    outGain.getSlider().textFromValueFunction = [] (double v)
+    {
+        return juce::String (v, 1).trimCharactersAtEnd ("0").trimCharactersAtEnd (".") + " dB";
+    };
+    outGain.getSlider().valueFromTextFunction = [] (const juce::String& t)
+    {
+        return t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
+    };
     setupSliderDoubleClickDefault (outGain.getSlider(), params::out::gainDb);
 
     // --- Serum-ish colour accents per block ---
@@ -2059,14 +2200,21 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (helpButton, cOut);
     setGroupAccent (pageSynthButton, cOsc1);
     setGroupAccent (pageModButton, cMod);
+    setGroupAccent (quickAssignMacro1, cMod);
+    setGroupAccent (quickAssignMacro2, cMod);
+    setGroupAccent (quickAssignLfo1, cMod);
+    setGroupAccent (quickAssignLfo2, cMod);
+    setGroupAccent (quickAssignClear, cMod);
     setGroupAccent (presetPrev, cOut);
     setGroupAccent (presetNext, cOut);
     setGroupAccent (presetSave, cOut);
     setGroupAccent (presetLoad, cOut);
+    setGroupAccent (intentMode, cOut);
     setGroupAccent (glideEnable, cMono);
     setGroupAccent (osc2Sync, cOsc2);
     setGroupAccent (modNoteSync, cDestroy);
     setGroupAccent (destroyPitchLockEnable, cDestroy);
+    setGroupAccent (destroyPitchLockMode, cDestroy);
     setGroupAccent (shaperEnable, cShaper);
     setGroupAccent (filterKeyTrack, cFilter);
 
@@ -2181,7 +2329,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         if (c != nullptr && c != &tooltipWindow)
             c->addMouseListener (this, deep);
 
-    setSize (1320, 820);
+    setSize (1060, 620);
 }
 
 IndustrialEnergySynthAudioProcessorEditor::~IndustrialEnergySynthAudioProcessorEditor()
@@ -2284,23 +2432,48 @@ void IndustrialEnergySynthAudioProcessorEditor::paint (juce::Graphics& g)
 
 void IndustrialEnergySynthAudioProcessorEditor::resized()
 {
-    auto r = getLocalBounds().reduced (12);
+    auto r = getLocalBounds().reduced (8);
+    const bool showModTop = (uiPage == pageMod);
 
     // Top bar
-    const auto topH = 44;
+    const auto topH = 36;
     auto top = r.removeFromTop (topH);
 
-    const auto langW = juce::jmin (320, top.getWidth() / 2);
-    language.setBounds (top.removeFromRight (langW).reduced (4, 8));
-    const int clipW = 74;
-    outClipIndicator.setBounds (top.removeFromRight (clipW).reduced (4, 11));
-    preClipIndicator.setBounds (top.removeFromRight (clipW).reduced (4, 11));
-    outMeter.setBounds (top.removeFromRight (112).reduced (4, 8));
-    helpButton.setBounds (top.removeFromLeft (34).reduced (4, 8));
-    pageSynthButton.setBounds (top.removeFromLeft (74).reduced (4, 8));
-    pageModButton.setBounds (top.removeFromLeft (74).reduced (4, 8));
-    panicButton.setBounds (top.removeFromLeft (70).reduced (4, 8));
-    initButton.setBounds (top.removeFromLeft (110).reduced (4, 8));
+    const auto langW = juce::jmin (220, top.getWidth() / 2);
+    language.setBounds (top.removeFromRight (langW).reduced (3, 5));
+    const bool compactTop = (getWidth() < 1280);
+    const auto intentW = compactTop ? 170 : 230;
+    intentMode.setBounds (top.removeFromRight (intentW).reduced (3, 5));
+    if (compactTop)
+        intentMode.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    else
+        intentMode.setLayout (ies::ui::ComboWithLabel::Layout::labelLeft);
+    safetyBudgetLabel.setBounds (top.removeFromRight (168).reduced (3, 8));
+    const int clipW = 62;
+    outClipIndicator.setBounds (top.removeFromRight (clipW).reduced (3, 8));
+    preClipIndicator.setBounds (top.removeFromRight (clipW).reduced (3, 8));
+    outMeter.setBounds (top.removeFromRight (96).reduced (3, 5));
+    helpButton.setBounds (top.removeFromLeft (28).reduced (3, 5));
+    pageSynthButton.setBounds (top.removeFromLeft (64).reduced (3, 5));
+    pageModButton.setBounds (top.removeFromLeft (56).reduced (3, 5));
+
+    const bool quickCompact = (getWidth() < 1080);
+    lastTouchedLabel.setVisible (showModTop && ! quickCompact);
+    if (showModTop && ! quickCompact)
+        lastTouchedLabel.setBounds (top.removeFromLeft (124).reduced (3, 7));
+
+    if (showModTop)
+    {
+        const int quickW = quickCompact ? 26 : 28;
+        quickAssignMacro1.setBounds (top.removeFromLeft (quickW).reduced (2, 5));
+        quickAssignMacro2.setBounds (top.removeFromLeft (quickW).reduced (2, 5));
+        quickAssignLfo1.setBounds (top.removeFromLeft (quickW).reduced (2, 5));
+        quickAssignLfo2.setBounds (top.removeFromLeft (quickW).reduced (2, 5));
+        quickAssignClear.setBounds (top.removeFromLeft (quickW).reduced (2, 5));
+    }
+
+    panicButton.setBounds (top.removeFromLeft (60).reduced (3, 5));
+    initButton.setBounds (top.removeFromLeft (84).reduced (3, 5));
 
     // Preset strip: tighten/hide optional buttons on narrow widths.
     const bool narrow = (getWidth() < 980);
@@ -2310,29 +2483,29 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     presetLoad.setVisible (! narrow);
 
     if (presetPrev.isVisible())
-        presetPrev.setBounds (top.removeFromLeft (34).reduced (4, 8));
+        presetPrev.setBounds (top.removeFromLeft (28).reduced (3, 5));
     if (presetNext.isVisible())
-        presetNext.setBounds (top.removeFromLeft (34).reduced (4, 8));
+        presetNext.setBounds (top.removeFromLeft (28).reduced (3, 5));
 
-    const auto presetW = narrow ? juce::jmin (280, top.getWidth() / 2) : 320;
-    preset.setBounds (top.removeFromLeft (presetW).reduced (4, 2));
+    const auto presetW = narrow ? juce::jmin (210, top.getWidth() / 2) : 250;
+    preset.setBounds (top.removeFromLeft (presetW).reduced (3, 1));
 
     if (presetSave.isVisible())
-        presetSave.setBounds (top.removeFromLeft (80).reduced (4, 8));
+        presetSave.setBounds (top.removeFromLeft (66).reduced (3, 5));
     if (presetLoad.isVisible())
-        presetLoad.setBounds (top.removeFromLeft (90).reduced (4, 8));
+        presetLoad.setBounds (top.removeFromLeft (66).reduced (3, 5));
 
-    statusLabel.setBounds (top.reduced (8, 8));
+    statusLabel.setBounds (top.reduced (5, 5));
 
-    r.removeFromTop (8);
+    r.removeFromTop (6);
 
     const bool showSynth = (uiPage == pageSynth);
     const bool showMod = (uiPage == pageMod);
 
     // Responsive grid: 2 columns on narrow widths, 3 on wide.
     const auto w = r.getWidth();
-    const int cols = (w >= 1180) ? 3 : 2;
-    const int gap = 10;
+    const int cols = (w >= 1060) ? 3 : 2;
+    const int gap = 7;
     const int colW = (w - gap * (cols - 1)) / cols;
 
     auto splitRow = [&](juce::Rectangle<int> row, int colIndex) -> juce::Rectangle<int>
@@ -2347,8 +2520,8 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     // narrow (2 cols): row1 mono/osc1, row2 osc2/destroy,
     // row3 shaper/filter, row4 fenv/amp, row5 tone/out.
     const int rows = showSynth ? ((cols == 3) ? 4 : 5) : 1;
-    const float weights3[] { 1.0f, 1.50f, 1.10f, 0.95f };
-    const float weights2[] { 1.0f, 1.35f, 1.05f, 1.0f, 1.15f };
+    const float weights3[] { 1.08f, 1.60f, 0.92f, 0.40f };
+    const float weights2[] { 1.12f, 1.30f, 0.98f, 0.98f, 0.62f };
 
     const auto totalGapH = gap * (rows - 1);
     const auto availH = juce::jmax (1, r.getHeight() - totalGapH);
@@ -2421,7 +2594,7 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
     auto layoutKnobGrid = [&](juce::Rectangle<int> area, std::initializer_list<juce::Component*> items)
     {
-        const auto itemGap = 8;
+        const auto itemGap = 6;
         const int count = (int) items.size();
         if (count <= 0)
             return;
@@ -2464,57 +2637,69 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
     // Mono group internal
     {
-        auto gr = monoGroup.getBounds().reduced (10, 26);
-        envMode.setBounds (gr.removeFromTop (46));
-        gr.removeFromTop (8);
-        glideEnable.setBounds (gr.removeFromTop (24));
-        gr.removeFromTop (8);
-        glideTime.setBounds (gr);
+        auto gr = monoGroup.getBounds().reduced (8, 22);
+        envMode.setBounds (gr.removeFromTop (32));
+        gr.removeFromTop (4);
+        glideEnable.setBounds (gr.removeFromTop (20));
+        gr.removeFromTop (4);
+        glideTime.setBounds (gr.removeFromTop (juce::jlimit (30, 42, gr.getHeight())));
     }
 
     // Osc 1 internal
     {
-        auto gr = osc1Group.getBounds().reduced (10, 26);
-        osc1Wave.setBounds (gr.removeFromTop (46));
-        gr.removeFromTop (6);
+        auto gr = osc1Group.getBounds().reduced (8, 22);
+        osc1Wave.setBounds (gr.removeFromTop (40));
+        gr.removeFromTop (4);
 
-        const auto previewH = juce::jlimit (42, 70, gr.getHeight() / 3);
+        const auto previewH = juce::jlimit (34, 56, gr.getHeight() / 3);
         osc1Preview.setBounds (gr.removeFromTop (previewH));
-        gr.removeFromTop (6);
+        gr.removeFromTop (4);
 
         layoutKnobGrid (gr, { &osc1Level, &osc1Coarse, &osc1Fine, &osc1Phase, &osc1Detune });
     }
 
     // Osc 2 internal
     {
-        auto gr = osc2Group.getBounds().reduced (10, 26);
-        osc2Wave.setBounds (gr.removeFromTop (46));
+        auto gr = osc2Group.getBounds().reduced (8, 22);
+        osc2Wave.setBounds (gr.removeFromTop (40));
         gr.removeFromTop (4);
-        osc2Sync.setBounds (gr.removeFromTop (24));
-        gr.removeFromTop (6);
+        osc2Sync.setBounds (gr.removeFromTop (20));
+        gr.removeFromTop (4);
 
-        const auto previewH = juce::jlimit (42, 70, gr.getHeight() / 3);
+        const auto previewH = juce::jlimit (34, 56, gr.getHeight() / 3);
         osc2Preview.setBounds (gr.removeFromTop (previewH));
-        gr.removeFromTop (6);
+        gr.removeFromTop (4);
 
         layoutKnobGrid (gr, { &osc2Level, &osc2Coarse, &osc2Fine, &osc2Phase, &osc2Detune });
     }
 
     // Destroy internal
     {
-        auto gr = destroyGroup.getBounds().reduced (10, 26);
+        auto gr = destroyGroup.getBounds().reduced (8, 22);
+        const bool destroyCompact = (destroyGroup.getWidth() < 500 || destroyGroup.getHeight() < 250);
+
+        foldPanel.setVisible (! destroyCompact);
+        clipPanel.setVisible (! destroyCompact);
+        modPanel.setVisible (! destroyCompact);
+        crushPanel.setVisible (! destroyCompact);
+
         {
-            auto head = gr.removeFromTop (46);
-            const auto osW = juce::jmin (210, juce::jmax (140, head.getWidth() / 2));
-            destroyOversample.setBounds (head.removeFromRight (osW));
-            head.removeFromRight (6);
-            const auto lockToggleW = juce::jmin (132, juce::jmax (88, head.getWidth() / 2));
-            destroyPitchLockEnable.setBounds (head.removeFromLeft (lockToggleW).reduced (0, 10));
-            head.removeFromLeft (6);
-            destroyPitchLockAmount.setBounds (head);
-            gr.removeFromTop (8);
+            auto head1 = gr.removeFromTop (30);
+            const auto osW = juce::jmin (180, juce::jmax (120, head1.getWidth() / 2));
+            destroyOversample.setBounds (head1.removeFromRight (osW));
+            head1.removeFromRight (4);
+            destroyPitchLockEnable.setBounds (head1.reduced (0, 6));
+
+            gr.removeFromTop (3);
+
+            auto head2 = gr.removeFromTop (30);
+            const auto modeW = juce::jmin (180, juce::jmax (130, head2.getWidth() / 2));
+            destroyPitchLockMode.setBounds (head2.removeFromLeft (modeW));
+            head2.removeFromLeft (4);
+            destroyPitchLockAmount.setBounds (head2);
+            gr.removeFromTop (4);
         }
-        const int panelGap = 8;
+        const int panelGap = destroyCompact ? 4 : 5;
         auto left = gr.removeFromLeft (gr.getWidth() / 2 - panelGap / 2);
         gr.removeFromLeft (panelGap);
         auto right = gr;
@@ -2527,39 +2712,58 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         right.removeFromTop (panelGap);
         auto botR = right;
 
-        foldPanel.setBounds (topL);
-        clipPanel.setBounds (botL);
-        modPanel.setBounds (topR);
-        crushPanel.setBounds (botR);
-
-        auto inside = [&] (juce::GroupComponent& panel) { return panel.getBounds().reduced (10, 26); };
-
-        layoutKnobGrid (inside (foldPanel), { &foldDrive, &foldAmount, &foldMix });
-        layoutKnobGrid (inside (clipPanel), { &clipDrive, &clipAmount, &clipMix });
-
+        if (! destroyCompact)
         {
-            auto m = inside (modPanel);
-            modMode.setBounds (m.removeFromTop (46));
-            m.removeFromTop (4);
-            modNoteSync.setBounds (m.removeFromTop (24));
-            m.removeFromTop (6);
+            foldPanel.setBounds (topL);
+            clipPanel.setBounds (botL);
+            modPanel.setBounds (topR);
+            crushPanel.setBounds (botR);
+
+            auto inside = [&] (juce::GroupComponent& panel) { return panel.getBounds().reduced (5, 12); };
+
+            layoutKnobGrid (inside (foldPanel), { &foldDrive, &foldAmount, &foldMix });
+            layoutKnobGrid (inside (clipPanel), { &clipDrive, &clipAmount, &clipMix });
+
+            {
+                auto m = inside (modPanel);
+                modMode.setBounds (m.removeFromTop (32));
+                m.removeFromTop (3);
+                modNoteSync.setBounds (m.removeFromTop (18));
+                m.removeFromTop (3);
+                layoutKnobGrid (m, { &modAmount, &modMix, &modFreq });
+            }
+
+            layoutKnobGrid (inside (crushPanel), { &crushBits, &crushDownsample, &crushMix });
+        }
+        else
+        {
+            auto inside = [] (juce::Rectangle<int> cell) { return cell.reduced (2, 2); };
+
+            layoutKnobGrid (inside (topL), { &foldDrive, &foldAmount, &foldMix });
+            layoutKnobGrid (inside (botL), { &clipDrive, &clipAmount, &clipMix });
+            layoutKnobGrid (inside (botR), { &crushBits, &crushDownsample, &crushMix });
+
+            auto m = inside (topR);
+            auto modeRow = m.removeFromTop (juce::jmin (24, juce::jmax (18, m.getHeight() / 3)));
+            modMode.setBounds (modeRow.removeFromLeft ((modeRow.getWidth() * 2) / 3));
+            modeRow.removeFromLeft (4);
+            modNoteSync.setBounds (modeRow);
+            m.removeFromTop (3);
             layoutKnobGrid (m, { &modAmount, &modMix, &modFreq });
         }
-
-        layoutKnobGrid (inside (crushPanel), { &crushBits, &crushDownsample, &crushMix });
     }
 
     // Shaper internal
     {
-        auto gr = shaperGroup.getBounds().reduced (10, 26);
-        auto topRow = gr.removeFromTop (46);
+        auto gr = shaperGroup.getBounds().reduced (8, 22);
+        auto topRow = gr.removeFromTop (40);
         const int placementW = juce::jmax (140, topRow.getWidth() / 2);
         shaperPlacement.setBounds (topRow.removeFromRight (placementW));
-        topRow.removeFromRight (8);
-        shaperEnable.setBounds (topRow.reduced (0, 10));
-        gr.removeFromTop (6);
+        topRow.removeFromRight (6);
+        shaperEnable.setBounds (topRow.reduced (0, 8));
+        gr.removeFromTop (4);
 
-        auto bottom = gr.removeFromBottom (juce::jmin (128, juce::jmax (72, gr.getHeight() / 2)));
+        auto bottom = gr.removeFromBottom (juce::jmin (112, juce::jmax (66, gr.getHeight() / 2)));
         shaperEditor.setBounds (gr);
         bottom.removeFromTop (4);
         layoutKnobGrid (bottom, { &shaperDrive, &shaperMix });
@@ -2567,10 +2771,10 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
     // Modulation internal
     {
-        auto gr = modGroup.getBounds().reduced (10, 26);
+        auto gr = modGroup.getBounds().reduced (8, 22);
 
-        const int panelGap = 8;
-        const int modTopH = juce::jlimit (130, 220, (int) std::round ((float) gr.getHeight() * 0.40f));
+        const int panelGap = 6;
+        const int modTopH = juce::jlimit (116, 190, (int) std::round ((float) gr.getHeight() * 0.38f));
 
         auto modTop = gr.removeFromTop (modTopH);
         gr.removeFromTop (panelGap);
@@ -2588,16 +2792,16 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         lfo2Panel.setBounds (aLfo2);
         modMatrixPanel.setBounds (bottom);
 
-        auto inside = [&] (juce::GroupComponent& panel) { return panel.getBounds().reduced (10, 26); };
+        auto inside = [&] (juce::GroupComponent& panel) { return panel.getBounds().reduced (8, 22); };
 
         {
             auto m = inside (macrosPanel);
-            auto badgeRow = m.removeFromTop (24);
+            auto badgeRow = m.removeFromTop (20);
             const int badgeW = 54;
             macro1Drag.setBounds (badgeRow.removeFromLeft (badgeW).withSizeKeepingCentre (badgeW, 22));
             badgeRow.removeFromLeft (6);
             macro2Drag.setBounds (badgeRow.removeFromLeft (badgeW).withSizeKeepingCentre (badgeW, 22));
-            m.removeFromTop (6);
+            m.removeFromTop (4);
             layoutKnobGrid (m, { &macro1, &macro2 });
         }
 
@@ -2610,14 +2814,14 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
                               ies::ui::KnobWithLabel& phase)
         {
             auto m = inside (panel);
-            auto waveRow = m.removeFromTop (46);
+            auto waveRow = m.removeFromTop (40);
             const int badgeW = juce::jmin (62, juce::jmax (44, waveRow.getWidth() / 4));
             auto badge = waveRow.removeFromRight (badgeW).reduced (0, 10);
             drag.setBounds (badge.withSizeKeepingCentre (badgeW, 22));
             wave.setBounds (waveRow);
             m.removeFromTop (4);
-            sync.setBounds (m.removeFromTop (24));
-            m.removeFromTop (6);
+            sync.setBounds (m.removeFromTop (20));
+            m.removeFromTop (4);
             layoutKnobGrid (m, { &rate, &div, &phase });
         };
 
@@ -2628,13 +2832,13 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         {
             auto m = inside (modMatrixPanel);
 
-            const int headerH = 18;
+            const int headerH = 16;
             auto header = m.removeFromTop (headerH);
 
             const int slotW = 22;
             const int gapX = 6;
-            const int srcW = juce::jlimit (120, 200, m.getWidth() / 4);
-            const int dstW = juce::jlimit (140, 260, m.getWidth() / 3);
+            const int srcW = juce::jlimit (108, 176, m.getWidth() / 4);
+            const int dstW = juce::jlimit (122, 220, m.getWidth() / 3);
 
             modHeaderSlot.setBounds (header.removeFromLeft (slotW));
             header.removeFromLeft (gapX);
@@ -2644,9 +2848,9 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
             header.removeFromLeft (gapX);
             modHeaderDepth.setBounds (header);
 
-            m.removeFromTop (4);
+            m.removeFromTop (3);
 
-            const int rowGap = 4;
+            const int rowGap = 3;
             const int n = params::mod::numSlots;
             const int tableRowH = juce::jmax (1, (m.getHeight() - rowGap * (n - 1)) / n);
 
@@ -2669,55 +2873,55 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
     // Filter internal
     {
-        auto gr = filterGroup.getBounds().reduced (10, 26);
-        filterType.setBounds (gr.removeFromTop (46));
+        auto gr = filterGroup.getBounds().reduced (8, 22);
+        filterType.setBounds (gr.removeFromTop (40));
         gr.removeFromTop (4);
-        filterKeyTrack.setBounds (gr.removeFromTop (24));
-        gr.removeFromTop (6);
+        filterKeyTrack.setBounds (gr.removeFromTop (20));
+        gr.removeFromTop (4);
         layoutKnobGrid (gr, { &filterCutoff, &filterReso, &filterEnvAmount });
     }
 
     // Filter env internal
     {
-        auto gr = filterEnvGroup.getBounds().reduced (10, 26);
-        const auto prevH = juce::jlimit (56, 84, gr.getHeight() / 3);
+        auto gr = filterEnvGroup.getBounds().reduced (8, 22);
+        const auto prevH = juce::jlimit (48, 72, gr.getHeight() / 3);
         filterEnvPreview.setBounds (gr.removeFromTop (prevH));
-        gr.removeFromTop (6);
+        gr.removeFromTop (4);
         layoutKnobGrid (gr, { &filterAttack, &filterDecay, &filterSustain, &filterRelease });
     }
 
     // Tone EQ / Spectrum internal
     {
-        auto gr = toneGroup.getBounds().reduced (10, 26);
-        auto toneRow1 = gr.removeFromTop (24);
+        auto gr = toneGroup.getBounds().reduced (8, 22);
+        auto toneRow1 = gr.removeFromTop (20);
         const int toggleW = juce::jmin (120, juce::jmax (88, toneRow1.getWidth() / 3));
         toneEnable.setBounds (toneRow1.removeFromLeft (toggleW));
-        toneRow1.removeFromLeft (8);
+        toneRow1.removeFromLeft (6);
         spectrumFreeze.setBounds (toneRow1.removeFromLeft (juce::jmin (120, juce::jmax (84, toneRow1.getWidth() / 2))));
-        gr.removeFromTop (6);
-        auto toneRow2 = gr.removeFromTop (46);
+        gr.removeFromTop (4);
+        auto toneRow2 = gr.removeFromTop (40);
         const int leftW = juce::jmax (140, toneRow2.getWidth() / 2 - 3);
         spectrumSource.setBounds (toneRow2.removeFromLeft (leftW));
         toneRow2.removeFromLeft (6);
         spectrumAveraging.setBounds (toneRow2);
-        gr.removeFromTop (6);
+        gr.removeFromTop (4);
         spectrumEditor.setBounds (gr);
     }
 
     // Amp + Output
     {
-        auto gr = ampGroup.getBounds().reduced (10, 26);
-        const auto prevH = juce::jlimit (56, 84, gr.getHeight() / 3);
+        auto gr = ampGroup.getBounds().reduced (8, 22);
+        const auto prevH = juce::jlimit (48, 72, gr.getHeight() / 3);
         ampEnvPreview.setBounds (gr.removeFromTop (prevH));
-        gr.removeFromTop (6);
+        gr.removeFromTop (4);
         layoutKnobGrid (gr, { &ampAttack, &ampDecay, &ampSustain, &ampRelease });
     }
 
     {
-        auto gr = outGroup.getBounds().reduced (10, 26);
+        auto gr = outGroup.getBounds().reduced (8, 22);
         // Output is intentionally simple; keep the main gain knob a sane size even when the panel spans width.
-        const int maxW = juce::jmin (220, gr.getWidth());
-        const int maxH = juce::jmin (220, gr.getHeight());
+        const int maxW = juce::jmin (118, gr.getWidth());
+        const int maxH = juce::jmin (118, gr.getHeight());
         outGain.setBounds (gr.withSizeKeepingCentre (maxW, maxH));
     }
 
@@ -2773,14 +2977,22 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     helpButton.setVisible (true);
     pageSynthButton.setVisible (true);
     pageModButton.setVisible (true);
+    lastTouchedLabel.setVisible (showMod);
+    quickAssignMacro1.setVisible (showMod);
+    quickAssignMacro2.setVisible (showMod);
+    quickAssignLfo1.setVisible (showMod);
+    quickAssignLfo2.setVisible (showMod);
+    quickAssignClear.setVisible (showMod);
     presetPrev.setVisible (true);
     presetNext.setVisible (true);
     presetSave.setVisible (true);
     presetLoad.setVisible (true);
     preset.setVisible (true);
+    intentMode.setVisible (true);
     language.setVisible (true);
     preClipIndicator.setVisible (true);
     outClipIndicator.setVisible (true);
+    safetyBudgetLabel.setVisible (true);
     outMeter.setVisible (true);
     statusLabel.setVisible (true);
 
@@ -2830,6 +3042,7 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     crushDownsample.setVisible (showSynth);
     crushMix.setVisible (showSynth);
     destroyPitchLockEnable.setVisible (showSynth);
+    destroyPitchLockMode.setVisible (showSynth);
     destroyPitchLockAmount.setVisible (showSynth);
 
     shaperGroup.setVisible (showSynth);
@@ -2923,11 +3136,17 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     presetLoad.setButtonText (ies::ui::tr (ies::ui::Key::presetLoad, langIdx));
     preset.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::init, langIdx));
 
+    intentMode.setLabelText (ies::ui::tr (ies::ui::Key::intentMode, langIdx));
+    intentMode.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::intentBass, langIdx));
+    intentMode.getCombo().changeItemText (2, ies::ui::tr (ies::ui::Key::intentLead, langIdx));
+    intentMode.getCombo().changeItemText (3, ies::ui::tr (ies::ui::Key::intentDrone, langIdx));
+
     language.setLabelText (ies::ui::tr (ies::ui::Key::language, langIdx));
     language.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::languageEnglish, langIdx));
     language.getCombo().changeItemText (2, ies::ui::tr (ies::ui::Key::languageRussian, langIdx));
     pageSynthButton.setButtonText (ies::ui::tr (ies::ui::Key::pageSynth, langIdx));
     pageModButton.setButtonText (ies::ui::tr (ies::ui::Key::pageMod, langIdx));
+    setLastTouchedModDest (lastTouchedModDest, false);
 
     monoGroup.setText (ies::ui::tr (ies::ui::Key::mono, langIdx));
     envMode.setLabelText (ies::ui::tr (ies::ui::Key::envMode, langIdx));
@@ -2985,6 +3204,10 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     crushDownsample.setLabelText (ies::ui::tr (ies::ui::Key::crushDownsample, langIdx));
     crushMix.setLabelText (ies::ui::tr (ies::ui::Key::crushMix, langIdx));
     destroyPitchLockEnable.setButtonText (ies::ui::tr (ies::ui::Key::destroyPitchLockEnable, langIdx));
+    destroyPitchLockMode.setLabelText (ies::ui::tr (ies::ui::Key::destroyPitchLockMode, langIdx));
+    destroyPitchLockMode.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::destroyPitchLockModeFundamental, langIdx));
+    destroyPitchLockMode.getCombo().changeItemText (2, ies::ui::tr (ies::ui::Key::destroyPitchLockModeHarmonic, langIdx));
+    destroyPitchLockMode.getCombo().changeItemText (3, ies::ui::tr (ies::ui::Key::destroyPitchLockModeHybrid, langIdx));
     destroyPitchLockAmount.setLabelText (ies::ui::tr (ies::ui::Key::destroyPitchLockAmount, langIdx));
 
     shaperGroup.setText (ies::ui::tr (ies::ui::Key::shaper, langIdx));
@@ -3055,6 +3278,8 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
         modSlotDst[(size_t) i].changeItemText (7, ies::ui::tr (ies::ui::Key::modDstClipAmount, langIdx));
         modSlotDst[(size_t) i].changeItemText (8, ies::ui::tr (ies::ui::Key::modDstModAmount, langIdx));
         modSlotDst[(size_t) i].changeItemText (9, ies::ui::tr (ies::ui::Key::modDstCrushMix, langIdx));
+        modSlotDst[(size_t) i].changeItemText (10, ies::ui::tr (ies::ui::Key::modDstShaperDrive, langIdx));
+        modSlotDst[(size_t) i].changeItemText (11, ies::ui::tr (ies::ui::Key::modDstShaperMix, langIdx));
     }
 
     filterGroup.setText (ies::ui::tr (ies::ui::Key::filter, langIdx));
@@ -3094,6 +3319,7 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
 
     preClipIndicator.setName (ies::ui::tr (ies::ui::Key::clipStatusPre, langIdx));
     outClipIndicator.setName (ies::ui::tr (ies::ui::Key::clipStatusOut, langIdx));
+    setLastTouchedModDest (lastTouchedModDest, false);
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
@@ -3115,11 +3341,26 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
     preset.getCombo().setTooltip (T ("Select a preset.", u8"Выбрать пресет."));
     presetSave.setTooltip (T ("Save current settings as a user preset.", u8"Сохранить текущие настройки как пользовательский пресет."));
     presetLoad.setTooltip (T ("Load a user preset from a file.", u8"Загрузить пользовательский пресет из файла."));
+    intentMode.getCombo().setTooltip (T ("Intent Layer: Bass/Lead/Drone focus. Highlights relevant controls and shows quick guidance.",
+                                         u8"Intent Layer: фокус Bass/Lead/Drone. Подсвечивает релевантные контролы и даёт быстрые подсказки."));
+    intentMode.getLabel().setTooltip (intentMode.getCombo().getTooltip());
 
     pageSynthButton.setTooltip (T ("Show Synth page (oscillators, destroy, filters, envelopes, tone, output).",
                                    u8"Показать страницу синта (осцилляторы, destroy, фильтры, огибающие, тон, выход)."));
     pageModButton.setTooltip (T ("Show Mod page (Macros, LFOs, Mod Matrix, drag-and-drop modulation).",
                                  u8"Показать страницу модуляции (макросы, LFO, матрица, drag-and-drop модуляция)."));
+    lastTouchedLabel.setTooltip (T ("Last touched modulation destination knob.",
+                                    u8"Последняя тронутая ручка-цель для модуляции."));
+    quickAssignMacro1.setTooltip (T ("Assign Macro 1 to the last touched destination.",
+                                     u8"Назначить Macro 1 на последнюю тронутую цель."));
+    quickAssignMacro2.setTooltip (T ("Assign Macro 2 to the last touched destination.",
+                                     u8"Назначить Macro 2 на последнюю тронутую цель."));
+    quickAssignLfo1.setTooltip (T ("Assign LFO 1 to the last touched destination.",
+                                   u8"Назначить LFO 1 на последнюю тронутую цель."));
+    quickAssignLfo2.setTooltip (T ("Assign LFO 2 to the last touched destination.",
+                                   u8"Назначить LFO 2 на последнюю тронутую цель."));
+    quickAssignClear.setTooltip (T ("Clear all modulation assignments from the last touched destination.",
+                                    u8"Удалить все назначения модуляции с последней тронутой цели."));
 
     glideEnable.setTooltip (T ("Enable portamento (glide) between notes.", u8"Включить портаменто (глайд) между нотами."));
     {
@@ -3209,6 +3450,12 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
     destroyPitchLockEnable.setTooltip (T ("Injects a note-locked fundamental after destruction to keep pitch readable.",
                                           u8"Подмешивает фундаментал, синхронизированный с нотой, после разрушения для лучшей читаемости высоты."));
     {
+        const auto tip = T ("Pitch lock mode: Fundamental / Harmonic / Hybrid.",
+                            u8"Режим pitch lock: фундаментал / гармонический / гибрид.");
+        destroyPitchLockMode.getCombo().setTooltip (tip);
+        destroyPitchLockMode.getLabel().setTooltip (tip);
+    }
+    {
         const auto tip = T ("Strength of the pitch lock helper signal.",
                             u8"Сила вспомогательного сигнала pitch lock.");
         destroyPitchLockAmount.getSlider().setTooltip (tip);
@@ -3264,6 +3511,8 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
 
     preClipIndicator.setTooltip (T ("Pre-Destroy safety indicator.", u8"Индикатор запаса по уровню до Destroy."));
     outClipIndicator.setTooltip (T ("Output safety indicator.", u8"Индикатор запаса по уровню на выходе."));
+    safetyBudgetLabel.setTooltip (T ("Safety budget: Pitch / Loudness / CPU / Aliasing risk.",
+                                     u8"Бюджет безопасности: риск Pitch / Loudness / CPU / Aliasing."));
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
@@ -3280,6 +3529,8 @@ void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
     const auto pitchLockOn = destroyPitchLockEnable.getToggleState();
     if (destroyPitchLockAmount.isEnabled() != pitchLockOn)
         destroyPitchLockAmount.setEnabled (pitchLockOn);
+    if (destroyPitchLockMode.isEnabled() != pitchLockOn)
+        destroyPitchLockMode.setEnabled (pitchLockOn);
 
     const auto shaperOn = shaperEnable.getToggleState();
     if (shaperPlacement.isEnabled() != shaperOn)
@@ -3307,6 +3558,18 @@ void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
         if (lfo2Div.isEnabled() != syncOn)
             lfo2Div.setEnabled (syncOn);
     }
+
+    const auto hasTarget = (lastTouchedModDest != params::mod::dstOff);
+    if (quickAssignMacro1.isEnabled() != hasTarget)
+        quickAssignMacro1.setEnabled (hasTarget);
+    if (quickAssignMacro2.isEnabled() != hasTarget)
+        quickAssignMacro2.setEnabled (hasTarget);
+    if (quickAssignLfo1.isEnabled() != hasTarget)
+        quickAssignLfo1.setEnabled (hasTarget);
+    if (quickAssignLfo2.isEnabled() != hasTarget)
+        quickAssignLfo2.setEnabled (hasTarget);
+    if (quickAssignClear.isEnabled() != hasTarget)
+        quickAssignClear.setEnabled (hasTarget);
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
@@ -3351,6 +3614,64 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
         applyClipIndicator (outClipIndicator, audioProcessor.getUiOutClipRisk(), ies::ui::Key::clipStatusOut);
     }
 
+    // Safety budget overlay (heuristic): Pitch / Loudness / CPU / Aliasing.
+    {
+        const auto loudRisk = juce::jmax (audioProcessor.getUiPreClipRisk(), audioProcessor.getUiOutClipRisk());
+        const auto cpuRisk = audioProcessor.getUiCpuRisk();
+
+        const auto osIdx = destroyOversample.getCombo().getSelectedItemIndex(); // 0=off,1=2x,2=4x
+        const auto osMitigation = (osIdx == 2) ? 0.45f : (osIdx == 1) ? 0.65f : 1.0f;
+        const auto aliasCore = juce::jlimit (0.0f, 1.0f,
+                                             0.38f * (float) foldAmount.getSlider().getValue()
+                                           + 0.38f * (float) clipAmount.getSlider().getValue()
+                                           + 0.24f * (float) crushMix.getSlider().getValue());
+        const auto aliasRisk = juce::jlimit (0.0f, 1.0f, aliasCore * osMitigation);
+
+        const auto destroyHarsh = juce::jlimit (0.0f, 1.0f,
+                                                0.30f * (float) foldAmount.getSlider().getValue()
+                                              + 0.30f * (float) clipAmount.getSlider().getValue()
+                                              + 0.20f * (float) modAmount.getSlider().getValue()
+                                              + 0.20f * (float) crushMix.getSlider().getValue());
+        float lockHelp = 0.0f;
+        if (destroyPitchLockEnable.getToggleState())
+        {
+            const auto amt = (float) destroyPitchLockAmount.getSlider().getValue();
+            const auto mode = destroyPitchLockMode.getCombo().getSelectedItemIndex(); // 0/1/2
+            const auto modeMul = (mode == 0) ? 0.80f : (mode == 1) ? 0.65f : 0.90f;
+            lockHelp = juce::jlimit (0.0f, 1.0f, amt * modeMul);
+        }
+        const auto pitchRisk = juce::jlimit (0.0f, 1.0f, destroyHarsh * (1.0f - 0.75f * lockHelp));
+
+        const auto toPct = [] (float v) { return (int) std::lround (juce::jlimit (0.0f, 1.0f, v) * 100.0f); };
+        const auto isRu = isRussian();
+        const auto text = isRu
+            ? (juce::String ("P ") + juce::String (toPct (pitchRisk))
+             + "  L " + juce::String (toPct (loudRisk))
+             + "  C " + juce::String (toPct (cpuRisk))
+             + "  A " + juce::String (toPct (aliasRisk)))
+            : (juce::String ("P ") + juce::String (toPct (pitchRisk))
+             + "  L " + juce::String (toPct (loudRisk))
+             + "  C " + juce::String (toPct (cpuRisk))
+             + "  A " + juce::String (toPct (aliasRisk)));
+
+        safetyBudgetLabel.setText (text, juce::dontSendNotification);
+
+        const auto worst = juce::jmax (juce::jmax (pitchRisk, loudRisk), juce::jmax (cpuRisk, aliasRisk));
+        juce::Colour bg (0xff162233), fg (0xff9bd8a3);
+        if (worst >= 0.70f)
+        {
+            bg = juce::Colour (0xff4a1419);
+            fg = juce::Colour (0xffff6b7d);
+        }
+        else if (worst >= 0.35f)
+        {
+            bg = juce::Colour (0xff3d2a16);
+            fg = juce::Colour (0xffffcf6a);
+        }
+        safetyBudgetLabel.setColour (juce::Label::backgroundColourId, bg);
+        safetyBudgetLabel.setColour (juce::Label::textColourId, fg);
+    }
+
     // Analyzer frame (UI-only). PRE/POST source is selected in the Tone panel.
     {
         audioProcessor.copyUiAudio (analyzerFramePost.data(), (int) analyzerFramePost.size(),
@@ -3379,6 +3700,32 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
     // Keep the status line live while dragging.
     if (hovered != nullptr)
         updateStatusFromComponent (hovered);
+    if (lastTouchedModDest != params::mod::dstOff)
+        setLastTouchedModDest (lastTouchedModDest, false);
+    if (hovered == nullptr && statusLabel.getText().isEmpty())
+    {
+        currentIntent = (IntentModeIndex) juce::jlimit (0, 2, intentMode.getCombo().getSelectedItemIndex());
+        juce::String rec;
+        if (isRussian())
+        {
+            switch (currentIntent)
+            {
+                case intentBass:  rec = juce::String::fromUTF8 (u8"Intent Bass: усиливай фундамент (Osc Level), контролируй Cutoff, и держи Mix дисторшна умеренным."); break;
+                case intentLead:  rec = juce::String::fromUTF8 (u8"Intent Lead: поднимай яркость через Filter Env/Resonance и следи за читаемостью через Pitch Lock."); break;
+                case intentDrone: rec = juce::String::fromUTF8 (u8"Intent Drone: длинные Attack/Release + Shaper/Tone EQ для движения и текстуры."); break;
+            }
+        }
+        else
+        {
+            switch (currentIntent)
+            {
+                case intentBass:  rec = "Intent Bass: reinforce foundation (Osc Level), control Cutoff, keep distortion Mix moderate."; break;
+                case intentLead:  rec = "Intent Lead: add brightness via Filter Env/Resonance and keep readability with Pitch Lock."; break;
+                case intentDrone: rec = "Intent Drone: long Attack/Release + Shaper/Tone EQ for evolving texture."; break;
+            }
+        }
+        statusLabel.setText (rec, juce::dontSendNotification);
+    }
 
     // Activity highlight (pure UI): blocks glow when they are actually doing work.
     auto setActivity = [] (juce::Component& c, float a)
@@ -3467,6 +3814,99 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
         setActivity (lfo2Panel, l2Act);
     }
 
+    // Intent Layer v1: goal-oriented UI guidance (Bass / Lead / Drone).
+    {
+        currentIntent = (IntentModeIndex) juce::jlimit (0, 2, intentMode.getCombo().getSelectedItemIndex());
+
+        auto boostGroup = [] (juce::Component& c, float amount)
+        {
+            const auto prevVar = c.getProperties().getWithDefault ("activity", 0.0);
+            const auto prev = prevVar.isDouble() ? (float) ((double) prevVar) : 0.0f;
+            const auto next = juce::jmax (prev, juce::jlimit (0.0f, 1.0f, amount));
+            c.getProperties().set ("activity", (double) next);
+            c.repaint();
+        };
+
+        auto markIntent = [] (juce::Slider& s, float amount)
+        {
+            s.getProperties().set ("intentGlow", (double) juce::jlimit (0.0f, 1.0f, amount));
+            s.repaint();
+        };
+
+        for (auto* s : { &glideTime.getSlider(),
+                         &osc1Level.getSlider(), &osc1Detune.getSlider(),
+                         &osc2Level.getSlider(), &osc2Detune.getSlider(),
+                         &foldAmount.getSlider(), &foldMix.getSlider(),
+                         &clipAmount.getSlider(), &clipMix.getSlider(),
+                         &modAmount.getSlider(), &modMix.getSlider(),
+                         &crushMix.getSlider(),
+                         &destroyPitchLockAmount.getSlider(),
+                         &shaperDrive.getSlider(), &shaperMix.getSlider(),
+                         &filterCutoff.getSlider(), &filterReso.getSlider(), &filterEnvAmount.getSlider(),
+                         &filterAttack.getSlider(), &filterRelease.getSlider(),
+                         &ampAttack.getSlider(), &ampRelease.getSlider(),
+                         &outGain.getSlider() })
+            markIntent (*s, 0.0f);
+
+        switch (currentIntent)
+        {
+            case intentBass:
+                boostGroup (monoGroup, 0.68f);
+                boostGroup (osc1Group, 0.70f);
+                boostGroup (osc2Group, 0.50f);
+                boostGroup (destroyGroup, 0.74f);
+                boostGroup (filterGroup, 0.72f);
+                boostGroup (outGroup, 0.66f);
+
+                markIntent (osc1Level.getSlider(), 0.90f);
+                markIntent (osc2Level.getSlider(), 0.62f);
+                markIntent (filterCutoff.getSlider(), 0.92f);
+                markIntent (filterReso.getSlider(), 0.50f);
+                markIntent (foldAmount.getSlider(), 0.78f);
+                markIntent (clipAmount.getSlider(), 0.78f);
+                markIntent (crushMix.getSlider(), 0.56f);
+                markIntent (outGain.getSlider(), 0.72f);
+                break;
+
+            case intentLead:
+                boostGroup (monoGroup, 0.58f);
+                boostGroup (osc1Group, 0.76f);
+                boostGroup (osc2Group, 0.76f);
+                boostGroup (destroyGroup, 0.66f);
+                boostGroup (filterGroup, 0.82f);
+                boostGroup (ampGroup, 0.72f);
+
+                markIntent (glideTime.getSlider(), 0.70f);
+                markIntent (osc1Detune.getSlider(), 0.78f);
+                markIntent (osc2Detune.getSlider(), 0.78f);
+                markIntent (filterCutoff.getSlider(), 0.84f);
+                markIntent (filterReso.getSlider(), 0.92f);
+                markIntent (filterEnvAmount.getSlider(), 0.94f);
+                markIntent (destroyPitchLockAmount.getSlider(), 0.74f);
+                markIntent (ampAttack.getSlider(), 0.56f);
+                break;
+
+            case intentDrone:
+                boostGroup (osc1Group, 0.66f);
+                boostGroup (osc2Group, 0.66f);
+                boostGroup (destroyGroup, 0.68f);
+                boostGroup (shaperGroup, 0.88f);
+                boostGroup (toneGroup, 0.90f);
+                boostGroup (filterEnvGroup, 0.76f);
+                boostGroup (ampGroup, 0.80f);
+
+                markIntent (shaperDrive.getSlider(), 0.98f);
+                markIntent (shaperMix.getSlider(), 0.94f);
+                markIntent (filterAttack.getSlider(), 0.78f);
+                markIntent (filterRelease.getSlider(), 0.86f);
+                markIntent (ampAttack.getSlider(), 0.78f);
+                markIntent (ampRelease.getSlider(), 0.92f);
+                markIntent (osc1Detune.getSlider(), 0.64f);
+                markIntent (osc2Detune.getSlider(), 0.64f);
+                break;
+        }
+    }
+
     // Modulation rings around destination knobs (Serum-like "wow": you see what's modded).
     {
         auto setIfChanged = [] (juce::Component& c, const juce::Identifier& k, juce::var v) -> bool
@@ -3498,7 +3938,7 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
 
             for (int i = 0; i < params::mod::numSlots; ++i)
             {
-                const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstCrushMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+                const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
                 if (d != dst)
                     continue;
 
@@ -3551,7 +3991,7 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
                 s.repaint();
         };
 
-        for (auto* k : { &osc1Level, &osc2Level, &filterCutoff, &filterReso, &foldAmount, &clipAmount, &modAmount, &crushMix })
+        for (auto* k : { &osc1Level, &osc2Level, &filterCutoff, &filterReso, &foldAmount, &clipAmount, &modAmount, &crushMix, &shaperDrive, &shaperMix })
             updateFor (*k);
     }
 }
@@ -3698,7 +4138,7 @@ void IndustrialEnergySynthAudioProcessorEditor::clearAllModForDest (params::mod:
 
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
-        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstCrushMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
         const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, modSlotSrc[(size_t) i].getSelectedItemIndex());
         if (d == dst && s != params::mod::srcOff)
             clearModSlot (i);
@@ -3724,7 +4164,7 @@ void IndustrialEnergySynthAudioProcessorEditor::assignModulation (params::mod::S
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
         const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, modSlotSrc[(size_t) i].getSelectedItemIndex());
-        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstCrushMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
 
         if (s == src && d == dst)
             existing = i;
@@ -3781,6 +4221,8 @@ void IndustrialEnergySynthAudioProcessorEditor::assignModulation (params::mod::S
                 case params::mod::dstClipAmount:       return isRu ? juce::String::fromUTF8 (u8"Amount (clip)") : "Clip Amount";
                 case params::mod::dstModAmount:        return isRu ? juce::String::fromUTF8 (u8"Amount (mod)") : "Mod Amount";
                 case params::mod::dstCrushMix:         return isRu ? juce::String::fromUTF8 (u8"Mix (crush)") : "Crush Mix";
+                case params::mod::dstShaperDrive:      return isRu ? juce::String::fromUTF8 (u8"Драйв (shaper)") : "Shaper Drive";
+                case params::mod::dstShaperMix:        return isRu ? juce::String::fromUTF8 (u8"Mix (shaper)") : "Shaper Mix";
                 default: break;
             }
             return "Off";
@@ -3804,7 +4246,7 @@ void IndustrialEnergySynthAudioProcessorEditor::showModulationMenu (params::mod:
     juce::Array<int> matchingSlots;
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
-        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstCrushMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
         const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, modSlotSrc[(size_t) i].getSelectedItemIndex());
         if (d == dst && s != params::mod::srcOff)
             matchingSlots.add (i);
@@ -3892,12 +4334,115 @@ void IndustrialEnergySynthAudioProcessorEditor::setupSliderDoubleClickDefault (j
     s.setDoubleClickReturnValue (true, defaultValue);
 }
 
+params::mod::Dest IndustrialEnergySynthAudioProcessorEditor::getModDestForComponent (juce::Component* c) const
+{
+    if (c == nullptr)
+        return params::mod::dstOff;
+
+    auto* s = dynamic_cast<juce::Slider*> (c);
+    if (s == nullptr && c->getParentComponent() != nullptr)
+        s = dynamic_cast<juce::Slider*> (c->getParentComponent());
+    if (s == nullptr)
+        return params::mod::dstOff;
+
+    if (s == &osc1Level.getSlider())    return params::mod::dstOsc1Level;
+    if (s == &osc2Level.getSlider())    return params::mod::dstOsc2Level;
+    if (s == &filterCutoff.getSlider()) return params::mod::dstFilterCutoff;
+    if (s == &filterReso.getSlider())   return params::mod::dstFilterResonance;
+    if (s == &foldAmount.getSlider())   return params::mod::dstFoldAmount;
+    if (s == &clipAmount.getSlider())   return params::mod::dstClipAmount;
+    if (s == &modAmount.getSlider())    return params::mod::dstModAmount;
+    if (s == &crushMix.getSlider())     return params::mod::dstCrushMix;
+    if (s == &shaperDrive.getSlider())  return params::mod::dstShaperDrive;
+    if (s == &shaperMix.getSlider())    return params::mod::dstShaperMix;
+
+    return params::mod::dstOff;
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::setLastTouchedModDest (params::mod::Dest dst, bool announce)
+{
+    const bool changed = (dst != lastTouchedModDest);
+    lastTouchedModDest = dst;
+
+    const auto isRu = isRussian();
+    auto dstName = [&]() -> juce::String
+    {
+        switch (dst)
+        {
+            case params::mod::dstOsc1Level:        return isRu ? juce::String::fromUTF8 (u8"Осц1 уровень") : "Osc1 Level";
+            case params::mod::dstOsc2Level:        return isRu ? juce::String::fromUTF8 (u8"Осц2 уровень") : "Osc2 Level";
+            case params::mod::dstFilterCutoff:     return isRu ? juce::String::fromUTF8 (u8"Фильтр срез") : "Filter Cutoff";
+            case params::mod::dstFilterResonance:  return isRu ? juce::String::fromUTF8 (u8"Фильтр резонанс") : "Filter Reso";
+            case params::mod::dstFoldAmount:       return isRu ? juce::String::fromUTF8 (u8"Amount (fold)") : "Fold Amount";
+            case params::mod::dstClipAmount:       return isRu ? juce::String::fromUTF8 (u8"Amount (clip)") : "Clip Amount";
+            case params::mod::dstModAmount:        return isRu ? juce::String::fromUTF8 (u8"Amount (mod)") : "Mod Amount";
+            case params::mod::dstCrushMix:         return isRu ? juce::String::fromUTF8 (u8"Mix (crush)") : "Crush Mix";
+            case params::mod::dstShaperDrive:      return isRu ? juce::String::fromUTF8 (u8"Драйв (shaper)") : "Shaper Drive";
+            case params::mod::dstShaperMix:        return isRu ? juce::String::fromUTF8 (u8"Mix (shaper)") : "Shaper Mix";
+            case params::mod::dstOff:              break;
+        }
+        return "-";
+    }();
+
+    float sumL1 = 0.0f, sumL2 = 0.0f, sumM1 = 0.0f, sumM2 = 0.0f;
+    for (int i = 0; i < params::mod::numSlots; ++i)
+    {
+        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+        if (d != dst)
+            continue;
+
+        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, modSlotSrc[(size_t) i].getSelectedItemIndex());
+        const auto dep = (float) modSlotDepth[(size_t) i].getValue();
+
+        switch (s)
+        {
+            case params::mod::srcLfo1:   sumL1 += dep; break;
+            case params::mod::srcLfo2:   sumL2 += dep; break;
+            case params::mod::srcMacro1: sumM1 += dep; break;
+            case params::mod::srcMacro2: sumM2 += dep; break;
+            case params::mod::srcOff:    break;
+        }
+    }
+
+    auto addPart = [] (juce::String& out, const char* name, float d)
+    {
+        if (std::abs (d) < 1.0e-4f)
+            return;
+        if (out.isNotEmpty())
+            out << " ";
+        const int pct = (int) std::lround (d * 100.0f);
+        out << name << (pct > 0 ? "+" : "") << pct << "%";
+    };
+
+    juce::String modInfo;
+    addPart (modInfo, "L1", sumL1);
+    addPart (modInfo, "L2", sumL2);
+    addPart (modInfo, "M1", sumM1);
+    addPart (modInfo, "M2", sumM2);
+
+    auto targetText = (isRu ? juce::String::fromUTF8 (u8"Цель: ") : juce::String ("Target: ")) + dstName;
+    if (modInfo.isNotEmpty())
+        targetText << " [" << modInfo << "]";
+    lastTouchedLabel.setText (targetText, juce::dontSendNotification);
+
+    if (announce && changed && dst != params::mod::dstOff)
+    {
+        auto st = (isRu ? juce::String::fromUTF8 (u8"Цель модуляции: ") : juce::String ("Mod target: ")) + dstName;
+        if (modInfo.isNotEmpty())
+            st << "  |  " << modInfo;
+        statusLabel.setText (st,
+                             juce::dontSendNotification);
+    }
+}
+
 void IndustrialEnergySynthAudioProcessorEditor::mouseEnter (const juce::MouseEvent& e)
 {
     if (e.eventComponent == nullptr)
         return;
 
     hovered = e.eventComponent;
+    if (const auto dst = getModDestForComponent (hovered); dst != params::mod::dstOff)
+        setLastTouchedModDest (dst, false);
     updateStatusFromComponent (hovered);
 }
 

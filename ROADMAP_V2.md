@@ -9,6 +9,10 @@
 - **Качество**: стабильность в Reaper, быстрый UI, ноль аллокаций в аудио‑потоке, предсказуемая автомейшн‑кривая.
 
 ## Текущий статус (реализовано в коде)
+- (2026-02-11) Safety Budget Overlay v1: добавлен live-индикатор `P/L/C/A` (Pitch/Loudness/CPU/Aliasing risk) в top bar.
+- (2026-02-11) Explainable Modulation v1: для `Last Touched` цели показываются суммарные влияния источников (`L1/L2/M1/M2`) в строке цели.
+- (2026-02-11) UI Compact Rewrite v1: уменьшены размеры кнопок/хедеров/контролов, снижены отступы, уменьшен дефолтный размер окна и минимальные размеры для более плотной работы.
+- (2026-02-11) Pitch Lock Mode: добавлен переключаемый режим `Fundamental / Harmonic / Hybrid` (параметр + UI + DSP логика).
 - (2026-02-11) V2.1 prototype: `Pitch Lock` (минимальный fundamental lock) в Destroy, управляемый `Enable/Amount`.
 - (2026-02-11) V1.3: отдельный `Shaper`-блок (curve editor + Drive/Mix + placement `Pre/Post Destroy`).
 - (2026-02-11) V1.1: `safe-clip` индикаторы PRE/OUT в top bar + decay hold для визуального контроля запаса.
@@ -18,6 +22,34 @@
 - (2026-02-10) Modulation v1: 2x LFO (free/sync) + 2x Macros + 8-slot Mod Matrix + drag‑and‑drop назначение на ручки.
 
 ## V2 Milestones (после v1.0)
+
+## Serum Gap: что ещё критично, чтобы приблизиться по уровню
+1. **Macro workflow как в Serum**
+- Macro rename (M1..M8 в будущем), color tags, value popups и быстрый learn/assign.
+- “Last touched” target assignment без открытия матрицы.
+2. **Routing и FX UX**
+- Drag reorder FX-блоков (минимум Destroy/Shaper/Filter/Tone).
+- Split routing (parallel serial blend) для Destroy/Tone.
+3. **LFO/Env редакторы уровня Serum**
+- Рисуемые LFO shape presets + one-shot/trigger/free-run режимы.
+- MSEG/step envelope для индустриальных паттернов.
+4. **Качество звука и контроль**
+- HQ режим: 2-stage oversampling + smarter anti-alias для sync/fold.
+- Match gain на Destroy/Shaper/Tone, чтобы сравнивать тембр “по-честному”.
+5. **Preset/Browser продуктового уровня**
+- Теги, фавориты, quick preview и intelligent random в рамках категории.
+
+## Beyond Serum UI: что делать не “как Serum”, а лучше в нашей нише
+1. **Intent Layer (необычно для синтов)**
+- Режим “Goal”: пользователь выбирает цель (“бас держит фундамент”, “лид режет микс”), UI подсвечивает только релевантные ручки.
+2. **Safety Budget Overlay**
+- Визуальный бюджет “Pitch / Loudness / CPU / Aliasing” в реальном времени, чтобы креатив не ломал практичность.
+3. **Explainable Modulation**
+- Не просто кольца модуляции, а “почему звучит так”: мини-строка влияния (`LFO1 -> Cutoff +32% -> Resonance`).
+4. **Transient/Fundamental Lock Assistant**
+- Авто-ассистент: при экстремальном Destroy предлагает корректировки, чтобы нота и атака оставались читаемыми.
+5. **Bilingual UX Native**
+- RU/EN не как перевод, а как нативный UX-режим: адаптивная длина подписей, контекстные подсказки с тех. термином и “человеческим” объяснением.
 
 ### V1.1 — Quality + CPU + Sound Consistency
 - Oversampling (опционально/auto) именно для DestroyChain (2x/4x) + downsample фильтрация.

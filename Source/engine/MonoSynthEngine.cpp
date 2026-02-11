@@ -280,6 +280,8 @@ void MonoSynthEngine::reset()
     driftState2 = 0.0f;
     pitchLockPhase = 0.0f;
     pitchLockFollower = 0.0f;
+    pitchLockLowpass = 0.0f;
+    pitchLockBrightness = 0.0f;
 
     if (params != nullptr)
     {
@@ -550,6 +552,11 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
     const auto crushBits       = params->crushBits       != nullptr ? (int) std::lround (params->crushBits->load())       : 16;
     const auto crushDownsample = params->crushDownsample != nullptr ? (int) std::lround (params->crushDownsample->load()) : 1;
     const auto pitchLockEnabled = params->destroyPitchLockEnable != nullptr && (params->destroyPitchLockEnable->load() >= 0.5f);
+    const auto pitchLockMode = params->destroyPitchLockMode != nullptr
+        ? juce::jlimit ((int) params::destroy::pitchModeFundamental,
+                        (int) params::destroy::pitchModeHybrid,
+                        (int) std::lround (params->destroyPitchLockMode->load()))
+        : (int) params::destroy::pitchModeHybrid;
 
     const auto shaperEnabled = params->shaperEnable != nullptr && (params->shaperEnable->load() >= 0.5f);
     const auto shaperPlacement = params->shaperPlacement != nullptr
@@ -696,7 +703,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         const auto dep = params->modSlotDepth[(size_t) s] != nullptr ? params->modSlotDepth[(size_t) s]->load() : 0.0f;
 
         slots[(size_t) s].src = juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, src);
-        slots[(size_t) s].dst = juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstCrushMix, dst);
+        slots[(size_t) s].dst = juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, dst);
         slots[(size_t) s].depth = juce::jlimit (-1.0f, 1.0f, dep);
     }
 
@@ -714,6 +721,8 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         float modClipAdd   = 0.0f;
         float modModAdd    = 0.0f;
         float modCrushAdd  = 0.0f;
+        float modShaperDriveAdd = 0.0f;
+        float modShaperMixAdd   = 0.0f;
 
         // Slot depths are in [-1..1]. Dest scaling is per-destination.
         constexpr float cutoffMaxSemis = 48.0f;
@@ -745,6 +754,8 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
                 case params::mod::dstClipAmount: modClipAdd += amt; break;
                 case params::mod::dstModAmount: modModAdd += amt; break;
                 case params::mod::dstCrushMix: modCrushAdd += amt; break;
+                case params::mod::dstShaperDrive: modShaperDriveAdd += (amt * 18.0f); break; // dB span
+                case params::mod::dstShaperMix: modShaperMixAdd += amt; break;
             }
         }
 
@@ -809,8 +820,8 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         destroyModFreqHz[(size_t) i]   = modFreqHzSm.getNextValue();
 
         destroyCrushMix[(size_t) i]    = juce::jlimit (0.0f, 1.0f, crushMixSm.getNextValue() + modCrushAdd);
-        shaperDriveDb[(size_t) i]      = shaperDriveDbSm.getNextValue();
-        shaperMix[(size_t) i]          = shaperMixSm.getNextValue();
+        shaperDriveDb[(size_t) i]      = juce::jlimit (-24.0f, 24.0f, shaperDriveDbSm.getNextValue() + modShaperDriveAdd);
+        shaperMix[(size_t) i]          = juce::jlimit (0.0f, 1.0f, shaperMixSm.getNextValue() + modShaperMixAdd);
     }
 
     // 2) Optional Shaper before Destroy.
@@ -884,13 +895,15 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         }
     }
 
-    // 6) Minimal pitch lock: inject note-locked fundamental energy after destruction.
+    // 6) Pitch lock: note-locked helper signal with selectable mode.
     const auto pitchLockAmountTarget = pitchLockEnabled ? juce::jlimit (0.0f, 1.0f, pitchLockAmountSm.getTargetValue()) : 0.0f;
     if (pitchLockAmountTarget > 1.0e-5f)
     {
         constexpr float followerAttack = 0.14f;
         constexpr float followerRelease = 0.02f;
-        constexpr float lockGain = 0.42f;
+        constexpr float brightnessFollow = 0.07f;
+        constexpr float lockGain = 0.50f;
+        const auto brightnessCut = juce::jlimit (0.001f, 0.25f, (float) (2.0 * juce::MathConstants<double>::pi * 1200.0 / sampleRateHz));
 
         for (int i = 0; i < numSamples; ++i)
         {
@@ -899,15 +912,72 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
             const auto coeff = envIn > pitchLockFollower ? followerAttack : followerRelease;
             pitchLockFollower += coeff * (envIn - pitchLockFollower);
 
+            // Brightness proxy from simple low/high split, used to steer harmonic weights.
+            pitchLockLowpass += brightnessCut * (in - pitchLockLowpass);
+            const auto hi = in - pitchLockLowpass;
+            const auto den = std::abs (pitchLockLowpass) + std::abs (hi) + 1.0e-5f;
+            const auto brightnessNow = juce::jlimit (0.0f, 1.0f, std::abs (hi) / den);
+            pitchLockBrightness += brightnessFollow * (brightnessNow - pitchLockBrightness);
+
             const auto noteHz = destroyNoteHz[(size_t) i];
             const auto phaseInc = juce::jlimit (0.0f, 0.5f, noteHz / (float) sampleRateHz);
             pitchLockPhase += phaseInc;
             if (pitchLockPhase >= 1.0f)
                 pitchLockPhase -= 1.0f;
 
-            const auto fundamental = std::sin (juce::MathConstants<float>::twoPi * pitchLockPhase);
+            const auto p = juce::MathConstants<float>::twoPi * pitchLockPhase;
+            const auto h1 = std::sin (p);
+            const auto h2 = std::sin (2.0f * p);
+            const auto h3 = std::sin (3.0f * p);
+            const auto h4 = std::sin (4.0f * p);
+            const auto h5 = std::sin (5.0f * p);
+
+            const auto nyqSafe = (float) (0.48 * sampleRateHz);
+            auto harmonicMask = [=] (float harmonicMul) noexcept
+            {
+                const auto rel = (harmonicMul * noteHz) / juce::jmax (10.0f, nyqSafe);
+                if (rel >= 1.0f)
+                    return 0.0f;
+                const auto m = 1.0f - rel * rel;
+                return juce::jlimit (0.0f, 1.0f, m);
+            };
+
+            const auto bright = juce::jlimit (0.0f, 1.0f, pitchLockBrightness);
+            float w1 = 1.00f;
+            float w2 = (0.22f + 0.28f * bright) * harmonicMask (2.0f);
+            float w3 = (0.12f + 0.26f * bright) * harmonicMask (3.0f);
+            float w4 = (0.05f + 0.20f * bright) * harmonicMask (4.0f);
+            float w5 = (0.02f + 0.12f * bright * bright) * harmonicMask (5.0f);
+
+            const auto norm = juce::jmax (1.0e-4f, w1 + w2 + w3 + w4 + w5);
+            const auto harmonicTone = (w1 * h1 + w2 * h2 + w3 * h3 + w4 * h4 + w5 * h5) / norm;
+            const auto fundamentalTone = h1;
+
+            float lockTone = harmonicTone;
+            float modeGain = 1.0f;
+            switch ((params::destroy::PitchLockMode) pitchLockMode)
+            {
+                case params::destroy::pitchModeFundamental:
+                    lockTone = fundamentalTone;
+                    modeGain = 0.95f;
+                    break;
+                case params::destroy::pitchModeHarmonic:
+                    lockTone = harmonicTone;
+                    modeGain = 1.00f;
+                    break;
+                case params::destroy::pitchModeHybrid:
+                default:
+                {
+                    const auto harmonicBlend = juce::jlimit (0.0f, 1.0f, 0.35f + 0.55f * bright);
+                    lockTone = juce::jmap (harmonicBlend, fundamentalTone, harmonicTone);
+                    modeGain = 1.07f;
+                    break;
+                }
+            }
+
             const auto amount = juce::jlimit (0.0f, 1.0f, pitchLockAmountSm.getNextValue());
-            sigBuf[i] = in + (fundamental * pitchLockFollower * amount * lockGain);
+            const auto gain = lockGain * (0.75f + 0.35f * (1.0f - bright));
+            sigBuf[i] = in + (lockTone * pitchLockFollower * amount * gain * modeGain);
         }
     }
     else
