@@ -158,6 +158,34 @@ enum OversampleMode
 inline constexpr const char* crushBits       = "destroy.crushBits";       // int 2..16
 inline constexpr const char* crushDownsample = "destroy.crushDownsample"; // int 1..32
 inline constexpr const char* crushMix        = "destroy.crushMix";
+
+// Minimal fundamental lock to keep note readability under extreme destruction.
+inline constexpr const char* pitchLockEnable = "destroy.pitchLockEnable"; // bool
+inline constexpr const char* pitchLockAmount = "destroy.pitchLockAmount"; // 0..1
+}
+
+namespace shaper
+{
+inline constexpr const char* enable    = "shaper.enable";    // bool
+inline constexpr const char* placement = "shaper.placement"; // choice: Pre Destroy / Post Destroy
+inline constexpr const char* driveDb   = "shaper.driveDb";   // -24..24 dB
+inline constexpr const char* mix       = "shaper.mix";       // 0..1
+
+// Fixed curve control points (x is fixed/evenly distributed; y is automatable).
+inline constexpr int numPoints = 7;
+inline constexpr const char* point1 = "shaper.point1";
+inline constexpr const char* point2 = "shaper.point2";
+inline constexpr const char* point3 = "shaper.point3";
+inline constexpr const char* point4 = "shaper.point4";
+inline constexpr const char* point5 = "shaper.point5";
+inline constexpr const char* point6 = "shaper.point6";
+inline constexpr const char* point7 = "shaper.point7";
+
+enum Placement
+{
+    preDestroy = 0,
+    postDestroy = 1
+};
 }
 
 namespace macros
@@ -314,6 +342,22 @@ inline constexpr const char* gainDb = "out.gainDb";
 namespace ui
 {
 inline constexpr const char* language = "ui.language"; // choice: EN, RU
+inline constexpr const char* analyzerSource = "ui.analyzerSource"; // choice: Post, Pre
+inline constexpr const char* analyzerFreeze = "ui.analyzerFreeze"; // bool
+inline constexpr const char* analyzerAveraging = "ui.analyzerAveraging"; // choice: Fast, Medium, Smooth
+
+enum AnalyzerSource
+{
+    analyzerPost = 0,
+    analyzerPre = 1
+};
+
+enum AnalyzerAveraging
+{
+    analyzerFast = 0,
+    analyzerMedium = 1,
+    analyzerSmooth = 2
+};
 
 enum Language
 {

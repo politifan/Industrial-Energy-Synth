@@ -7,10 +7,19 @@ namespace ies::ui
 class SpectrumEditor final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
+    enum class InputMode
+    {
+        postOutput = 0,
+        preDestroy = 1
+    };
+
     SpectrumEditor();
     ~SpectrumEditor() override;
 
     void setAccentColour (juce::Colour c) { accent = c; repaint(); }
+    void setInputMode (InputMode m) noexcept { inputMode = m; repaint(); }
+    void setFrozen (bool shouldFreeze) noexcept { frozen = shouldFreeze; }
+    void setAveragingAmount01 (float amount) noexcept { averagingAmount01 = juce::jlimit (0.0f, 1.0f, amount); }
 
     void bind (juce::AudioProcessorValueTreeState& apvts,
                const char* enableParamId,
@@ -175,6 +184,9 @@ private:
     float dragStartPeakGainDb = 0.0f;
 
     juce::Colour accent { 0xff00c7ff };
+    InputMode inputMode = InputMode::postOutput;
+    bool frozen = false;
+    float averagingAmount01 = 0.55f;
 
     double sr = 44100.0;
 

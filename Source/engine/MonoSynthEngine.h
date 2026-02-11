@@ -12,6 +12,7 @@
 #include "../dsp/PolyBlepOscillator.h"
 #include "../dsp/SvfFilter.h"
 #include "../dsp/ToneEQ.h"
+#include "../dsp/WaveShaper.h"
 #include "NoteStackMono.h"
 
 namespace ies::engine
@@ -64,6 +65,14 @@ public:
         std::atomic<float>* crushBits = nullptr;
         std::atomic<float>* crushDownsample = nullptr;
         std::atomic<float>* crushMix = nullptr;
+        std::atomic<float>* destroyPitchLockEnable = nullptr;
+        std::atomic<float>* destroyPitchLockAmount = nullptr;
+
+        std::atomic<float>* shaperEnable = nullptr;
+        std::atomic<float>* shaperPlacement = nullptr;
+        std::atomic<float>* shaperDriveDb = nullptr;
+        std::atomic<float>* shaperMix = nullptr;
+        std::array<std::atomic<float>*, (size_t) params::shaper::numPoints> shaperPoints {};
 
         std::atomic<float>* filterType = nullptr;
         std::atomic<float>* filterCutoffHz = nullptr;
@@ -149,7 +158,8 @@ public:
     void reset();
 
     // Render audio into buffer for [startSample, startSample+numSamples).
-    void render (juce::AudioBuffer<float>& buffer, int startSample, int numSamples);
+    // Optional preDestroyOut captures the signal right before the Destroy chain.
+    void render (juce::AudioBuffer<float>& buffer, int startSample, int numSamples, float* preDestroyOut = nullptr);
 
     void setHostBpm (double bpm) noexcept;
 
@@ -241,6 +251,10 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> modFreqHzSm;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> crushMixSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> pitchLockAmountSm;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> shaperDriveDbSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> shaperMixSm;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> filterCutoffHzSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> filterResKnobSm;
@@ -318,10 +332,18 @@ private:
     std::vector<float> destroyModMix;
     std::vector<float> destroyModFreqHz;
     std::vector<float> destroyCrushMix;
+    std::vector<float> shaperDriveDb;
+    std::vector<float> shaperMix;
     std::vector<float> filterModCutoffSemis;
     std::vector<float> filterModResAdd;
     dsp::SvfFilter filter;
     dsp::ToneEQ toneEq;
+    dsp::WaveShaper shaper;
+
+    std::array<float, (size_t) params::shaper::numPoints> shaperPointsCache
+    {
+        -1.0f, -0.6667f, -0.3333f, 0.0f, 0.3333f, 0.6667f, 1.0f
+    };
 
     int toneCoeffCountdown = 0;
     bool toneEnabledPrev = false;
@@ -330,5 +352,8 @@ private:
     juce::Random driftRng2 { 0x2468ace0 };
     float driftState1 = 0.0f;
     float driftState2 = 0.0f;
+
+    float pitchLockPhase = 0.0f;
+    float pitchLockFollower = 0.0f;
 };
 } // namespace ies::engine

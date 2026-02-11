@@ -90,6 +90,20 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
     paramPointers.crushBits       = apvts.getRawParameterValue (params::destroy::crushBits);
     paramPointers.crushDownsample = apvts.getRawParameterValue (params::destroy::crushDownsample);
     paramPointers.crushMix        = apvts.getRawParameterValue (params::destroy::crushMix);
+    paramPointers.destroyPitchLockEnable = apvts.getRawParameterValue (params::destroy::pitchLockEnable);
+    paramPointers.destroyPitchLockAmount = apvts.getRawParameterValue (params::destroy::pitchLockAmount);
+
+    paramPointers.shaperEnable    = apvts.getRawParameterValue (params::shaper::enable);
+    paramPointers.shaperPlacement = apvts.getRawParameterValue (params::shaper::placement);
+    paramPointers.shaperDriveDb   = apvts.getRawParameterValue (params::shaper::driveDb);
+    paramPointers.shaperMix       = apvts.getRawParameterValue (params::shaper::mix);
+    paramPointers.shaperPoints[0] = apvts.getRawParameterValue (params::shaper::point1);
+    paramPointers.shaperPoints[1] = apvts.getRawParameterValue (params::shaper::point2);
+    paramPointers.shaperPoints[2] = apvts.getRawParameterValue (params::shaper::point3);
+    paramPointers.shaperPoints[3] = apvts.getRawParameterValue (params::shaper::point4);
+    paramPointers.shaperPoints[4] = apvts.getRawParameterValue (params::shaper::point5);
+    paramPointers.shaperPoints[5] = apvts.getRawParameterValue (params::shaper::point6);
+    paramPointers.shaperPoints[6] = apvts.getRawParameterValue (params::shaper::point7);
 
     paramPointers.filterType      = apvts.getRawParameterValue (params::filter::type);
     paramPointers.filterCutoffHz  = apvts.getRawParameterValue (params::filter::cutoffHz);
@@ -217,15 +231,16 @@ void IndustrialEnergySynthAudioProcessor::applyStateFromUi (juce::ValueTree stat
     engine.reset();
 }
 
-void IndustrialEnergySynthAudioProcessor::copyUiAudio (float* dest, int numSamples) const noexcept
+void IndustrialEnergySynthAudioProcessor::copyUiAudio (float* dest, int numSamples, UiAudioTap tap) const noexcept
 {
     if (dest == nullptr || numSamples <= 0)
         return;
 
-    const auto cap = (int) uiAudioRing.size();
+    const auto cap = (int) uiAudioRingPost.size();
     const auto n = juce::jlimit (1, cap, numSamples);
 
-    const auto w = uiAudioWritePos.load (std::memory_order_relaxed);
+    const auto* ring = (tap == UiAudioTap::preDestroy) ? uiAudioRingPre.data() : uiAudioRingPost.data();
+    const auto w = (tap == UiAudioTap::preDestroy ? uiAudioWritePosPre : uiAudioWritePosPost).load (std::memory_order_relaxed);
     auto start = w - n;
     if (start < 0)
         start += cap;
@@ -233,7 +248,7 @@ void IndustrialEnergySynthAudioProcessor::copyUiAudio (float* dest, int numSampl
     for (int i = 0; i < n; ++i)
     {
         const int idx = (start + i) % cap;
-        dest[i] = uiAudioRing[(size_t) idx];
+        dest[i] = ring[(size_t) idx];
     }
 
     // If the caller asked for more than we have, zero-fill the rest.
@@ -307,6 +322,14 @@ void IndustrialEnergySynthAudioProcessor::changeProgramName (int index, const ju
 void IndustrialEnergySynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     engine.prepare (sampleRate, samplesPerBlock);
+    uiPreDestroyScratch.resize ((size_t) juce::jmax (1, samplesPerBlock));
+    std::fill (uiAudioRingPost.begin(), uiAudioRingPost.end(), 0.0f);
+    std::fill (uiAudioRingPre.begin(), uiAudioRingPre.end(), 0.0f);
+    uiAudioWritePosPost.store (0, std::memory_order_relaxed);
+    uiAudioWritePosPre.store (0, std::memory_order_relaxed);
+    uiOutputPeak.store (0.0f, std::memory_order_relaxed);
+    uiPreClipRisk.store (0.0f, std::memory_order_relaxed);
+    uiOutClipRisk.store (0.0f, std::memory_order_relaxed);
 }
 
 void IndustrialEnergySynthAudioProcessor::releaseResources()
@@ -360,6 +383,7 @@ void IndustrialEnergySynthAudioProcessor::processBlock (juce::AudioBuffer<float>
         engine.allNotesOff();
 
     const auto totalSamples = buffer.getNumSamples();
+    const bool capturePre = (totalSamples > 0 && (int) uiPreDestroyScratch.size() >= totalSamples);
     int cursor = 0;
 
     for (const auto metadata : midiMessages)
@@ -369,7 +393,8 @@ void IndustrialEnergySynthAudioProcessor::processBlock (juce::AudioBuffer<float>
         const auto numToRender = samplePos - cursor;
         if (numToRender > 0)
         {
-            engine.render (buffer, cursor, numToRender);
+            auto* preTap = capturePre ? (uiPreDestroyScratch.data() + cursor) : nullptr;
+            engine.render (buffer, cursor, numToRender, preTap);
             cursor = samplePos;
         }
 
@@ -390,29 +415,56 @@ void IndustrialEnergySynthAudioProcessor::processBlock (juce::AudioBuffer<float>
     }
 
     if (cursor < totalSamples)
-        engine.render (buffer, cursor, totalSamples - cursor);
+    {
+        auto* preTap = capturePre ? (uiPreDestroyScratch.data() + cursor) : nullptr;
+        engine.render (buffer, cursor, totalSamples - cursor, preTap);
+    }
 
     // UI metering (mono signal is duplicated to all channels).
     {
-        float peak = 0.0f;
+        float peakOut = 0.0f;
+        float peakPre = 0.0f;
         if (buffer.getNumChannels() > 0)
         {
-            const auto* d = buffer.getReadPointer (0);
-            auto w = uiAudioWritePos.load (std::memory_order_relaxed);
-            const auto cap = (int) uiAudioRing.size();
+            const auto* post = buffer.getReadPointer (0);
+            auto wPost = uiAudioWritePosPost.load (std::memory_order_relaxed);
+            auto wPre = uiAudioWritePosPre.load (std::memory_order_relaxed);
+            const auto cap = (int) uiAudioRingPost.size();
             for (int i = 0; i < totalSamples; ++i)
             {
-                peak = juce::jmax (peak, std::abs (d[i]));
-                uiAudioRing[(size_t) w] = d[i];
-                ++w;
-                if (w >= cap)
-                    w = 0;
+                const auto postSample = post[i];
+                const auto preSample = capturePre ? uiPreDestroyScratch[(size_t) i] : postSample;
+
+                peakOut = juce::jmax (peakOut, std::abs (postSample));
+                peakPre = juce::jmax (peakPre, std::abs (preSample));
+                uiAudioRingPost[(size_t) wPost] = postSample;
+                uiAudioRingPre[(size_t) wPre] = preSample;
+
+                ++wPost;
+                if (wPost >= cap)
+                    wPost = 0;
+
+                ++wPre;
+                if (wPre >= cap)
+                    wPre = 0;
             }
 
-            uiAudioWritePos.store (w, std::memory_order_relaxed);
+            uiAudioWritePosPost.store (wPost, std::memory_order_relaxed);
+            uiAudioWritePosPre.store (wPre, std::memory_order_relaxed);
         }
 
-        uiOutputPeak.store (peak, std::memory_order_relaxed);
+        uiOutputPeak.store (peakOut, std::memory_order_relaxed);
+
+        auto updateRisk = [] (std::atomic<float>& riskAtomic, float peak) noexcept
+        {
+            const auto prev = riskAtomic.load (std::memory_order_relaxed);
+            const auto riskNow = juce::jlimit (0.0f, 1.0f, (peak - 0.92f) / 0.10f);
+            const auto decayed = prev * 0.90f;
+            riskAtomic.store (juce::jmax (riskNow, decayed), std::memory_order_relaxed);
+        };
+
+        updateRisk (uiPreClipRisk, peakPre);
+        updateRisk (uiOutClipRisk, peakOut);
     }
 
     midiMessages.clear();
@@ -466,6 +518,17 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
                                                                      "Language",
                                                                      juce::StringArray { "English", "Russian" },
                                                                      (int) params::ui::en));
+    uiGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::ui::analyzerSource),
+                                                                     "Analyzer Source",
+                                                                     juce::StringArray { "Post", "Pre" },
+                                                                     (int) params::ui::analyzerPost));
+    uiGroup->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::ui::analyzerFreeze),
+                                                                   "Analyzer Freeze",
+                                                                   false));
+    uiGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::ui::analyzerAveraging),
+                                                                     "Analyzer Averaging",
+                                                                     juce::StringArray { "Fast", "Medium", "Smooth" },
+                                                                     (int) params::ui::analyzerMedium));
     layout.add (std::move (uiGroup));
 
     // --- Mono ---
@@ -628,7 +691,37 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
     destroyGroup->addChild (std::make_unique<juce::AudioParameterInt> (params::makeID (params::destroy::crushDownsample), "Crush Downsample", 1, 32, 1));
     destroyGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::destroy::crushMix), "Crush Mix",
                                                                          juce::NormalisableRange<float> (0.0f, 1.0f), 1.0f));
+    destroyGroup->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::destroy::pitchLockEnable), "Pitch Lock Enable", false));
+    destroyGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::destroy::pitchLockAmount), "Pitch Lock Amount",
+                                                                         juce::NormalisableRange<float> (0.0f, 1.0f), 0.35f));
     layout.add (std::move (destroyGroup));
+
+    // --- Shaper ---
+    auto shaperGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("shaper", "Shaper", "|");
+    shaperGroup->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::shaper::enable), "Enable", false));
+    shaperGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::shaper::placement), "Placement",
+                                                                         juce::StringArray { "Pre Destroy", "Post Destroy" },
+                                                                         (int) params::shaper::preDestroy));
+    shaperGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::shaper::driveDb), "Drive",
+                                                                        juce::NormalisableRange<float> (-24.0f, 24.0f), 0.0f, "dB"));
+    shaperGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::shaper::mix), "Mix",
+                                                                        juce::NormalisableRange<float> (0.0f, 1.0f), 1.0f));
+
+    auto addShaperPoint = [&] (const char* id, const char* name, float def)
+    {
+        shaperGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (id), name,
+                                                                            juce::NormalisableRange<float> (-1.0f, 1.0f), def));
+    };
+
+    addShaperPoint (params::shaper::point1, "Point 1", -1.0f);
+    addShaperPoint (params::shaper::point2, "Point 2", -0.6667f);
+    addShaperPoint (params::shaper::point3, "Point 3", -0.3333f);
+    addShaperPoint (params::shaper::point4, "Point 4", 0.0f);
+    addShaperPoint (params::shaper::point5, "Point 5", 0.3333f);
+    addShaperPoint (params::shaper::point6, "Point 6", 0.6667f);
+    addShaperPoint (params::shaper::point7, "Point 7", 1.0f);
+
+    layout.add (std::move (shaperGroup));
 
     // --- Filter (post-destroy) ---
     auto filterGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("filter", "Filter", "|");

@@ -51,6 +51,7 @@ target_sources(IndustrialEnergySynth PRIVATE
   Source/dsp/PolyBlepOscillator.h
   Source/dsp/SvfFilter.h
   Source/dsp/ToneEQ.h
+  Source/dsp/WaveShaper.h
   Source/engine/MonoSynthEngine.cpp
   Source/engine/MonoSynthEngine.h
   Source/engine/NoteStackMono.h
@@ -68,6 +69,8 @@ target_sources(IndustrialEnergySynth PRIVATE
   Source/ui/ModSourceBadge.h
   Source/ui/SpectrumEditor.cpp
   Source/ui/SpectrumEditor.h
+  Source/ui/ShaperEditor.cpp
+  Source/ui/ShaperEditor.h
   Source/ui/WavePreview.cpp
   Source/ui/WavePreview.h
 )

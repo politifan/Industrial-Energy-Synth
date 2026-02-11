@@ -9,6 +9,10 @@
 - **Качество**: стабильность в Reaper, быстрый UI, ноль аллокаций в аудио‑потоке, предсказуемая автомейшн‑кривая.
 
 ## Текущий статус (реализовано в коде)
+- (2026-02-11) V2.1 prototype: `Pitch Lock` (минимальный fundamental lock) в Destroy, управляемый `Enable/Amount`.
+- (2026-02-11) V1.3: отдельный `Shaper`-блок (curve editor + Drive/Mix + placement `Pre/Post Destroy`).
+- (2026-02-11) V1.1: `safe-clip` индикаторы PRE/OUT в top bar + decay hold для визуального контроля запаса.
+- (2026-02-11) Spectrum Analyzer v2: переключение источника PRE/POST, Freeze, регулируемое Averaging в Tone-блоке.
 - (2026-02-10) Tone/Spectrum: Serum‑like EQ до 8 peak‑узлов, добавление `double-click` по пустому месту, удаление `ПКМ` по узлу.
 - (2026-02-10) Destroy OS: oversampling Off/2x/4x для Fold/Clip/Mod (снижение алиасинга, цена = CPU).
 - (2026-02-10) Modulation v1: 2x LFO (free/sync) + 2x Macros + 8-slot Mod Matrix + drag‑and‑drop назначение на ручки.

@@ -70,3 +70,12 @@
 
 Ожидание: нет крашей, нет утечек UI, нет “зависших” нот (Panic помогает).
 
+### 7.1 Stress matrix (SR / Buffer / Automation)
+| SR | Buffer | Что крутить/автоматизировать | Что проверить |
+|---:|---:|---|---|
+| 44.1 kHz | 64 | `destroy.*`, `shaper.*`, `out.gainDb` | Нет кликов/краша, PRE/OUT clip индикаторы корректно реагируют |
+| 44.1 kHz | 512 | Длинные ноты + rapid note repeat | Нет подвисших нот, корректный last-note/legato |
+| 48 kHz | 128 | `filter.cutoffHz`, `tone.*`, `shaper.mix` | Automation гладкая, без zipper-шума |
+| 48 kHz | 1024 | Быстрый пресет-свитч + play/stop transport | Нет утечек UI, восстановление state стабильное |
+| 96 kHz | 64 | Экстремальный Destroy + Pitch Lock | Нота читается, CPU поведение предсказуемо |
+| 96 kHz | 256 | Переключение OS Off/2x/4x на лету | Без крэшей/взрывных выбросов уровня |

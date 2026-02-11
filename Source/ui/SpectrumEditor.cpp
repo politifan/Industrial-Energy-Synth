@@ -141,6 +141,9 @@ void SpectrumEditor::setAudioFrame (const float* samples, int numSamples, double
     if (samples == nullptr || numSamples <= 0)
         return;
 
+    if (frozen)
+        return;
+
     sr = (sampleRate > 0.0) ? sampleRate : 44100.0;
 
     const auto n = juce::jmin (numSamples, fftSize);
@@ -178,8 +181,9 @@ void SpectrumEditor::setAudioFrame (const float* samples, int numSamples, double
         }
 
         const auto db = juce::Decibels::gainToDecibels (mag, -120.0f);
-        // Smooth to avoid flicker.
-        magsDb[(size_t) k] = magsDb[(size_t) k] * 0.85f + db * 0.15f;
+        // Averaging amount is user-controlled: 0 = fast, 1 = very smooth.
+        const auto inWeight = juce::jmap (averagingAmount01, 0.0f, 1.0f, 0.40f, 0.03f);
+        magsDb[(size_t) k] = magsDb[(size_t) k] * (1.0f - inWeight) + db * inWeight;
     }
 
     repaint();
@@ -293,6 +297,7 @@ void SpectrumEditor::paint (juce::Graphics& g)
     g.drawRoundedRectangle (bounds, 10.0f, 1.0f);
 
     const auto plot = plotBounds().toFloat();
+    const auto analyzerColour = (inputMode == InputMode::preDestroy) ? juce::Colour (0xffff8a4f) : accent;
 
     // Grid
     g.setColour (juce::Colour (0x0bffffff));
@@ -327,7 +332,7 @@ void SpectrumEditor::paint (juce::Graphics& g)
             }
         }
 
-        g.setColour (accent.withAlpha (0.20f));
+        g.setColour (analyzerColour.withAlpha (0.20f));
         g.strokePath (p, juce::PathStrokeType (2.0f));
 
         // Soft fill under the analyzer curve (Serum-ish energy).
@@ -335,8 +340,23 @@ void SpectrumEditor::paint (juce::Graphics& g)
         fill.lineTo (plot.getRight(), plot.getBottom());
         fill.lineTo (plot.getX(), plot.getBottom());
         fill.closeSubPath();
-        g.setColour (accent.withAlpha (0.06f));
+        g.setColour (analyzerColour.withAlpha (0.06f));
         g.fillPath (fill);
+    }
+
+    // Analyzer mode badge (pre/post + freeze) for quick visual context.
+    {
+        const auto modeText = (inputMode == InputMode::preDestroy) ? "PRE" : "POST";
+        const juce::String text = frozen ? juce::String (modeText) + " | FREEZE" : juce::String (modeText);
+
+        auto badge = plot.toNearestInt().removeFromTop (18).removeFromLeft (122).toFloat();
+        g.setColour (juce::Colour (0x33000000));
+        g.fillRoundedRectangle (badge, 5.0f);
+        g.setColour (analyzerColour.withAlpha (0.85f));
+        g.drawRoundedRectangle (badge, 5.0f, 1.0f);
+        g.setColour (juce::Colours::whitesmoke.withAlpha (0.88f));
+        g.setFont (11.0f);
+        g.drawText (text, badge.toNearestInt(), juce::Justification::centredLeft);
     }
 
     // EQ response curve

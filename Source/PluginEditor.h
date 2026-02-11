@@ -8,6 +8,7 @@
 #include "ui/AdsrPreview.h"
 #include "ui/LevelMeter.h"
 #include "ui/SpectrumEditor.h"
+#include "ui/ShaperEditor.h"
 #include "ui/WavePreview.h"
 #include "ui/ModSourceBadge.h"
 #include "presets/PresetManager.h"
@@ -51,6 +52,8 @@ private:
     void showModulationMenu (params::mod::Dest dst, juce::Point<int> screenPos);
     void clearAllModForDest (params::mod::Dest dst);
     void clearModSlot (int slotIndex);
+    void setUiPage (int newPageIndex);
+    void applyUiPageVisibility();
 
     void timerCallback() override;
     void mouseEnter (const juce::MouseEvent&) override;
@@ -62,6 +65,8 @@ private:
     juce::TextButton initButton;
     juce::TextButton panicButton;
     juce::TextButton helpButton;
+    juce::TextButton pageSynthButton;
+    juce::TextButton pageModButton;
     juce::TextButton presetPrev;
     juce::TextButton presetNext;
     ies::ui::ComboWithLabel preset;
@@ -69,12 +74,22 @@ private:
     juce::TextButton presetLoad;
     ies::ui::ComboWithLabel language;
     std::unique_ptr<APVTS::ComboBoxAttachment> languageAttachment;
+    juce::Label preClipIndicator;
+    juce::Label outClipIndicator;
     ies::ui::LevelMeter outMeter;
     juce::Label statusLabel;
     std::unique_ptr<ies::presets::PresetManager> presetManager;
     juce::Array<juce::File> presetFilesByItem;
     bool presetMenuRebuilding = false;
     std::unique_ptr<juce::FileChooser> presetFileChooser;
+
+    // UI pages: split controls in 2 screens to keep layout readable on smaller windows.
+    enum UiPage
+    {
+        pageSynth = 0,
+        pageMod = 1
+    };
+    UiPage uiPage = pageSynth;
 
     // Mono
     juce::GroupComponent monoGroup;
@@ -158,6 +173,22 @@ private:
     std::unique_ptr<APVTS::SliderAttachment> crushDownsampleAttachment;
     ies::ui::KnobWithLabel crushMix;
     std::unique_ptr<APVTS::SliderAttachment> crushMixAttachment;
+    juce::ToggleButton destroyPitchLockEnable;
+    std::unique_ptr<APVTS::ButtonAttachment> destroyPitchLockEnableAttachment;
+    ies::ui::KnobWithLabel destroyPitchLockAmount;
+    std::unique_ptr<APVTS::SliderAttachment> destroyPitchLockAmountAttachment;
+
+    // Shaper
+    juce::GroupComponent shaperGroup;
+    juce::ToggleButton shaperEnable;
+    std::unique_ptr<APVTS::ButtonAttachment> shaperEnableAttachment;
+    ies::ui::ComboWithLabel shaperPlacement;
+    std::unique_ptr<APVTS::ComboBoxAttachment> shaperPlacementAttachment;
+    ies::ui::KnobWithLabel shaperDrive;
+    std::unique_ptr<APVTS::SliderAttachment> shaperDriveAttachment;
+    ies::ui::KnobWithLabel shaperMix;
+    std::unique_ptr<APVTS::SliderAttachment> shaperMixAttachment;
+    ies::ui::ShaperEditor shaperEditor;
 
     // Filter
     juce::GroupComponent filterGroup;
@@ -200,6 +231,14 @@ private:
     juce::GroupComponent toneGroup;
     juce::ToggleButton toneEnable;
     std::unique_ptr<APVTS::ButtonAttachment> toneEnableAttachment;
+    ies::ui::ComboWithLabel spectrumSource;
+    std::unique_ptr<APVTS::ComboBoxAttachment> spectrumSourceAttachment;
+    ies::ui::ComboWithLabel spectrumAveraging;
+    std::unique_ptr<APVTS::ComboBoxAttachment> spectrumAveragingAttachment;
+    juce::ToggleButton spectrumFreeze;
+    std::unique_ptr<APVTS::ButtonAttachment> spectrumFreezeAttachment;
+    std::array<float, 2048> analyzerFramePre {};
+    std::array<float, 2048> analyzerFramePost {};
     ies::ui::SpectrumEditor spectrumEditor;
 
     // Modulation (V1.2): Macros + 2 LFO + Mod Matrix

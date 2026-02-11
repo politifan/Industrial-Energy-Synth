@@ -18,6 +18,8 @@ enum class Key
     language,
     languageEnglish,
     languageRussian,
+    pageSynth,
+    pageMod,
     init,
 
     mono,
@@ -65,6 +67,16 @@ enum class Key
     crushBits,
     crushDownsample,
     crushMix,
+    destroyPitchLockEnable,
+    destroyPitchLockAmount,
+
+    shaper,
+    shaperEnable,
+    shaperPlacement,
+    shaperPlacementPre,
+    shaperPlacementPost,
+    shaperDrive,
+    shaperMix,
 
     filter,
     filterEnv,
@@ -84,6 +96,14 @@ enum class Key
 
     tone,
     toneEnable,
+    toneAnalyzerSource,
+    toneAnalyzerPre,
+    toneAnalyzerPost,
+    toneAnalyzerFreeze,
+    toneAnalyzerAverage,
+    toneAnalyzerAvgFast,
+    toneAnalyzerAvgMedium,
+    toneAnalyzerAvgSmooth,
 
     modulation,
     macros,
@@ -119,6 +139,12 @@ enum class Key
     modDstModAmount,
     modDstCrushMix,
 
+    clipStatusPre,
+    clipStatusOut,
+    clipStatusSafe,
+    clipStatusHot,
+    clipStatusClip,
+
     output,
     gain
 };
@@ -142,6 +168,8 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::language:     return u8 (u8"Язык");
             case Key::languageEnglish: return u8 (u8"Английский");
             case Key::languageRussian: return u8 (u8"Русский");
+            case Key::pageSynth:    return u8 (u8"Синт");
+            case Key::pageMod:      return u8 (u8"Мод");
             case Key::init:         return u8 (u8"Сброс");
 
             case Key::mono:         return u8 (u8"Моно");
@@ -189,6 +217,16 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::crushBits:    return u8 (u8"Bits (crush)");
             case Key::crushDownsample: return u8 (u8"Downsample");
             case Key::crushMix:     return u8 (u8"Mix (crush)");
+            case Key::destroyPitchLockEnable: return u8 (u8"Pitch Lock");
+            case Key::destroyPitchLockAmount: return u8 (u8"Pitch Lock Amount");
+
+            case Key::shaper:       return u8 (u8"Шейпер");
+            case Key::shaperEnable: return u8 (u8"Вкл");
+            case Key::shaperPlacement: return u8 (u8"Позиция");
+            case Key::shaperPlacementPre: return u8 (u8"До Destroy");
+            case Key::shaperPlacementPost: return u8 (u8"После Destroy");
+            case Key::shaperDrive:  return u8 (u8"Драйв (shaper)");
+            case Key::shaperMix:    return u8 (u8"Mix (shaper)");
 
             case Key::filter:       return u8 (u8"Фильтр");
             case Key::filterEnv:    return u8 (u8"Огиб. фильтра");
@@ -208,6 +246,14 @@ inline juce::String tr (Key key, int languageChoiceIndex)
 
             case Key::tone:         return u8 (u8"Тон EQ");
             case Key::toneEnable:   return u8 (u8"Вкл");
+            case Key::toneAnalyzerSource: return u8 (u8"Анализатор");
+            case Key::toneAnalyzerPre: return u8 (u8"PRE");
+            case Key::toneAnalyzerPost: return u8 (u8"POST");
+            case Key::toneAnalyzerFreeze: return u8 (u8"Freeze");
+            case Key::toneAnalyzerAverage: return u8 (u8"Сглаживание");
+            case Key::toneAnalyzerAvgFast: return u8 (u8"Быстро");
+            case Key::toneAnalyzerAvgMedium: return u8 (u8"Средне");
+            case Key::toneAnalyzerAvgSmooth: return u8 (u8"Плавно");
 
             case Key::modulation:   return u8 (u8"Модуляция");
             case Key::macros:       return u8 (u8"Макросы");
@@ -243,6 +289,12 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::modDstModAmount:     return u8 (u8"Amount (mod)");
             case Key::modDstCrushMix:      return u8 (u8"Mix (crush)");
 
+            case Key::clipStatusPre:  return u8 (u8"PRE");
+            case Key::clipStatusOut:  return u8 (u8"OUT");
+            case Key::clipStatusSafe: return u8 (u8"НОРМА");
+            case Key::clipStatusHot:  return u8 (u8"ГРАНЬ");
+            case Key::clipStatusClip: return u8 (u8"КЛИП");
+
             case Key::output:       return u8 (u8"Выход");
             case Key::gain:         return u8 (u8"Громкость");
         }
@@ -261,6 +313,8 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::language:     return "Language";
             case Key::languageEnglish: return "English";
             case Key::languageRussian: return "Russian";
+            case Key::pageSynth:    return "Synth";
+            case Key::pageMod:      return "Mod";
             case Key::init:         return "Init";
 
             case Key::mono:         return "Mono";
@@ -308,6 +362,16 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::crushBits:    return "Crush Bits";
             case Key::crushDownsample: return "Crush DS";
             case Key::crushMix:     return "Crush Mix";
+            case Key::destroyPitchLockEnable: return "Pitch Lock";
+            case Key::destroyPitchLockAmount: return "Pitch Lock Amount";
+
+            case Key::shaper:       return "Shaper";
+            case Key::shaperEnable: return "Enable";
+            case Key::shaperPlacement: return "Placement";
+            case Key::shaperPlacementPre: return "Pre Destroy";
+            case Key::shaperPlacementPost: return "Post Destroy";
+            case Key::shaperDrive:  return "Shaper Drive";
+            case Key::shaperMix:    return "Shaper Mix";
 
             case Key::filter:       return "Filter";
             case Key::filterEnv:    return "Filter Env";
@@ -327,6 +391,14 @@ inline juce::String tr (Key key, int languageChoiceIndex)
 
             case Key::tone:         return "Tone EQ";
             case Key::toneEnable:   return "Enable";
+            case Key::toneAnalyzerSource: return "Analyzer";
+            case Key::toneAnalyzerPre: return "PRE";
+            case Key::toneAnalyzerPost: return "POST";
+            case Key::toneAnalyzerFreeze: return "Freeze";
+            case Key::toneAnalyzerAverage: return "Averaging";
+            case Key::toneAnalyzerAvgFast: return "Fast";
+            case Key::toneAnalyzerAvgMedium: return "Medium";
+            case Key::toneAnalyzerAvgSmooth: return "Smooth";
 
             case Key::modulation:   return "Modulation";
             case Key::macros:       return "Macros";
@@ -361,6 +433,12 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::modDstClipAmount:    return "Clip Amount";
             case Key::modDstModAmount:     return "Mod Amount";
             case Key::modDstCrushMix:      return "Crush Mix";
+
+            case Key::clipStatusPre:  return "PRE";
+            case Key::clipStatusOut:  return "OUT";
+            case Key::clipStatusSafe: return "SAFE";
+            case Key::clipStatusHot:  return "HOT";
+            case Key::clipStatusClip: return "CLIP";
 
             case Key::output:       return "Output";
             case Key::gain:         return "Gain";

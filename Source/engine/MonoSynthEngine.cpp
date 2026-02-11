@@ -33,6 +33,7 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     destroyOs4.prepare (sampleRateHz * 4.0);
     filter.prepare (sampleRateHz);
     toneEq.prepare (sampleRateHz);
+    shaper.prepare (sampleRateHz);
 
     // Oversampling/scratch buffers are allocated up-front (no audio-thread allocations).
     const auto maxN = juce::jmax (1, maxBlockSize);
@@ -48,6 +49,8 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     destroyModMix.resize ((size_t) maxN);
     destroyModFreqHz.resize ((size_t) maxN);
     destroyCrushMix.resize ((size_t) maxN);
+    shaperDriveDb.resize ((size_t) maxN);
+    shaperMix.resize ((size_t) maxN);
     filterModCutoffSemis.resize ((size_t) maxN);
     filterModResAdd.resize ((size_t) maxN);
 
@@ -87,6 +90,13 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
 
     crushMixSm.reset (sampleRateHz, smoothSeconds);
     crushMixSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->crushMix : nullptr, 1.0f));
+    pitchLockAmountSm.reset (sampleRateHz, smoothSeconds);
+    pitchLockAmountSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->destroyPitchLockAmount : nullptr, 0.0f));
+
+    shaperDriveDbSm.reset (sampleRateHz, smoothSeconds);
+    shaperDriveDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->shaperDriveDb : nullptr, 0.0f));
+    shaperMixSm.reset (sampleRateHz, smoothSeconds);
+    shaperMixSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->shaperMix : nullptr, 1.0f));
 
     filterCutoffHzSm.reset (sampleRateHz, smoothSeconds);
     filterCutoffHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->filterCutoffHz : nullptr, 2000.0f));
@@ -185,6 +195,7 @@ void MonoSynthEngine::reset()
     destroyOversamplingFactorPrev = 1;
     filter.reset();
     toneEq.reset();
+    shaper.reset();
     toneCoeffCountdown = 0;
     toneEnabledPrev = false;
 
@@ -210,6 +221,10 @@ void MonoSynthEngine::reset()
     modFreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->modFreqHz : nullptr, 100.0f));
 
     crushMixSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->crushMix : nullptr, 1.0f));
+    pitchLockAmountSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->destroyPitchLockAmount : nullptr, 0.0f));
+
+    shaperDriveDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->shaperDriveDb : nullptr, 0.0f));
+    shaperMixSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->shaperMix : nullptr, 1.0f));
 
     filterCutoffHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->filterCutoffHz : nullptr, 2000.0f));
     filterResKnobSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->filterResonance : nullptr, 0.25f));
@@ -263,6 +278,19 @@ void MonoSynthEngine::reset()
     // Keep drift running across notes, but reset to a neutral state on transport resets.
     driftState1 = 0.0f;
     driftState2 = 0.0f;
+    pitchLockPhase = 0.0f;
+    pitchLockFollower = 0.0f;
+
+    if (params != nullptr)
+    {
+        for (int i = 0; i < params::shaper::numPoints; ++i)
+        {
+            const auto* raw = params->shaperPoints[(size_t) i];
+            const auto def = juce::jmap ((float) i, 0.0f, (float) (params::shaper::numPoints - 1), -1.0f, 1.0f);
+            shaperPointsCache[(size_t) i] = raw != nullptr ? juce::jlimit (-1.0f, 1.0f, raw->load()) : def;
+        }
+        shaper.setPoints (shaperPointsCache);
+    }
 }
 
 void MonoSynthEngine::setHostBpm (double bpm) noexcept
@@ -422,7 +450,7 @@ void MonoSynthEngine::allNotesOff()
     filterEnv.noteOff();
 }
 
-void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample, int numSamples)
+void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample, int numSamples, float* preDestroyOut)
 {
     if (numSamples <= 0)
         return;
@@ -459,6 +487,10 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
     setTargetIfChanged (modFreqHzSm, params->modFreqHz != nullptr ? params->modFreqHz->load() : 100.0f);
 
     setTargetIfChanged (crushMixSm, params->crushMix != nullptr ? params->crushMix->load() : 1.0f);
+    setTargetIfChanged (pitchLockAmountSm, params->destroyPitchLockAmount != nullptr ? params->destroyPitchLockAmount->load() : 0.0f);
+
+    setTargetIfChanged (shaperDriveDbSm, params->shaperDriveDb != nullptr ? params->shaperDriveDb->load() : 0.0f);
+    setTargetIfChanged (shaperMixSm, params->shaperMix != nullptr ? params->shaperMix->load() : 1.0f);
 
     setTargetIfChanged (filterCutoffHzSm, params->filterCutoffHz != nullptr ? params->filterCutoffHz->load() : 2000.0f);
     setTargetIfChanged (filterResKnobSm,  params->filterResonance != nullptr ? params->filterResonance->load() : 0.25f);
@@ -517,6 +549,13 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
 
     const auto crushBits       = params->crushBits       != nullptr ? (int) std::lround (params->crushBits->load())       : 16;
     const auto crushDownsample = params->crushDownsample != nullptr ? (int) std::lround (params->crushDownsample->load()) : 1;
+    const auto pitchLockEnabled = params->destroyPitchLockEnable != nullptr && (params->destroyPitchLockEnable->load() >= 0.5f);
+
+    const auto shaperEnabled = params->shaperEnable != nullptr && (params->shaperEnable->load() >= 0.5f);
+    const auto shaperPlacement = params->shaperPlacement != nullptr
+        ? (int) std::lround (params->shaperPlacement->load())
+        : (int) params::shaper::preDestroy;
+    const auto shaperPre = (shaperPlacement == (int) params::shaper::preDestroy);
 
     const auto typeIdx  = params->filterType != nullptr ? (int) std::lround (params->filterType->load()) : (int) params::filter::lp;
     const auto keyTrack = params->filterKeyTrack != nullptr && (params->filterKeyTrack->load() >= 0.5f);
@@ -563,6 +602,8 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         || (int) destroyModMix.size() < numSamples
         || (int) destroyModFreqHz.size() < numSamples
         || (int) destroyCrushMix.size() < numSamples
+        || (int) shaperDriveDb.size() < numSamples
+        || (int) shaperMix.size() < numSamples
         || (int) filterModCutoffSemis.size() < numSamples
         || (int) filterModResAdd.size() < numSamples)
     {
@@ -571,6 +612,28 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
     }
 
     auto* sigBuf = destroyBuffer.getWritePointer (0);
+
+    // Pull shaper curve points once per block and update LUT only if something changed.
+    if (params != nullptr)
+    {
+        std::array<float, (size_t) params::shaper::numPoints> points = shaperPointsCache;
+        bool changed = false;
+        for (int i = 0; i < params::shaper::numPoints; ++i)
+        {
+            const auto* raw = params->shaperPoints[(size_t) i];
+            const auto def = juce::jmap ((float) i, 0.0f, (float) (params::shaper::numPoints - 1), -1.0f, 1.0f);
+            const auto v = raw != nullptr ? juce::jlimit (-1.0f, 1.0f, raw->load()) : def;
+            points[(size_t) i] = v;
+            if (std::abs (v - shaperPointsCache[(size_t) i]) > 1.0e-6f)
+                changed = true;
+        }
+
+        if (changed)
+        {
+            shaperPointsCache = points;
+            shaper.setPoints (shaperPointsCache);
+        }
+    }
 
     // --- Modulation setup (per render segment) ---
     const auto macro1 = params->macro1 != nullptr ? juce::jlimit (0.0f, 1.0f, params->macro1->load()) : 0.0f;
@@ -730,6 +793,8 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         }
 
         sigBuf[i] = s1 * lvl1 + s2 * lvl2;
+        if (preDestroyOut != nullptr)
+            preDestroyOut[i] = sigBuf[i];
 
         destroyFoldDriveDb[(size_t) i] = foldDriveDbSm.getNextValue();
         destroyFoldAmount[(size_t) i]  = juce::jlimit (0.0f, 1.0f, foldAmountSm.getNextValue() + modFoldAdd);
@@ -744,9 +809,27 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         destroyModFreqHz[(size_t) i]   = modFreqHzSm.getNextValue();
 
         destroyCrushMix[(size_t) i]    = juce::jlimit (0.0f, 1.0f, crushMixSm.getNextValue() + modCrushAdd);
+        shaperDriveDb[(size_t) i]      = shaperDriveDbSm.getNextValue();
+        shaperMix[(size_t) i]          = shaperMixSm.getNextValue();
     }
 
-    // 2) Destroy chain (fold -> clip -> ringmod/FM), optionally oversampled.
+    // 2) Optional Shaper before Destroy.
+    if (shaperEnabled && shaperPre)
+    {
+        shaper.setEnabled (true);
+        for (int i = 0; i < numSamples; ++i)
+        {
+            shaper.setDriveDb (shaperDriveDb[(size_t) i]);
+            shaper.setMix (shaperMix[(size_t) i]);
+            sigBuf[i] = shaper.processSample (sigBuf[i]);
+        }
+    }
+    else
+    {
+        shaper.setEnabled (false);
+    }
+
+    // 3) Destroy chain (fold -> clip -> ringmod/FM), optionally oversampled.
     if (osFactor == 1)
     {
         for (int i = 0; i < numSamples; ++i)
@@ -785,11 +868,55 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         os.processSamplesDown (baseBlock);
     }
 
-    // 3) Crush always at base sample rate (keeps SRR behaviour stable).
+    // 4) Crush always at base sample rate (keeps SRR behaviour stable).
     for (int i = 0; i < numSamples; ++i)
         sigBuf[i] = destroyBase.processSampleCrush (sigBuf[i], crushBits, crushDownsample, destroyCrushMix[(size_t) i]);
 
-    // 4) Post (filter -> tone -> amp -> out) and write to all channels.
+    // 5) Optional Shaper after Destroy.
+    if (shaperEnabled && ! shaperPre)
+    {
+        shaper.setEnabled (true);
+        for (int i = 0; i < numSamples; ++i)
+        {
+            shaper.setDriveDb (shaperDriveDb[(size_t) i]);
+            shaper.setMix (shaperMix[(size_t) i]);
+            sigBuf[i] = shaper.processSample (sigBuf[i]);
+        }
+    }
+
+    // 6) Minimal pitch lock: inject note-locked fundamental energy after destruction.
+    const auto pitchLockAmountTarget = pitchLockEnabled ? juce::jlimit (0.0f, 1.0f, pitchLockAmountSm.getTargetValue()) : 0.0f;
+    if (pitchLockAmountTarget > 1.0e-5f)
+    {
+        constexpr float followerAttack = 0.14f;
+        constexpr float followerRelease = 0.02f;
+        constexpr float lockGain = 0.42f;
+
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const auto in = sigBuf[i];
+            const auto envIn = std::abs (in);
+            const auto coeff = envIn > pitchLockFollower ? followerAttack : followerRelease;
+            pitchLockFollower += coeff * (envIn - pitchLockFollower);
+
+            const auto noteHz = destroyNoteHz[(size_t) i];
+            const auto phaseInc = juce::jlimit (0.0f, 0.5f, noteHz / (float) sampleRateHz);
+            pitchLockPhase += phaseInc;
+            if (pitchLockPhase >= 1.0f)
+                pitchLockPhase -= 1.0f;
+
+            const auto fundamental = std::sin (juce::MathConstants<float>::twoPi * pitchLockPhase);
+            const auto amount = juce::jlimit (0.0f, 1.0f, pitchLockAmountSm.getNextValue());
+            sigBuf[i] = in + (fundamental * pitchLockFollower * amount * lockGain);
+        }
+    }
+    else
+    {
+        // Keep smoothing in sync even when lock is disabled.
+        pitchLockAmountSm.skip (numSamples);
+    }
+
+    // 7) Post (filter -> tone -> amp -> out) and write to all channels.
     for (int i = 0; i < numSamples; ++i)
     {
         auto sig = sigBuf[i];

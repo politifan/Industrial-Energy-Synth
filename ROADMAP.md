@@ -64,6 +64,12 @@
 - Build UX: добавлены `CMakePresets.json` + PowerShell-скрипты сборки/установки (`scripts/build-win.ps1`, `scripts/install-vst3.ps1`).
 - Авто-тесты (опционально): добавлен минимальный `ctest`-таргет (`IES_BUILD_TESTS=ON`) для проверки NoteStackMono (last-note правила).
 - Dev UX: добавлен `scripts/clean-build.ps1` для безопасной очистки build-папок.
+- UI Layout: добавлено переключение интерфейса на 2 страницы (`Synth` / `Mod`) для работы в меньшем окне без перегруза.
+
+### 0.1.9 (2026-02-11)
+- Tone/Spectrum: добавлены режимы анализатора `PRE/POST` (до Destroy / после полной цепи).
+- Tone/Spectrum: добавлен `Freeze` (заморозка кадра анализатора) для точной настройки.
+- Tone/Spectrum: добавлен `Averaging` (`Fast/Medium/Smooth`) для контроля инерции спектра.
 
 ## Архитектура (целевая на MVP)
 - `AudioProcessorValueTreeState` (APVTS) как единый источник параметров и состояния.
