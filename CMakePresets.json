@@ -1,0 +1,59 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 22,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "win-release",
+      "displayName": "Windows Release (Ninja + cl)",
+      "description": "Requires VS Developer PowerShell / Native Tools prompt so `cl.exe` is in PATH.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-win-release",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "cl",
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "win-debug",
+      "displayName": "Windows Debug (Ninja + cl)",
+      "description": "Requires VS Developer PowerShell / Native Tools prompt so `cl.exe` is in PATH.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-win-debug",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "cl",
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "displayName": "Linux Debug (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-linux",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "win-release",
+      "configurePreset": "win-release",
+      "jobs": 8
+    },
+    {
+      "name": "win-debug",
+      "configurePreset": "win-debug",
+      "jobs": 8
+    },
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug",
+      "jobs": 8
+    }
+  ]
+}
+

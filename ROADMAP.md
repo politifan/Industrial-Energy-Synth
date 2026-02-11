@@ -46,6 +46,25 @@
 - Реальная модуляция в движке (sample-rate): Osc уровни, Filter cutoff/resonance, Destroy Amounts (fold/clip/mod) + crush mix.
 - UI: добавлен блок Modulation (Macros/LFO/Matrix), RU/EN подписи и подсказки.
 
+### 0.1.5 (2026-02-10)
+- Modulation UX: drag-and-drop назначение модуляции (Serum-like) из LFO/Macro на ручки.
+- Визуал: “кольца” модуляции вокруг ручек + подсветка цели при перетаскивании.
+- Контекстное меню на ручке (ПКМ): удалить модуляции для этой ручки / удалить отдельный слот.
+
+### 0.1.6 (2026-02-10)
+- Modulation UX: “кольцо” модуляции теперь можно тянуть мышью (drag) для изменения глубины (Shift = fine), как в Serum.
+- Визуал: дуги модуляции показывают направление (плюс/минус) от базового значения ручки.
+
+### 0.1.7 (2026-02-10)
+- Modulation UX: Alt-клик по кольцу модуляции быстро удаляет модуляции для ручки (без меню).
+- Инженерия: уменьшено дублирование ID-таблиц Mod Matrix в UI-коде (меньше шансов на рассинхрон).
+
+### 0.1.8 (2026-02-10)
+- M9 QA: добавлен чек-лист тестирования под Reaper (`IES_QA.md`).
+- Build UX: добавлены `CMakePresets.json` + PowerShell-скрипты сборки/установки (`scripts/build-win.ps1`, `scripts/install-vst3.ps1`).
+- Авто-тесты (опционально): добавлен минимальный `ctest`-таргет (`IES_BUILD_TESTS=ON`) для проверки NoteStackMono (last-note правила).
+- Dev UX: добавлен `scripts/clean-build.ps1` для безопасной очистки build-папок.
+
 ## Архитектура (целевая на MVP)
 - `AudioProcessorValueTreeState` (APVTS) как единый источник параметров и состояния.
 - Моно-движок без `juce::Synthesiser` (или 1 voice), с явным note-stack и last-note priority.

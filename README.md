@@ -8,6 +8,26 @@
 - CMake 3.22+
 - Git
 
+Важно:
+- Не смешивай build-папки между WSL (`/mnt/c/...`) и Windows (`C:\...`). Для Windows используй отдельные папки типа `build-win-*`.
+- Если CMake “не видит Visual Studio”, запускай команды из `Developer PowerShell for VS` / `x64 Native Tools Command Prompt for VS`.
+
+### Самый простой вариант (CMake Presets + скрипты)
+В `Developer PowerShell for VS`:
+```powershell
+pwsh -File scripts/build-win.ps1 -Config Release
+pwsh -File scripts/install-vst3.ps1 -Config Release -Dest C:\VST3
+```
+
+Список шагов для тестирования в Reaper: `IES_QA.md`.
+
+### Лёгкие авто-тесты (опционально)
+```powershell
+cmake -S . -B build-win-debug -G Ninja -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Debug -DIES_BUILD_TESTS=ON
+cmake --build build-win-debug -j 8
+ctest --test-dir build-win-debug -C Debug --output-on-failure
+```
+
 ### Рекомендуемый вариант (Ninja + cl)
 В `Developer PowerShell for VS`:
 ```powershell

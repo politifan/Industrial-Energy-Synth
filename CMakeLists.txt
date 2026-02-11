@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(IndustrialEnergySynth VERSION 0.1.4 LANGUAGES CXX)
+project(IndustrialEnergySynth VERSION 0.1.8 LANGUAGES CXX)
 
 option(IES_COPY_PLUGIN_AFTER_BUILD "Copy built plugin to the default VST3 folder after build" OFF)
+option(IES_BUILD_TESTS "Build lightweight unit tests (non-plugin)" OFF)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -64,6 +65,7 @@ target_sources(IndustrialEnergySynth PRIVATE
   Source/ui/LevelMeter.h
   Source/ui/ParamComponents.cpp
   Source/ui/ParamComponents.h
+  Source/ui/ModSourceBadge.h
   Source/ui/SpectrumEditor.cpp
   Source/ui/SpectrumEditor.h
   Source/ui/WavePreview.cpp
@@ -89,3 +91,12 @@ target_link_libraries(IndustrialEnergySynth PRIVATE
 )
 
 juce_generate_juce_header(IndustrialEnergySynth)
+
+if (IES_BUILD_TESTS)
+  enable_testing()
+  add_executable(ies_tests
+    tests/NoteStackMonoTests.cpp
+  )
+  target_compile_features(ies_tests PRIVATE cxx_std_17)
+  add_test(NAME ies_tests COMMAND ies_tests)
+endif()

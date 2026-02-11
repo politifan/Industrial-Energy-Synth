@@ -9,13 +9,16 @@
 #include "ui/LevelMeter.h"
 #include "ui/SpectrumEditor.h"
 #include "ui/WavePreview.h"
+#include "ui/ModSourceBadge.h"
 #include "presets/PresetManager.h"
 
 #include <array>
 
 class IndustrialEnergySynthAudioProcessor;
 
-class IndustrialEnergySynthAudioProcessorEditor final : public juce::AudioProcessorEditor, private juce::Timer
+class IndustrialEnergySynthAudioProcessorEditor final : public juce::AudioProcessorEditor,
+                                                        public juce::DragAndDropContainer,
+                                                        private juce::Timer
 {
 public:
     explicit IndustrialEnergySynthAudioProcessorEditor (IndustrialEnergySynthAudioProcessor&);
@@ -43,6 +46,11 @@ private:
     void applyFactoryPreset (int factoryIndex);
     void setParamValue (const char* paramId, float actualValue);
     bool isRussian() const { return getLanguageIndex() == (int) params::ui::ru; }
+
+    void assignModulation (params::mod::Source src, params::mod::Dest dst);
+    void showModulationMenu (params::mod::Dest dst, juce::Point<int> screenPos);
+    void clearAllModForDest (params::mod::Dest dst);
+    void clearModSlot (int slotIndex);
 
     void timerCallback() override;
     void mouseEnter (const juce::MouseEvent&) override;
@@ -197,12 +205,15 @@ private:
     // Modulation (V1.2): Macros + 2 LFO + Mod Matrix
     juce::GroupComponent modGroup;
     juce::GroupComponent macrosPanel;
+    ies::ui::ModSourceBadge macro1Drag;
     ies::ui::KnobWithLabel macro1;
     std::unique_ptr<APVTS::SliderAttachment> macro1Attachment;
+    ies::ui::ModSourceBadge macro2Drag;
     ies::ui::KnobWithLabel macro2;
     std::unique_ptr<APVTS::SliderAttachment> macro2Attachment;
 
     juce::GroupComponent lfo1Panel;
+    ies::ui::ModSourceBadge lfo1Drag;
     ies::ui::ComboWithLabel lfo1Wave;
     std::unique_ptr<APVTS::ComboBoxAttachment> lfo1WaveAttachment;
     juce::ToggleButton lfo1Sync;
@@ -215,6 +226,7 @@ private:
     std::unique_ptr<APVTS::SliderAttachment> lfo1PhaseAttachment;
 
     juce::GroupComponent lfo2Panel;
+    ies::ui::ModSourceBadge lfo2Drag;
     ies::ui::ComboWithLabel lfo2Wave;
     std::unique_ptr<APVTS::ComboBoxAttachment> lfo2WaveAttachment;
     juce::ToggleButton lfo2Sync;
@@ -239,6 +251,13 @@ private:
     std::array<std::unique_ptr<APVTS::ComboBoxAttachment>, (size_t) params::mod::numSlots> modSlotSrcAttachment;
     std::array<std::unique_ptr<APVTS::ComboBoxAttachment>, (size_t) params::mod::numSlots> modSlotDstAttachment;
     std::array<std::unique_ptr<APVTS::SliderAttachment>, (size_t) params::mod::numSlots> modSlotDepthAttachment;
+
+    // Drag-ring depth editing: we keep track of the most recently assigned slot per destination.
+    std::array<int, 9> modLastSlotByDest { { -1, -1, -1, -1, -1, -1, -1, -1, -1 } };
+    int modDepthDragSlot = -1;
+    params::mod::Dest modDepthDragDest = params::mod::dstOff;
+    float modDepthDragStart = 0.0f;
+    juce::RangedAudioParameter* modDepthDragParam = nullptr;
 
     // Output
     juce::GroupComponent outGroup;

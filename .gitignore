@@ -69,6 +69,11 @@ Presets/User/
 .vscode/
 
 ####################################
+# Scripts
+####################################
+# (keep scripts tracked; no ignore rules here)
+
+####################################
 # CMake
 ####################################
 CMakeCache.txt

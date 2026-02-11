@@ -1,5 +1,7 @@
 #include "IndustrialLookAndFeel.h"
 
+#include "../Params.h"
+
 namespace ies::ui
 {
 static juce::Colour colourFromProperty (const juce::Component& c, const juce::Identifier& key, juce::Colour fallback)
@@ -141,6 +143,34 @@ void IndustrialLookAndFeel::drawRotarySlider (juce::Graphics& g,
     if (! enabled)
         accentCol = accentCol.withAlpha (0.25f);
 
+    // Drag-over highlight (modulation assignment).
+    {
+        const auto dragOverVar = slider.getProperties().getWithDefault ("modDragOver", 0);
+        const bool dragOver = dragOverVar.isInt() ? ((int) dragOverVar != 0) : false;
+
+        if (dragOver && enabled)
+        {
+            const auto srcVar = slider.getProperties().getWithDefault ("modDragSrc", (int) params::mod::srcOff);
+            const int src = srcVar.isInt() ? (int) srcVar : (int) params::mod::srcOff;
+
+            auto c = accentCol;
+            switch ((params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, src))
+            {
+                case params::mod::srcOff:    break;
+                case params::mod::srcLfo1:   c = juce::Colour (0xff00c7ff); break;
+                case params::mod::srcLfo2:   c = juce::Colour (0xff7d5fff); break;
+                case params::mod::srcMacro1: c = juce::Colour (0xffffb000); break;
+                case params::mod::srcMacro2: c = juce::Colour (0xfff06bff); break;
+            }
+
+            auto halo = knob.expanded (5.0f);
+            g.setColour (c.withAlpha (0.12f));
+            g.drawEllipse (halo, 8.0f);
+            g.setColour (c.withAlpha (0.20f));
+            g.drawEllipse (halo, 3.0f);
+        }
+    }
+
     // Body
     {
         const auto top = panel.brighter (0.10f);
@@ -177,6 +207,54 @@ void IndustrialLookAndFeel::drawRotarySlider (juce::Graphics& g,
 
         g.setColour (accentCol.withAlpha (enabled ? 0.95f : 0.25f));
         g.strokePath (value, juce::PathStrokeType (2.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    // Modulation rings (outer arcs, one per source) - Serum-like visual feedback.
+    {
+        const auto countVar = slider.getProperties().getWithDefault ("modArcCount", 0);
+        const int count = countVar.isInt() ? juce::jlimit (0, 8, (int) countVar) : 0;
+        if (count > 0)
+        {
+            const auto range = (rotaryEndAngle - rotaryStartAngle);
+            float arcR = knobR + 4.5f;
+
+            for (int i = 0; i < count; ++i)
+            {
+                const auto depthKey = juce::Identifier ("modArc" + juce::String (i) + "Depth");
+                const auto colourKey = juce::Identifier ("modArc" + juce::String (i) + "Colour");
+
+                const auto depth = floatFromProperty (slider, depthKey, 0.0f);
+                auto col = colourFromProperty (slider, colourKey, accentCol);
+                if (! enabled)
+                    col = col.withAlpha (0.25f);
+
+                const auto mag = juce::jlimit (0.0f, 1.0f, std::abs (depth));
+                if (mag < 1.0e-6f)
+                    continue;
+
+                const auto span = mag * range;
+                // Serum-like: show direction from the base value (positive = clockwise).
+                auto a0 = (depth >= 0.0f) ? angle : (angle - span);
+                auto a1 = (depth >= 0.0f) ? (angle + span) : angle;
+                a0 = juce::jlimit (rotaryStartAngle, rotaryEndAngle, a0);
+                a1 = juce::jlimit (rotaryStartAngle, rotaryEndAngle, a1);
+
+                juce::Path arc;
+                arc.addCentredArc (centre.x, centre.y, arcR, arcR, 0.0f, a0, a1, true);
+
+                const auto alpha = enabled ? (depth < 0.0f ? 0.45f : 0.75f) : 0.25f;
+                if (hot && enabled)
+                {
+                    g.setColour (col.withAlpha (0.12f));
+                    g.strokePath (arc, juce::PathStrokeType (6.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                }
+
+                g.setColour (col.withAlpha (alpha));
+                g.strokePath (arc, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+                arcR += 4.0f;
+            }
+        }
     }
 
     // Pointer

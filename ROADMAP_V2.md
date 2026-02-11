@@ -11,7 +11,7 @@
 ## Текущий статус (реализовано в коде)
 - (2026-02-10) Tone/Spectrum: Serum‑like EQ до 8 peak‑узлов, добавление `double-click` по пустому месту, удаление `ПКМ` по узлу.
 - (2026-02-10) Destroy OS: oversampling Off/2x/4x для Fold/Clip/Mod (снижение алиасинга, цена = CPU).
-- (2026-02-10) Modulation v1: 2x LFO (free/sync) + 2x Macros + 8-slot Mod Matrix (без drag‑and‑drop пока).
+- (2026-02-10) Modulation v1: 2x LFO (free/sync) + 2x Macros + 8-slot Mod Matrix + drag‑and‑drop назначение на ручки.
 
 ## V2 Milestones (после v1.0)
 

@@ -11,6 +11,22 @@ struct FactoryPreset final
     std::initializer_list<std::pair<const char*, float>> values; // actual values in parameter units
 };
 
+static constexpr const char* kModSlotSrcIds[params::mod::numSlots] =
+{
+    params::mod::slot1Src, params::mod::slot2Src, params::mod::slot3Src, params::mod::slot4Src,
+    params::mod::slot5Src, params::mod::slot6Src, params::mod::slot7Src, params::mod::slot8Src
+};
+static constexpr const char* kModSlotDstIds[params::mod::numSlots] =
+{
+    params::mod::slot1Dst, params::mod::slot2Dst, params::mod::slot3Dst, params::mod::slot4Dst,
+    params::mod::slot5Dst, params::mod::slot6Dst, params::mod::slot7Dst, params::mod::slot8Dst
+};
+static constexpr const char* kModSlotDepthIds[params::mod::numSlots] =
+{
+    params::mod::slot1Depth, params::mod::slot2Depth, params::mod::slot3Depth, params::mod::slot4Depth,
+    params::mod::slot5Depth, params::mod::slot6Depth, params::mod::slot7Depth, params::mod::slot8Depth
+};
+
 // Keep this list stable once you ship factory content (names can change, ordering/IDs should not).
 static const FactoryPreset kFactoryPresets[] =
 {
@@ -1139,6 +1155,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                       u8"• Double-click по ручке: сброс к дефолту.\n"
                                       u8"• Init/Сброс: сброс всех параметров (язык сохраняется).\n"
                                       u8"• Mod Matrix: выбери Source и Destination, Depth задаёт глубину (может быть отрицательной).\n"
+                                      u8"• Drag: перетащи M1/M2/LFO1/LFO2 на ручку чтобы назначить модуляцию.\n"
+                                      u8"• Mod Ring: тяни кольцо вокруг ручки чтобы менять Depth (Shift = точно). Alt-клик по кольцу: удалить модуляции для ручки.\n"
                                       u8"• LFO Sync: если ВКЛ, используется Div, а Rate (Гц) отключается.\n"
                                       u8"• Note Sync: Mod Freq отключается.\n"
                                       u8"• Тон EQ: маркеры на спектре (Shift: Q, double-click: сброс). Double-click пусто: добавить пик. ПКМ по пику: удалить.\n"
@@ -1149,6 +1167,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                             "• Double-click knob: reset to default.\n"
                             "• Init: resets all params (keeps language).\n"
                             "• Mod Matrix: pick Source and Destination, Depth sets amount (can be negative).\n"
+                            "• Drag: drop M1/M2/LFO1/LFO2 on a knob to assign modulation.\n"
+                            "• Mod Ring: drag the outer ring to adjust Depth (Shift = fine). Alt-click ring: clear modulation for this knob.\n"
                             "• LFO Sync: when ON, Div is used and Rate (Hz) is disabled.\n"
                             "• Note Sync: disables Mod Freq.\n"
                             "• Tone EQ: drag handles in the spectrum (Shift: Q, double-click: reset). Double-click empty: add peak. Right-click peak: remove.\n"
@@ -1403,11 +1423,22 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     macrosPanel.setText ("Macros");
     addAndMakeVisible (macrosPanel);
 
+    // Drag badges (Serum-like: drag to a knob to assign mod).
+    macro1Drag.setSource (params::mod::srcMacro1);
+    macro1Drag.setText ("M1");
+    macro1Drag.setAccent (juce::Colour (0xffffb000));
+    addAndMakeVisible (macro1Drag);
+
     addAndMakeVisible (macro1);
     macro1Attachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::macros::m1, macro1.getSlider());
     macro1.getSlider().textFromValueFunction = osc1Level.getSlider().textFromValueFunction;
     macro1.getSlider().valueFromTextFunction = osc1Level.getSlider().valueFromTextFunction;
     setupSliderDoubleClickDefault (macro1.getSlider(), params::macros::m1);
+
+    macro2Drag.setSource (params::mod::srcMacro2);
+    macro2Drag.setText ("M2");
+    macro2Drag.setAccent (juce::Colour (0xfff06bff));
+    addAndMakeVisible (macro2Drag);
 
     addAndMakeVisible (macro2);
     macro2Attachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::macros::m2, macro2.getSlider());
@@ -1417,6 +1448,11 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     lfo1Panel.setText ("LFO 1");
     addAndMakeVisible (lfo1Panel);
+
+    lfo1Drag.setSource (params::mod::srcLfo1);
+    lfo1Drag.setText ("LFO1");
+    lfo1Drag.setAccent (juce::Colour (0xff00c7ff));
+    addAndMakeVisible (lfo1Drag);
 
     addAndMakeVisible (lfo1Wave);
     lfo1Wave.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
@@ -1463,6 +1499,11 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     lfo2Panel.setText ("LFO 2");
     addAndMakeVisible (lfo2Panel);
+
+    lfo2Drag.setSource (params::mod::srcLfo2);
+    lfo2Drag.setText ("LFO2");
+    lfo2Drag.setAccent (juce::Colour (0xff7d5fff));
+    addAndMakeVisible (lfo2Drag);
 
     addAndMakeVisible (lfo2Wave);
     lfo2Wave.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
@@ -1521,22 +1562,6 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setupHeader (modHeaderDst);
     setupHeader (modHeaderDepth);
 
-    static constexpr const char* slotSrcIds[params::mod::numSlots] =
-    {
-        params::mod::slot1Src, params::mod::slot2Src, params::mod::slot3Src, params::mod::slot4Src,
-        params::mod::slot5Src, params::mod::slot6Src, params::mod::slot7Src, params::mod::slot8Src
-    };
-    static constexpr const char* slotDstIds[params::mod::numSlots] =
-    {
-        params::mod::slot1Dst, params::mod::slot2Dst, params::mod::slot3Dst, params::mod::slot4Dst,
-        params::mod::slot5Dst, params::mod::slot6Dst, params::mod::slot7Dst, params::mod::slot8Dst
-    };
-    static constexpr const char* slotDepthIds[params::mod::numSlots] =
-    {
-        params::mod::slot1Depth, params::mod::slot2Depth, params::mod::slot3Depth, params::mod::slot4Depth,
-        params::mod::slot5Depth, params::mod::slot6Depth, params::mod::slot7Depth, params::mod::slot8Depth
-    };
-
     auto setupDepthSlider = [&] (juce::Slider& s)
     {
         s.setSliderStyle (juce::Slider::LinearHorizontal);
@@ -1569,7 +1594,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         src.addItem ("Macro 1", 4);
         src.addItem ("Macro 2", 5);
         addAndMakeVisible (src);
-        modSlotSrcAttachment[(size_t) i] = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), slotSrcIds[i], src);
+        modSlotSrcAttachment[(size_t) i] = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), kModSlotSrcIds[i], src);
 
         auto& dst = modSlotDst[(size_t) i];
         dst.addItem ("Off", 1);
@@ -1582,14 +1607,114 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         dst.addItem ("Mod Amount", 8);
         dst.addItem ("Crush Mix", 9);
         addAndMakeVisible (dst);
-        modSlotDstAttachment[(size_t) i] = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), slotDstIds[i], dst);
+        modSlotDstAttachment[(size_t) i] = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), kModSlotDstIds[i], dst);
 
         auto& dep = modSlotDepth[(size_t) i];
         setupDepthSlider (dep);
         addAndMakeVisible (dep);
-        modSlotDepthAttachment[(size_t) i] = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), slotDepthIds[i], dep);
-        setupSliderDoubleClickDefault (dep, slotDepthIds[i]);
+        modSlotDepthAttachment[(size_t) i] = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), kModSlotDepthIds[i], dep);
+        setupSliderDoubleClickDefault (dep, kModSlotDepthIds[i]);
     }
+
+    // Enable drag-and-drop targets + context menu on the key knobs.
+    auto bindTarget = [&] (ies::ui::KnobWithLabel& knob, params::mod::Dest dst)
+    {
+        knob.getModSlider().setModTarget (dst);
+        knob.getModSlider().setOnModDrop ([this] (params::mod::Source src, params::mod::Dest d)
+                                          { assignModulation (src, d); });
+        knob.getModSlider().setOnModMenu ([this] (params::mod::Dest d, juce::Point<int> pos)
+                                          { showModulationMenu (d, pos); });
+        knob.getModSlider().setOnModClear ([this] (params::mod::Dest d)
+                                           { clearAllModForDest (d); });
+        knob.getModSlider().setOnModDepthGesture ([this] (params::mod::Dest d, bool begin, bool end, float delta, bool /*fine*/)
+                                                  {
+                                                      auto findSlotForDest = [&] (params::mod::Dest wantDst) -> int
+                                                      {
+                                                          const int di = (int) wantDst;
+                                                          if (di >= 0 && di < (int) modLastSlotByDest.size())
+                                                          {
+                                                              const int s = modLastSlotByDest[(size_t) di];
+                                                              if (s >= 0 && s < params::mod::numSlots)
+                                                              {
+                                                                  const auto dNow = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff,
+                                                                                                                     (int) params::mod::dstCrushMix,
+                                                                                                                     modSlotDst[(size_t) s].getSelectedItemIndex());
+                                                                  const auto srcNow = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff,
+                                                                                                                          (int) params::mod::srcMacro2,
+                                                                                                                          modSlotSrc[(size_t) s].getSelectedItemIndex());
+                                                                  if (dNow == wantDst && srcNow != params::mod::srcOff)
+                                                                      return s;
+                                                              }
+                                                          }
+
+                                                          // Pick the last matching slot (highest index) to match user expectations.
+                                                          for (int i = params::mod::numSlots - 1; i >= 0; --i)
+                                                          {
+                                                              const auto dNow = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff,
+                                                                                                                 (int) params::mod::dstCrushMix,
+                                                                                                                 modSlotDst[(size_t) i].getSelectedItemIndex());
+                                                              const auto srcNow = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff,
+                                                                                                                      (int) params::mod::srcMacro2,
+                                                                                                                      modSlotSrc[(size_t) i].getSelectedItemIndex());
+                                                              if (dNow == wantDst && srcNow != params::mod::srcOff)
+                                                                  return i;
+                                                          }
+
+                                                          return -1;
+                                                      };
+
+                                                      if (begin)
+                                                      {
+                                                          modDepthDragDest = d;
+                                                          modDepthDragSlot = findSlotForDest (d);
+                                                          modDepthDragParam = nullptr;
+                                                          modDepthDragStart = 0.0f;
+
+                                                          if (modDepthDragSlot < 0)
+                                                              return;
+
+                                                          if (const auto di = (int) d; di >= 0 && di < (int) modLastSlotByDest.size())
+                                                              modLastSlotByDest[(size_t) di] = modDepthDragSlot;
+
+                                                          modDepthDragStart = (float) modSlotDepth[(size_t) modDepthDragSlot].getValue();
+
+                                                          auto* paramBase = audioProcessor.getAPVTS().getParameter (kModSlotDepthIds[modDepthDragSlot]);
+                                                          modDepthDragParam = dynamic_cast<juce::RangedAudioParameter*> (paramBase);
+                                                          if (modDepthDragParam != nullptr)
+                                                              modDepthDragParam->beginChangeGesture();
+
+                                                          return;
+                                                      }
+
+                                                      if (end)
+                                                      {
+                                                          if (modDepthDragParam != nullptr)
+                                                              modDepthDragParam->endChangeGesture();
+
+                                                          modDepthDragSlot = -1;
+                                                          modDepthDragDest = params::mod::dstOff;
+                                                          modDepthDragStart = 0.0f;
+                                                          modDepthDragParam = nullptr;
+                                                          return;
+                                                      }
+
+                                                      if (modDepthDragSlot < 0 || modDepthDragParam == nullptr)
+                                                          return;
+
+                                                      const auto next = juce::jlimit (-1.0f, 1.0f, modDepthDragStart + delta);
+                                                      const auto norm = modDepthDragParam->convertTo0to1 (next);
+                                                      modDepthDragParam->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, norm));
+                                                  });
+    };
+
+    bindTarget (osc1Level, params::mod::dstOsc1Level);
+    bindTarget (osc2Level, params::mod::dstOsc2Level);
+    bindTarget (filterCutoff, params::mod::dstFilterCutoff);
+    bindTarget (filterReso, params::mod::dstFilterResonance);
+    bindTarget (foldAmount, params::mod::dstFoldAmount);
+    bindTarget (clipAmount, params::mod::dstClipAmount);
+    bindTarget (modAmount, params::mod::dstModAmount);
+    bindTarget (crushMix, params::mod::dstCrushMix);
 
     // --- Filter ---
     filterGroup.setText ("Filter");
@@ -2230,9 +2355,19 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
         auto inside = [&] (juce::GroupComponent& panel) { return panel.getBounds().reduced (10, 26); };
 
-        layoutKnobGrid (inside (macrosPanel), { &macro1, &macro2 });
+        {
+            auto m = inside (macrosPanel);
+            auto badgeRow = m.removeFromTop (24);
+            const int badgeW = 54;
+            macro1Drag.setBounds (badgeRow.removeFromLeft (badgeW).withSizeKeepingCentre (badgeW, 22));
+            badgeRow.removeFromLeft (6);
+            macro2Drag.setBounds (badgeRow.removeFromLeft (badgeW).withSizeKeepingCentre (badgeW, 22));
+            m.removeFromTop (6);
+            layoutKnobGrid (m, { &macro1, &macro2 });
+        }
 
         auto layoutLfo = [&] (juce::GroupComponent& panel,
+                              ies::ui::ModSourceBadge& drag,
                               ies::ui::ComboWithLabel& wave,
                               juce::ToggleButton& sync,
                               ies::ui::KnobWithLabel& rate,
@@ -2240,15 +2375,19 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
                               ies::ui::KnobWithLabel& phase)
         {
             auto m = inside (panel);
-            wave.setBounds (m.removeFromTop (46));
+            auto waveRow = m.removeFromTop (46);
+            const int badgeW = juce::jmin (62, juce::jmax (44, waveRow.getWidth() / 4));
+            auto badge = waveRow.removeFromRight (badgeW).reduced (0, 10);
+            drag.setBounds (badge.withSizeKeepingCentre (badgeW, 22));
+            wave.setBounds (waveRow);
             m.removeFromTop (4);
             sync.setBounds (m.removeFromTop (24));
             m.removeFromTop (6);
             layoutKnobGrid (m, { &rate, &div, &phase });
         };
 
-        layoutLfo (lfo1Panel, lfo1Wave, lfo1Sync, lfo1Rate, lfo1Div, lfo1Phase);
-        layoutLfo (lfo2Panel, lfo2Wave, lfo2Sync, lfo2Rate, lfo2Div, lfo2Phase);
+        layoutLfo (lfo1Panel, lfo1Drag, lfo1Wave, lfo1Sync, lfo1Rate, lfo1Div, lfo1Phase);
+        layoutLfo (lfo2Panel, lfo2Drag, lfo2Wave, lfo2Sync, lfo2Rate, lfo2Div, lfo2Phase);
 
         // Mod matrix table
         {
@@ -2549,6 +2688,21 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
     }
 
     {
+        const auto tipM1 = T ("Drag Macro 1 to a knob to assign modulation.",
+                              u8"Перетащи Макро 1 на ручку, чтобы назначить модуляцию.");
+        const auto tipM2 = T ("Drag Macro 2 to a knob to assign modulation.",
+                              u8"Перетащи Макро 2 на ручку, чтобы назначить модуляцию.");
+        const auto tipL1 = T ("Drag LFO 1 to a knob to assign modulation.",
+                              u8"Перетащи LFO 1 на ручку, чтобы назначить модуляцию.");
+        const auto tipL2 = T ("Drag LFO 2 to a knob to assign modulation.",
+                              u8"Перетащи LFO 2 на ручку, чтобы назначить модуляцию.");
+        macro1Drag.setTooltipText (tipM1);
+        macro2Drag.setTooltipText (tipM2);
+        lfo1Drag.setTooltipText (tipL1);
+        lfo2Drag.setTooltipText (tipL2);
+    }
+
+    {
         const auto tipSync = T ("Tempo-sync LFO to host BPM. When ON, Div is used and Rate (Hz) is disabled.",
                                 u8"Синхронизация LFO с темпом хоста (BPM). Если ВКЛ, используется Div, а Rate (Гц) отключается.");
         lfo1Sync.setTooltip (tipSync);
@@ -2762,6 +2916,94 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
         setActivity (lfo1Panel, l1Act);
         setActivity (lfo2Panel, l2Act);
     }
+
+    // Modulation rings around destination knobs (Serum-like "wow": you see what's modded).
+    {
+        auto setIfChanged = [] (juce::Component& c, const juce::Identifier& k, juce::var v) -> bool
+        {
+            auto& p = c.getProperties();
+            const auto prev = p.getWithDefault (k, {});
+            if (prev == v)
+                return false;
+            p.set (k, v);
+            return true;
+        };
+
+        const juce::Colour colLfo1  (0xff00c7ff);
+        const juce::Colour colLfo2  (0xff7d5fff);
+        const juce::Colour colMacro1(0xffffb000);
+        const juce::Colour colMacro2(0xfff06bff);
+
+        auto updateFor = [&] (ies::ui::KnobWithLabel& knob)
+        {
+            auto& s = knob.getModSlider();
+            const auto dst = s.getModTarget();
+            if (dst == params::mod::dstOff)
+                return;
+
+            float sumLfo1 = 0.0f;
+            float sumLfo2 = 0.0f;
+            float sumM1 = 0.0f;
+            float sumM2 = 0.0f;
+
+            for (int i = 0; i < params::mod::numSlots; ++i)
+            {
+                const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstCrushMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+                if (d != dst)
+                    continue;
+
+                const auto src = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, modSlotSrc[(size_t) i].getSelectedItemIndex());
+                const auto dep = (float) modSlotDepth[(size_t) i].getValue();
+
+                switch (src)
+                {
+                    case params::mod::srcOff:    break;
+                    case params::mod::srcLfo1:   sumLfo1 += dep; break;
+                    case params::mod::srcLfo2:   sumLfo2 += dep; break;
+                    case params::mod::srcMacro1: sumM1   += dep; break;
+                    case params::mod::srcMacro2: sumM2   += dep; break;
+                    default: break;
+                }
+            }
+
+            struct Arc final { float depth; juce::Colour col; };
+            std::array<Arc, 4> arcs {};
+            int count = 0;
+
+            auto addArc = [&] (float d, juce::Colour c)
+            {
+                if (std::abs (d) < 1.0e-6f || count >= (int) arcs.size())
+                    return;
+                arcs[(size_t) count++] = { d, c };
+            };
+
+            addArc (sumLfo1, colLfo1);
+            addArc (sumLfo2, colLfo2);
+            addArc (sumM1, colMacro1);
+            addArc (sumM2, colMacro2);
+
+            bool changed = false;
+            changed |= setIfChanged (s, "modArcCount", count);
+
+            for (int i = 0; i < (int) arcs.size(); ++i)
+            {
+                const auto depthKey = juce::Identifier ("modArc" + juce::String (i) + "Depth");
+                const auto colourKey = juce::Identifier ("modArc" + juce::String (i) + "Colour");
+
+                const float d = (i < count) ? arcs[(size_t) i].depth : 0.0f;
+                const int c = (i < count) ? (int) arcs[(size_t) i].col.getARGB() : 0;
+
+                changed |= setIfChanged (s, depthKey, d);
+                changed |= setIfChanged (s, colourKey, c);
+            }
+
+            if (changed)
+                s.repaint();
+        };
+
+        for (auto* k : { &osc1Level, &osc2Level, &filterCutoff, &filterReso, &foldAmount, &clipAmount, &modAmount, &crushMix })
+            updateFor (*k);
+    }
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::resetAllParamsKeepLanguage()
@@ -2889,6 +3131,181 @@ void IndustrialEnergySynthAudioProcessorEditor::setParamValue (const char* param
     rp->endChangeGesture();
 }
 
+void IndustrialEnergySynthAudioProcessorEditor::clearModSlot (int slotIndex)
+{
+    if (slotIndex < 0 || slotIndex >= params::mod::numSlots)
+        return;
+
+    setParamValue (kModSlotDepthIds[slotIndex], 0.0f);
+    setParamValue (kModSlotSrcIds[slotIndex], (float) params::mod::srcOff);
+    setParamValue (kModSlotDstIds[slotIndex], (float) params::mod::dstOff);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::clearAllModForDest (params::mod::Dest dst)
+{
+    if (dst == params::mod::dstOff)
+        return;
+
+    for (int i = 0; i < params::mod::numSlots; ++i)
+    {
+        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstCrushMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, modSlotSrc[(size_t) i].getSelectedItemIndex());
+        if (d == dst && s != params::mod::srcOff)
+            clearModSlot (i);
+    }
+
+    if (hovered == nullptr)
+    {
+        const auto isRu = isRussian();
+        statusLabel.setText (isRu ? juce::String::fromUTF8 (u8"Модуляция удалена для ручки.")
+                                  : "Modulation cleared for this knob.",
+                             juce::dontSendNotification);
+    }
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::assignModulation (params::mod::Source src, params::mod::Dest dst)
+{
+    if (src == params::mod::srcOff || dst == params::mod::dstOff)
+        return;
+
+    int existing = -1;
+    int freeSlot = -1;
+
+    for (int i = 0; i < params::mod::numSlots; ++i)
+    {
+        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, modSlotSrc[(size_t) i].getSelectedItemIndex());
+        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstCrushMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+
+        if (s == src && d == dst)
+            existing = i;
+
+        if (freeSlot < 0 && (s == params::mod::srcOff || d == params::mod::dstOff))
+            freeSlot = i;
+    }
+
+    const int slot = (existing >= 0) ? existing : ((freeSlot >= 0) ? freeSlot : (params::mod::numSlots - 1));
+
+    setParamValue (kModSlotSrcIds[slot], (float) src);
+    setParamValue (kModSlotDstIds[slot], (float) dst);
+
+    if (existing < 0)
+    {
+        const bool isMacro = (src == params::mod::srcMacro1 || src == params::mod::srcMacro2);
+        const float defDepth = isMacro ? 1.0f : 0.25f;
+        setParamValue (kModSlotDepthIds[slot], defDepth);
+    }
+
+    // Remember the most recent slot used for this destination (ring drag editing picks this first).
+    if (const int di = (int) dst; di >= 0 && di < (int) modLastSlotByDest.size())
+        modLastSlotByDest[(size_t) di] = slot;
+
+    // Friendly feedback in the status line (when not hovering something else).
+    if (hovered == nullptr)
+    {
+        const auto isRu = (getLanguageIndex() == (int) params::ui::ru);
+
+        auto srcName = [&]() -> juce::String
+        {
+            switch (src)
+            {
+                case params::mod::srcOff:    break;
+                case params::mod::srcLfo1:   return isRu ? juce::String::fromUTF8 (u8"LFO 1") : "LFO 1";
+                case params::mod::srcLfo2:   return isRu ? juce::String::fromUTF8 (u8"LFO 2") : "LFO 2";
+                case params::mod::srcMacro1: return isRu ? juce::String::fromUTF8 (u8"Макро 1") : "Macro 1";
+                case params::mod::srcMacro2: return isRu ? juce::String::fromUTF8 (u8"Макро 2") : "Macro 2";
+                default: break;
+            }
+            return "Off";
+        }();
+
+        auto dstName = [&]() -> juce::String
+        {
+            switch (dst)
+            {
+                case params::mod::dstOff:              break;
+                case params::mod::dstOsc1Level:        return isRu ? juce::String::fromUTF8 (u8"Осц1 уровень") : "Osc1 Level";
+                case params::mod::dstOsc2Level:        return isRu ? juce::String::fromUTF8 (u8"Осц2 уровень") : "Osc2 Level";
+                case params::mod::dstFilterCutoff:     return isRu ? juce::String::fromUTF8 (u8"Фильтр срез") : "Filter Cutoff";
+                case params::mod::dstFilterResonance:  return isRu ? juce::String::fromUTF8 (u8"Фильтр резонанс") : "Filter Reso";
+                case params::mod::dstFoldAmount:       return isRu ? juce::String::fromUTF8 (u8"Amount (fold)") : "Fold Amount";
+                case params::mod::dstClipAmount:       return isRu ? juce::String::fromUTF8 (u8"Amount (clip)") : "Clip Amount";
+                case params::mod::dstModAmount:        return isRu ? juce::String::fromUTF8 (u8"Amount (mod)") : "Mod Amount";
+                case params::mod::dstCrushMix:         return isRu ? juce::String::fromUTF8 (u8"Mix (crush)") : "Crush Mix";
+                default: break;
+            }
+            return "Off";
+        }();
+
+        const auto msg = (isRu ? juce::String::fromUTF8 (u8"Модуляция: ") : "Mod: ")
+                       + srcName + " -> " + dstName + " (Slot " + juce::String (slot + 1) + ")";
+        statusLabel.setText (msg, juce::dontSendNotification);
+    }
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::showModulationMenu (params::mod::Dest dst, juce::Point<int> screenPos)
+{
+    if (dst == params::mod::dstOff)
+        return;
+
+    const auto isRu = (getLanguageIndex() == (int) params::ui::ru);
+
+    juce::PopupMenu m;
+
+    juce::Array<int> matchingSlots;
+    for (int i = 0; i < params::mod::numSlots; ++i)
+    {
+        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstCrushMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, modSlotSrc[(size_t) i].getSelectedItemIndex());
+        if (d == dst && s != params::mod::srcOff)
+            matchingSlots.add (i);
+    }
+
+    if (matchingSlots.isEmpty())
+    {
+        m.addItem (1, isRu ? juce::String::fromUTF8 (u8"Нет назначений") : "No assignments", false);
+    }
+    else
+    {
+        m.addItem (1, isRu ? juce::String::fromUTF8 (u8"Удалить всё для этой ручки") : "Remove all for this knob");
+        m.addSeparator();
+
+        for (int idx = 0; idx < matchingSlots.size(); ++idx)
+        {
+            const int slot = matchingSlots[idx];
+            const auto srcTxt = modSlotSrc[(size_t) slot].getText();
+            const auto dstTxt = modSlotDst[(size_t) slot].getText();
+            const auto d = modSlotDepth[(size_t) slot].getTextFromValue (modSlotDepth[(size_t) slot].getValue());
+
+            const auto label = "Slot " + juce::String (slot + 1) + ": " + srcTxt + " -> " + dstTxt + "  (" + d + ")";
+            m.addItem (100 + slot, label);
+        }
+    }
+
+    juce::Component::SafePointer<IndustrialEnergySynthAudioProcessorEditor> safeThis (this);
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea (juce::Rectangle<int> (screenPos.x, screenPos.y, 1, 1))
+                                         .withMinimumWidth (320)
+                                         .withMaximumNumColumns (1)
+                                         .withParentComponent (this),
+                     [safeThis, matchingSlots] (int result)
+                     {
+                         if (safeThis == nullptr)
+                             return;
+
+                         if (result == 1)
+                         {
+                             for (int i = 0; i < matchingSlots.size(); ++i)
+                                 safeThis->clearModSlot (matchingSlots[i]);
+                             return;
+                         }
+
+                         if (result >= 100)
+                         {
+                             safeThis->clearModSlot (result - 100);
+                             return;
+                         }
+                     });
+}
+
 void IndustrialEnergySynthAudioProcessorEditor::applyFactoryPreset (int factoryIndex)
 {
     if (factoryIndex < 0 || factoryIndex >= getNumFactoryPresets())
@@ -3006,6 +3423,9 @@ void IndustrialEnergySynthAudioProcessorEditor::updateStatusFromComponent (juce:
                 out << "  |  " << tip;
             return out;
         }
+
+        if (tip.isNotEmpty())
+            return tip;
 
         return {};
     }();
