@@ -58,10 +58,15 @@ private:
     void applyUiPageVisibility();
 
     void timerCallback() override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
     void mouseEnter (const juce::MouseEvent&) override;
     void mouseExit (const juce::MouseEvent&) override;
 
     void setupSliderDoubleClickDefault (juce::Slider&, const char* paramId);
+    void loadMacroNamesFromState();
+    void storeMacroNameToState (int macroIndex, const juce::String& name);
+    void refreshMacroNames();
+    void promptMacroRename (int macroIndex);
 
     // Top bar
     juce::TextButton initButton;
@@ -69,6 +74,7 @@ private:
     juce::TextButton helpButton;
     juce::TextButton pageSynthButton;
     juce::TextButton pageModButton;
+    juce::TextButton pageLabButton;
     juce::Label lastTouchedLabel;
     juce::TextButton quickAssignMacro1;
     juce::TextButton quickAssignMacro2;
@@ -97,7 +103,8 @@ private:
     enum UiPage
     {
         pageSynth = 0,
-        pageMod = 1
+        pageMod = 1,
+        pageLab = 2
     };
     UiPage uiPage = pageSynth;
 
@@ -143,6 +150,22 @@ private:
     std::unique_ptr<APVTS::SliderAttachment> osc2DetuneAttachment;
     juce::ToggleButton osc2Sync;
     std::unique_ptr<APVTS::ButtonAttachment> osc2SyncAttachment;
+
+    // Osc 3
+    juce::GroupComponent osc3Group;
+    ies::ui::ComboWithLabel osc3Wave;
+    std::unique_ptr<APVTS::ComboBoxAttachment> osc3WaveAttachment;
+    ies::ui::WavePreview osc3Preview;
+    ies::ui::KnobWithLabel osc3Level;
+    std::unique_ptr<APVTS::SliderAttachment> osc3LevelAttachment;
+    ies::ui::KnobWithLabel osc3Coarse;
+    std::unique_ptr<APVTS::SliderAttachment> osc3CoarseAttachment;
+    ies::ui::KnobWithLabel osc3Fine;
+    std::unique_ptr<APVTS::SliderAttachment> osc3FineAttachment;
+    ies::ui::KnobWithLabel osc3Phase;
+    std::unique_ptr<APVTS::SliderAttachment> osc3PhaseAttachment;
+    ies::ui::KnobWithLabel osc3Detune;
+    std::unique_ptr<APVTS::SliderAttachment> osc3DetuneAttachment;
 
     // Destroy / Modulation
     juce::GroupComponent destroyGroup;
@@ -302,18 +325,31 @@ private:
     std::array<std::unique_ptr<APVTS::ComboBoxAttachment>, (size_t) params::mod::numSlots> modSlotSrcAttachment;
     std::array<std::unique_ptr<APVTS::ComboBoxAttachment>, (size_t) params::mod::numSlots> modSlotDstAttachment;
     std::array<std::unique_ptr<APVTS::SliderAttachment>, (size_t) params::mod::numSlots> modSlotDepthAttachment;
+    juce::GroupComponent modInsightsPanel;
+    juce::Label modInsightsTitle;
+    juce::TextEditor modInsightsBody;
+    juce::GroupComponent modQuickPanel;
+    juce::TextEditor modQuickBody;
 
     // Drag-ring depth editing: we keep track of the most recently assigned slot per destination.
-    std::array<int, 11> modLastSlotByDest { { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 } };
+    std::array<int, 12> modLastSlotByDest { { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 } };
     int modDepthDragSlot = -1;
     params::mod::Dest modDepthDragDest = params::mod::dstOff;
     float modDepthDragStart = 0.0f;
     juce::RangedAudioParameter* modDepthDragParam = nullptr;
 
-    // Output
-    juce::GroupComponent outGroup;
+    // Output gain (moved into Mono group for tighter layout).
     ies::ui::KnobWithLabel outGain;
     std::unique_ptr<APVTS::SliderAttachment> outGainAttachment;
+
+    // Lab page (third page): consolidated diagnostics/workflow.
+    juce::GroupComponent labGroup;
+    juce::GroupComponent labIntentPanel;
+    juce::TextEditor labIntentBody;
+    juce::GroupComponent labRoutingPanel;
+    juce::TextEditor labRoutingBody;
+    juce::GroupComponent labSafetyPanel;
+    juce::TextEditor labSafetyBody;
 
     juce::ComponentBoundsConstrainer boundsConstrainer;
     juce::ResizableBorderComponent resizeBorder { this, &boundsConstrainer };
@@ -329,6 +365,8 @@ private:
         intentDrone = 2
     };
     IntentModeIndex currentIntent = intentBass;
+    juce::String macroName1;
+    juce::String macroName2;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (IndustrialEnergySynthAudioProcessorEditor)
 };

@@ -66,6 +66,13 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
     paramPointers.osc2Detune    = apvts.getRawParameterValue (params::osc2::detune);
     paramPointers.osc2Sync      = apvts.getRawParameterValue (params::osc2::sync);
 
+    paramPointers.osc3Wave      = apvts.getRawParameterValue (params::osc3::wave);
+    paramPointers.osc3Level     = apvts.getRawParameterValue (params::osc3::level);
+    paramPointers.osc3Coarse    = apvts.getRawParameterValue (params::osc3::coarse);
+    paramPointers.osc3Fine      = apvts.getRawParameterValue (params::osc3::fine);
+    paramPointers.osc3Phase     = apvts.getRawParameterValue (params::osc3::phase);
+    paramPointers.osc3Detune    = apvts.getRawParameterValue (params::osc3::detune);
+
     paramPointers.ampAttackMs   = apvts.getRawParameterValue (params::amp::attackMs);
     paramPointers.ampDecayMs    = apvts.getRawParameterValue (params::amp::decayMs);
     paramPointers.ampSustain    = apvts.getRawParameterValue (params::amp::sustain);
@@ -613,7 +620,7 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
     // --- Mod Matrix (fixed slots; no drag/drop yet) ---
     auto modGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("mod", "Mod Matrix", "|");
     const auto modSrcChoices = juce::StringArray { "Off", "LFO 1", "LFO 2", "Macro 1", "Macro 2" };
-    const auto modDstChoices = juce::StringArray { "Off", "Osc1 Level", "Osc2 Level", "Filter Cutoff", "Filter Reso",
+    const auto modDstChoices = juce::StringArray { "Off", "Osc1 Level", "Osc2 Level", "Osc3 Level", "Filter Cutoff", "Filter Reso",
                                                    "Fold Amount", "Clip Amount", "Mod Amount", "Crush Mix",
                                                    "Shaper Drive", "Shaper Mix" };
 
@@ -674,6 +681,19 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
                                                                       juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
     osc2Group->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::osc2::sync), "Sync to Osc1", false));
     layout.add (std::move (osc2Group));
+
+    auto osc3Group = std::make_unique<juce::AudioProcessorParameterGroup> ("osc3", "Osc 3", "|");
+    osc3Group->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::osc3::wave), "Wave", waveChoices, (int) params::osc::saw));
+    osc3Group->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::osc3::level), "Level",
+                                                                      juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+    osc3Group->addChild (std::make_unique<juce::AudioParameterInt> (params::makeID (params::osc3::coarse), "Coarse", -24, 24, 0));
+    osc3Group->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::osc3::fine), "Fine",
+                                                                      juce::NormalisableRange<float> (-100.0f, 100.0f), 0.0f, "cents"));
+    osc3Group->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::osc3::phase), "Phase",
+                                                                      juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+    osc3Group->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::osc3::detune), "Detune (Unstable)",
+                                                                      juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+    layout.add (std::move (osc3Group));
 
     // --- Destroy / Modulation ---
     auto destroyGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("destroy", "Destroy", "|");

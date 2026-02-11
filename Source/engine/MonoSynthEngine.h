@@ -41,6 +41,13 @@ public:
         std::atomic<float>* osc2Detune = nullptr;
         std::atomic<float>* osc2Sync = nullptr;
 
+        std::atomic<float>* osc3Wave = nullptr;
+        std::atomic<float>* osc3Level = nullptr;
+        std::atomic<float>* osc3Coarse = nullptr;
+        std::atomic<float>* osc3Fine = nullptr;
+        std::atomic<float>* osc3Phase = nullptr;
+        std::atomic<float>* osc3Detune = nullptr;
+
         std::atomic<float>* ampAttackMs = nullptr;
         std::atomic<float>* ampDecayMs = nullptr;
         std::atomic<float>* ampSustain = nullptr;
@@ -308,6 +315,7 @@ private:
 
     dsp::PolyBlepOscillator osc1;
     dsp::PolyBlepOscillator osc2;
+    dsp::PolyBlepOscillator osc3;
 
     dsp::Lfo lfo1;
     dsp::Lfo lfo2;
@@ -351,8 +359,10 @@ private:
 
     juce::Random driftRng1 { 0x13579bdf };
     juce::Random driftRng2 { 0x2468ace0 };
+    juce::Random driftRng3 { 0x369cf012 };
     float driftState1 = 0.0f;
     float driftState2 = 0.0f;
+    float driftState3 = 0.0f;
 
     float pitchLockPhase = 0.0f;
     float pitchLockFollower = 0.0f;

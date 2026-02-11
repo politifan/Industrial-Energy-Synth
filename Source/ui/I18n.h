@@ -20,6 +20,7 @@ enum class Key
     languageRussian,
     pageSynth,
     pageMod,
+    pageLab,
     init,
     intentMode,
     intentBass,
@@ -35,6 +36,7 @@ enum class Key
 
     osc1,
     osc2,
+    osc3,
     wave,
     waveSaw,
     waveSquare,
@@ -140,6 +142,7 @@ enum class Key
     modSrcMacro2,
     modDstOsc1Level,
     modDstOsc2Level,
+    modDstOsc3Level,
     modDstFilterCutoff,
     modDstFilterReso,
     modDstFoldAmount,
@@ -180,6 +183,7 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::languageRussian: return u8 (u8"Русский");
             case Key::pageSynth:    return u8 (u8"Синт");
             case Key::pageMod:      return u8 (u8"Мод");
+            case Key::pageLab:      return u8 (u8"Лаб");
             case Key::init:         return u8 (u8"Сброс");
             case Key::intentMode:   return u8 (u8"Цель");
             case Key::intentBass:   return u8 (u8"Бас");
@@ -195,6 +199,7 @@ inline juce::String tr (Key key, int languageChoiceIndex)
 
             case Key::osc1:         return u8 (u8"Осц 1");
             case Key::osc2:         return u8 (u8"Осц 2");
+            case Key::osc3:         return u8 (u8"Осц 3");
             case Key::wave:         return u8 (u8"Волна");
             case Key::waveSaw:      return u8 (u8"Пила");
             case Key::waveSquare:   return u8 (u8"Квадрат");
@@ -300,6 +305,7 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::modSrcMacro2: return u8 (u8"Макро 2");
             case Key::modDstOsc1Level:     return u8 (u8"Осц1 уровень");
             case Key::modDstOsc2Level:     return u8 (u8"Осц2 уровень");
+            case Key::modDstOsc3Level:     return u8 (u8"Осц3 уровень");
             case Key::modDstFilterCutoff:  return u8 (u8"Фильтр срез");
             case Key::modDstFilterReso:    return u8 (u8"Фильтр резонанс");
             case Key::modDstFoldAmount:    return u8 (u8"Amount (fold)");
@@ -335,6 +341,7 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::languageRussian: return "Russian";
             case Key::pageSynth:    return "Synth";
             case Key::pageMod:      return "Mod";
+            case Key::pageLab:      return "Lab";
             case Key::init:         return "Init";
             case Key::intentMode:   return "Intent";
             case Key::intentBass:   return "Bass";
@@ -350,6 +357,7 @@ inline juce::String tr (Key key, int languageChoiceIndex)
 
             case Key::osc1:         return "Osc 1";
             case Key::osc2:         return "Osc 2";
+            case Key::osc3:         return "Osc 3";
             case Key::wave:         return "Wave";
             case Key::waveSaw:      return "Saw";
             case Key::waveSquare:   return "Square";
@@ -455,6 +463,7 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::modSrcMacro2: return "Macro 2";
             case Key::modDstOsc1Level:     return "Osc1 Level";
             case Key::modDstOsc2Level:     return "Osc2 Level";
+            case Key::modDstOsc3Level:     return "Osc3 Level";
             case Key::modDstFilterCutoff:  return "Filter Cutoff";
             case Key::modDstFilterReso:    return "Filter Reso";
             case Key::modDstFoldAmount:    return "Fold Amount";

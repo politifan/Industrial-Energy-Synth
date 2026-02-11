@@ -5,7 +5,7 @@ namespace ies::ui
 KnobWithLabel::KnobWithLabel()
 {
     slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 56, 14);
+    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 66, 16);
     slider.setNumDecimalPlacesToDisplay (2);
     addAndMakeVisible (slider);
 
@@ -60,7 +60,7 @@ void ComboWithLabel::resized()
 
     if (layout == Layout::labelTop)
     {
-        const auto labelH = 14;
+        const auto labelH = 16;
         label.setBounds (r.removeFromTop (labelH));
         combo.setBounds (r.reduced (0, 1));
         label.setJustificationType (juce::Justification::centredLeft);

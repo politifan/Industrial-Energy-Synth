@@ -57,6 +57,16 @@ inline constexpr const char* detune = "osc2.detune";
 inline constexpr const char* sync   = "osc2.sync"; // bool
 }
 
+namespace osc3
+{
+inline constexpr const char* wave   = "osc3.wave";
+inline constexpr const char* level  = "osc3.level";
+inline constexpr const char* coarse = "osc3.coarse";
+inline constexpr const char* fine   = "osc3.fine";
+inline constexpr const char* phase  = "osc3.phase";
+inline constexpr const char* detune = "osc3.detune";
+}
+
 namespace lfo
 {
 inline constexpr const char* wave    = "wave";    // choice
@@ -253,14 +263,15 @@ enum Dest
     dstOff = 0,
     dstOsc1Level = 1,
     dstOsc2Level = 2,
-    dstFilterCutoff = 3,
-    dstFilterResonance = 4,
-    dstFoldAmount = 5,
-    dstClipAmount = 6,
-    dstModAmount = 7,
-    dstCrushMix = 8,
-    dstShaperDrive = 9,
-    dstShaperMix = 10
+    dstOsc3Level = 3,
+    dstFilterCutoff = 4,
+    dstFilterResonance = 5,
+    dstFoldAmount = 6,
+    dstClipAmount = 7,
+    dstModAmount = 8,
+    dstCrushMix = 9,
+    dstShaperDrive = 10,
+    dstShaperMix = 11
 };
 }
 

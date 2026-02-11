@@ -2,6 +2,9 @@
 
 #include "../dsp/ToneEQ.h"
 
+#include <algorithm>
+#include <vector>
+
 namespace ies::ui
 {
 SpectrumEditor::SpectrumEditor()
@@ -403,6 +406,23 @@ void SpectrumEditor::paint (juce::Graphics& g)
     const auto p8g = getParamValueActual (params.peak8Gain, params.peak8GainRaw, 0.0f);
     const auto p8q = getParamValueActual (params.peak8Q,    params.peak8QRaw,    0.90f);
 
+    auto peakColourForIndex = [&] (int idx) -> juce::Colour
+    {
+        switch (idx)
+        {
+            case 1: return juce::Colour (0xff00c7ff);
+            case 2: return juce::Colour (0xff00e8c6);
+            case 3: return juce::Colour (0xff7dff6b);
+            case 4: return juce::Colour (0xffffd166);
+            case 5: return juce::Colour (0xffff9f43);
+            case 6: return juce::Colour (0xffff6b6b);
+            case 7: return juce::Colour (0xfff06bff);
+            case 8: return juce::Colour (0xff9d7dff);
+            default: break;
+        }
+        return accent;
+    };
+
     {
         juce::Path p;
         const int steps = juce::jmax (64, (int) plot.getWidth());
@@ -433,9 +453,102 @@ void SpectrumEditor::paint (juce::Graphics& g)
                 p.lineTo (x, y);
         }
 
-        const auto col = enabled ? accent.withAlpha (0.92f) : juce::Colour (0xff9aa4b2).withAlpha (0.55f);
-        g.setColour (col);
+        if (enabled)
+        {
+            juce::ColourGradient eg (juce::Colour (0xff00c7ff), plot.getX(), plot.getCentreY(),
+                                     juce::Colour (0xff9d7dff), plot.getRight(), plot.getCentreY(),
+                                     false);
+            eg.addColour (0.22, juce::Colour (0xff00e8c6));
+            eg.addColour (0.42, juce::Colour (0xff7dff6b));
+            eg.addColour (0.60, juce::Colour (0xffffd166));
+            eg.addColour (0.78, juce::Colour (0xffff9f43));
+            g.setGradientFill (eg);
+        }
+        else
+        {
+            g.setColour (juce::Colour (0xff9aa4b2).withAlpha (0.55f));
+        }
         g.strokePath (p, juce::PathStrokeType (2.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    // Smooth helper spline through active peak nodes (point-to-point visual guide).
+    {
+        struct PeakNode final
+        {
+            float x = 0.0f;
+            float y = 0.0f;
+            int idx = 0;
+        };
+
+        std::vector<PeakNode> nodes;
+        nodes.reserve (8);
+
+        auto addNode = [&] (bool on, float freq, float gainDb, int idx)
+        {
+            if (! on)
+                return;
+
+            nodes.push_back ({ freqHzToX (freq), dbToY (gainDb), idx });
+        };
+
+        addNode (p1on, p1f, p1g, 1);
+        addNode (p2on, p2f, p2g, 2);
+        addNode (p3on, p3f, p3g, 3);
+        addNode (p4on, p4f, p4g, 4);
+        addNode (p5on, p5f, p5g, 5);
+        addNode (p6on, p6f, p6g, 6);
+        addNode (p7on, p7f, p7g, 7);
+        addNode (p8on, p8f, p8g, 8);
+
+        std::sort (nodes.begin(), nodes.end(), [] (const PeakNode& lhs, const PeakNode& rhs) { return lhs.x < rhs.x; });
+
+        if (nodes.size() >= 2)
+        {
+            juce::Path spline;
+            spline.startNewSubPath (nodes.front().x, nodes.front().y);
+
+            constexpr float tension = 0.85f;
+            for (size_t i = 0; i + 1 < nodes.size(); ++i)
+            {
+                const auto p0 = (i > 0) ? juce::Point<float> { nodes[i - 1].x, nodes[i - 1].y }
+                                        : juce::Point<float> { nodes[i].x, nodes[i].y };
+                const auto p1 = juce::Point<float> { nodes[i].x, nodes[i].y };
+                const auto p2 = juce::Point<float> { nodes[i + 1].x, nodes[i + 1].y };
+                const auto p3 = (i + 2 < nodes.size()) ? juce::Point<float> { nodes[i + 2].x, nodes[i + 2].y }
+                                                       : juce::Point<float> { nodes[i + 1].x, nodes[i + 1].y };
+
+                const auto d1 = (p2 - p0) * (tension / 6.0f);
+                const auto d2 = (p3 - p1) * (tension / 6.0f);
+
+                spline.cubicTo (p1 + d1, p2 - d2, p2);
+            }
+
+            if (enabled)
+            {
+                juce::ColourGradient cg (peakColourForIndex (nodes.front().idx),
+                                         nodes.front().x, plot.getCentreY(),
+                                         peakColourForIndex (nodes.back().idx),
+                                         nodes.back().x, plot.getCentreY(),
+                                         false);
+
+                for (size_t i = 0; i < nodes.size(); ++i)
+                {
+                    const auto span = juce::jmax (1.0f, nodes.back().x - nodes.front().x);
+                    const auto t = juce::jlimit (0.0f, 1.0f, (nodes[i].x - nodes.front().x) / span);
+                    cg.addColour (t, peakColourForIndex (nodes[i].idx));
+                }
+
+                g.setColour (juce::Colour (0x22000000).withAlpha (0.35f));
+                g.strokePath (spline, juce::PathStrokeType (3.2f));
+                g.setGradientFill (cg);
+                g.strokePath (spline, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            }
+            else
+            {
+                g.setColour (juce::Colour (0xff9aa4b2).withAlpha (0.35f));
+                g.strokePath (spline, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            }
+        }
     }
 
     // Handles
@@ -472,11 +585,14 @@ void SpectrumEditor::paint (juce::Graphics& g)
     drawCut (lowX, true);
     drawCut (highX, false);
 
-    auto drawPeak = [&] (float x, float y, DragTarget t)
+    auto drawPeak = [&] (float x, float y, DragTarget t, int idx)
     {
         const auto hot = (hover == t) || (dragging == t);
         const auto r = hot ? 7.0f : 6.0f;
-        g.setColour ((hot ? accent : accent.withAlpha (0.75f)).withAlpha (enabled ? 0.95f : 0.35f));
+        auto peakCol = peakColourForIndex (idx);
+        if (! hot)
+            peakCol = peakCol.withAlpha (0.75f);
+        g.setColour (peakCol.withAlpha (enabled ? 0.95f : 0.35f));
         g.fillEllipse (x - r, y - r, r * 2.0f, r * 2.0f);
         g.setColour (juce::Colour (0xff0f1218).withAlpha (0.85f));
         g.drawEllipse (x - r, y - r, r * 2.0f, r * 2.0f, 1.2f);
@@ -500,7 +616,7 @@ void SpectrumEditor::paint (juce::Graphics& g)
     {
         if (! on)
             return;
-        drawPeak (freqHzToX (f), dbToY (gDb), t);
+        drawPeak (freqHzToX (f), dbToY (gDb), t, idx);
         juce::ignoreUnused (idx);
     };
 
