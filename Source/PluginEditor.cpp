@@ -6250,13 +6250,12 @@ juce::String IndustrialEnergySynthAudioProcessorEditor::keyCodeToLabel (int keyC
     if (keyCode >= 32 && keyCode < 127)
         return juce::String::charToString ((juce::juce_wchar) keyCode);
 
-    switch (keyCode)
-    {
-        case juce::KeyPress::spaceKey: return "Space";
-        case juce::KeyPress::returnKey: return "Enter";
-        case juce::KeyPress::tabKey: return "Tab";
-        default: break;
-    }
+    if (keyCode == juce::KeyPress::spaceKey)
+        return "Space";
+    if (keyCode == juce::KeyPress::returnKey)
+        return "Enter";
+    if (keyCode == juce::KeyPress::tabKey)
+        return "Tab";
 
     return juce::String (keyCode);
 }
