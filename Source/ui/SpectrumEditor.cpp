@@ -19,34 +19,42 @@ void SpectrumEditor::bind (juce::AudioProcessorValueTreeState& apvts,
                            const char* lowCutParamId,
                            const char* highCutParamId,
                            const char* peak1EnableParamId,
+                           const char* peak1TypeParamId,
                            const char* peak1FreqParamId,
                            const char* peak1GainParamId,
                            const char* peak1QParamId,
                            const char* peak2EnableParamId,
+                           const char* peak2TypeParamId,
                            const char* peak2FreqParamId,
                            const char* peak2GainParamId,
                            const char* peak2QParamId,
                            const char* peak3EnableParamId,
+                           const char* peak3TypeParamId,
                            const char* peak3FreqParamId,
                            const char* peak3GainParamId,
                            const char* peak3QParamId,
                            const char* peak4EnableParamId,
+                           const char* peak4TypeParamId,
                            const char* peak4FreqParamId,
                            const char* peak4GainParamId,
                            const char* peak4QParamId,
                            const char* peak5EnableParamId,
+                           const char* peak5TypeParamId,
                            const char* peak5FreqParamId,
                            const char* peak5GainParamId,
                            const char* peak5QParamId,
                            const char* peak6EnableParamId,
+                           const char* peak6TypeParamId,
                            const char* peak6FreqParamId,
                            const char* peak6GainParamId,
                            const char* peak6QParamId,
                            const char* peak7EnableParamId,
+                           const char* peak7TypeParamId,
                            const char* peak7FreqParamId,
                            const char* peak7GainParamId,
                            const char* peak7QParamId,
                            const char* peak8EnableParamId,
+                           const char* peak8TypeParamId,
                            const char* peak8FreqParamId,
                            const char* peak8GainParamId,
                            const char* peak8QParamId)
@@ -56,39 +64,47 @@ void SpectrumEditor::bind (juce::AudioProcessorValueTreeState& apvts,
     params.lowCut   = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (lowCutParamId));
     params.highCut  = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (highCutParamId));
     params.peak1Enable = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak1EnableParamId));
+    params.peak1Type = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak1TypeParamId));
     params.peak1Freq = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak1FreqParamId));
     params.peak1Gain = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak1GainParamId));
     params.peak1Q    = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak1QParamId));
     params.peak2Enable = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak2EnableParamId));
+    params.peak2Type = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak2TypeParamId));
     params.peak2Freq = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak2FreqParamId));
     params.peak2Gain = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak2GainParamId));
     params.peak2Q    = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak2QParamId));
     params.peak3Enable = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak3EnableParamId));
+    params.peak3Type = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak3TypeParamId));
     params.peak3Freq = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak3FreqParamId));
     params.peak3Gain = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak3GainParamId));
     params.peak3Q    = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak3QParamId));
 
     params.peak4Enable = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak4EnableParamId));
+    params.peak4Type = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak4TypeParamId));
     params.peak4Freq = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak4FreqParamId));
     params.peak4Gain = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak4GainParamId));
     params.peak4Q    = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak4QParamId));
 
     params.peak5Enable = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak5EnableParamId));
+    params.peak5Type = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak5TypeParamId));
     params.peak5Freq = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak5FreqParamId));
     params.peak5Gain = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak5GainParamId));
     params.peak5Q    = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak5QParamId));
 
     params.peak6Enable = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak6EnableParamId));
+    params.peak6Type = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak6TypeParamId));
     params.peak6Freq = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak6FreqParamId));
     params.peak6Gain = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak6GainParamId));
     params.peak6Q    = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak6QParamId));
 
     params.peak7Enable = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak7EnableParamId));
+    params.peak7Type = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak7TypeParamId));
     params.peak7Freq = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak7FreqParamId));
     params.peak7Gain = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak7GainParamId));
     params.peak7Q    = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak7QParamId));
 
     params.peak8Enable = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak8EnableParamId));
+    params.peak8Type = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak8TypeParamId));
     params.peak8Freq = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak8FreqParamId));
     params.peak8Gain = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak8GainParamId));
     params.peak8Q    = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (peak8QParamId));
@@ -99,41 +115,49 @@ void SpectrumEditor::bind (juce::AudioProcessorValueTreeState& apvts,
     params.highCutRaw  = apvts.getRawParameterValue (highCutParamId);
 
     params.peak1EnableRaw = apvts.getRawParameterValue (peak1EnableParamId);
+    params.peak1TypeRaw = apvts.getRawParameterValue (peak1TypeParamId);
     params.peak1FreqRaw = apvts.getRawParameterValue (peak1FreqParamId);
     params.peak1GainRaw = apvts.getRawParameterValue (peak1GainParamId);
     params.peak1QRaw    = apvts.getRawParameterValue (peak1QParamId);
 
     params.peak2EnableRaw = apvts.getRawParameterValue (peak2EnableParamId);
+    params.peak2TypeRaw = apvts.getRawParameterValue (peak2TypeParamId);
     params.peak2FreqRaw = apvts.getRawParameterValue (peak2FreqParamId);
     params.peak2GainRaw = apvts.getRawParameterValue (peak2GainParamId);
     params.peak2QRaw    = apvts.getRawParameterValue (peak2QParamId);
 
     params.peak3EnableRaw = apvts.getRawParameterValue (peak3EnableParamId);
+    params.peak3TypeRaw = apvts.getRawParameterValue (peak3TypeParamId);
     params.peak3FreqRaw = apvts.getRawParameterValue (peak3FreqParamId);
     params.peak3GainRaw = apvts.getRawParameterValue (peak3GainParamId);
     params.peak3QRaw    = apvts.getRawParameterValue (peak3QParamId);
 
     params.peak4EnableRaw = apvts.getRawParameterValue (peak4EnableParamId);
+    params.peak4TypeRaw = apvts.getRawParameterValue (peak4TypeParamId);
     params.peak4FreqRaw = apvts.getRawParameterValue (peak4FreqParamId);
     params.peak4GainRaw = apvts.getRawParameterValue (peak4GainParamId);
     params.peak4QRaw    = apvts.getRawParameterValue (peak4QParamId);
 
     params.peak5EnableRaw = apvts.getRawParameterValue (peak5EnableParamId);
+    params.peak5TypeRaw = apvts.getRawParameterValue (peak5TypeParamId);
     params.peak5FreqRaw = apvts.getRawParameterValue (peak5FreqParamId);
     params.peak5GainRaw = apvts.getRawParameterValue (peak5GainParamId);
     params.peak5QRaw    = apvts.getRawParameterValue (peak5QParamId);
 
     params.peak6EnableRaw = apvts.getRawParameterValue (peak6EnableParamId);
+    params.peak6TypeRaw = apvts.getRawParameterValue (peak6TypeParamId);
     params.peak6FreqRaw = apvts.getRawParameterValue (peak6FreqParamId);
     params.peak6GainRaw = apvts.getRawParameterValue (peak6GainParamId);
     params.peak6QRaw    = apvts.getRawParameterValue (peak6QParamId);
 
     params.peak7EnableRaw = apvts.getRawParameterValue (peak7EnableParamId);
+    params.peak7TypeRaw = apvts.getRawParameterValue (peak7TypeParamId);
     params.peak7FreqRaw = apvts.getRawParameterValue (peak7FreqParamId);
     params.peak7GainRaw = apvts.getRawParameterValue (peak7GainParamId);
     params.peak7QRaw    = apvts.getRawParameterValue (peak7QParamId);
 
     params.peak8EnableRaw = apvts.getRawParameterValue (peak8EnableParamId);
+    params.peak8TypeRaw = apvts.getRawParameterValue (peak8TypeParamId);
     params.peak8FreqRaw = apvts.getRawParameterValue (peak8FreqParamId);
     params.peak8GainRaw = apvts.getRawParameterValue (peak8GainParamId);
     params.peak8QRaw    = apvts.getRawParameterValue (peak8QParamId);
@@ -367,41 +391,49 @@ void SpectrumEditor::paint (juce::Graphics& g)
     const auto lowCutHz   = getParamValueActual (params.lowCut,   params.lowCutRaw,   20.0f);
     const auto highCutHz  = getParamValueActual (params.highCut,  params.highCutRaw,  20000.0f);
     const auto p1on = getParamValueActual (params.peak1Enable, params.peak1EnableRaw, 1.0f) >= 0.5f;
+    const auto p1t = (int) std::lround (getParamValueActual (params.peak1Type, params.peak1TypeRaw, (float) params::tone::peakBell));
     const auto p1f = getParamValueActual (params.peak1Freq, params.peak1FreqRaw, 220.0f);
     const auto p1g = getParamValueActual (params.peak1Gain, params.peak1GainRaw, 0.0f);
     const auto p1q = getParamValueActual (params.peak1Q,    params.peak1QRaw,    0.90f);
 
     const auto p2on = getParamValueActual (params.peak2Enable, params.peak2EnableRaw, 1.0f) >= 0.5f;
+    const auto p2t = (int) std::lround (getParamValueActual (params.peak2Type, params.peak2TypeRaw, (float) params::tone::peakBell));
     const auto p2f = getParamValueActual (params.peak2Freq, params.peak2FreqRaw, 1000.0f);
     const auto p2g = getParamValueActual (params.peak2Gain, params.peak2GainRaw, 0.0f);
     const auto p2q = getParamValueActual (params.peak2Q,    params.peak2QRaw,    0.7071f);
 
     const auto p3on = getParamValueActual (params.peak3Enable, params.peak3EnableRaw, 1.0f) >= 0.5f;
+    const auto p3t = (int) std::lround (getParamValueActual (params.peak3Type, params.peak3TypeRaw, (float) params::tone::peakBell));
     const auto p3f = getParamValueActual (params.peak3Freq, params.peak3FreqRaw, 4200.0f);
     const auto p3g = getParamValueActual (params.peak3Gain, params.peak3GainRaw, 0.0f);
     const auto p3q = getParamValueActual (params.peak3Q,    params.peak3QRaw,    0.90f);
 
     const auto p4on = getParamValueActual (params.peak4Enable, params.peak4EnableRaw, 0.0f) >= 0.5f;
+    const auto p4t = (int) std::lround (getParamValueActual (params.peak4Type, params.peak4TypeRaw, (float) params::tone::peakBell));
     const auto p4f = getParamValueActual (params.peak4Freq, params.peak4FreqRaw, 700.0f);
     const auto p4g = getParamValueActual (params.peak4Gain, params.peak4GainRaw, 0.0f);
     const auto p4q = getParamValueActual (params.peak4Q,    params.peak4QRaw,    0.90f);
 
     const auto p5on = getParamValueActual (params.peak5Enable, params.peak5EnableRaw, 0.0f) >= 0.5f;
+    const auto p5t = (int) std::lround (getParamValueActual (params.peak5Type, params.peak5TypeRaw, (float) params::tone::peakBell));
     const auto p5f = getParamValueActual (params.peak5Freq, params.peak5FreqRaw, 1800.0f);
     const auto p5g = getParamValueActual (params.peak5Gain, params.peak5GainRaw, 0.0f);
     const auto p5q = getParamValueActual (params.peak5Q,    params.peak5QRaw,    0.90f);
 
     const auto p6on = getParamValueActual (params.peak6Enable, params.peak6EnableRaw, 0.0f) >= 0.5f;
+    const auto p6t = (int) std::lround (getParamValueActual (params.peak6Type, params.peak6TypeRaw, (float) params::tone::peakBell));
     const auto p6f = getParamValueActual (params.peak6Freq, params.peak6FreqRaw, 5200.0f);
     const auto p6g = getParamValueActual (params.peak6Gain, params.peak6GainRaw, 0.0f);
     const auto p6q = getParamValueActual (params.peak6Q,    params.peak6QRaw,    0.90f);
 
     const auto p7on = getParamValueActual (params.peak7Enable, params.peak7EnableRaw, 0.0f) >= 0.5f;
+    const auto p7t = (int) std::lround (getParamValueActual (params.peak7Type, params.peak7TypeRaw, (float) params::tone::peakBell));
     const auto p7f = getParamValueActual (params.peak7Freq, params.peak7FreqRaw, 250.0f);
     const auto p7g = getParamValueActual (params.peak7Gain, params.peak7GainRaw, 0.0f);
     const auto p7q = getParamValueActual (params.peak7Q,    params.peak7QRaw,    0.90f);
 
     const auto p8on = getParamValueActual (params.peak8Enable, params.peak8EnableRaw, 0.0f) >= 0.5f;
+    const auto p8t = (int) std::lround (getParamValueActual (params.peak8Type, params.peak8TypeRaw, (float) params::tone::peakBell));
     const auto p8f = getParamValueActual (params.peak8Freq, params.peak8FreqRaw, 9500.0f);
     const auto p8g = getParamValueActual (params.peak8Gain, params.peak8GainRaw, 0.0f);
     const auto p8q = getParamValueActual (params.peak8Q,    params.peak8QRaw,    0.90f);
@@ -434,14 +466,14 @@ void SpectrumEditor::paint (juce::Graphics& g)
             float respDb = 0.0f;
             ies::dsp::ToneEQ::makeResponse (sr,
                                             lowCutHz, highCutHz,
-                                            p1on, p1f, p1g, p1q,
-                                            p2on, p2f, p2g, p2q,
-                                            p3on, p3f, p3g, p3q,
-                                            p4on, p4f, p4g, p4q,
-                                            p5on, p5f, p5g, p5q,
-                                            p6on, p6f, p6g, p6q,
-                                            p7on, p7f, p7g, p7q,
-                                            p8on, p8f, p8g, p8q,
+                                            p1on, p1t, p1f, p1g, p1q,
+                                            p2on, p2t, p2f, p2g, p2q,
+                                            p3on, p3t, p3f, p3g, p3q,
+                                            p4on, p4t, p4f, p4g, p4q,
+                                            p5on, p5t, p5f, p5g, p5q,
+                                            p6on, p6t, p6f, p6g, p6q,
+                                            p7on, p7t, p7f, p7g, p7q,
+                                            p8on, p8t, p8f, p8g, p8q,
                                             f, respDb);
 
             const auto x = plot.getX() + t * plot.getWidth();
@@ -818,18 +850,59 @@ void SpectrumEditor::mouseDown (const juce::MouseEvent& e)
     // Right-click a node to remove it (disable).
     if (e.mods.isRightButtonDown())
     {
-        juce::RangedAudioParameter *pEn = nullptr, *pFreq = nullptr, *pGain = nullptr, *pQ = nullptr;
-        std::atomic<float> *rEn = nullptr, *rFreq = nullptr, *rGain = nullptr, *rQ = nullptr;
-        float defF = 1000.0f, defQ = 0.9f;
-        bool defOn = false;
-        if (peakPtrs (hover, pEn, pFreq, pGain, pQ, rEn, rFreq, rGain, rQ, defF, defQ, defOn) && pEn != nullptr)
+        juce::RangedAudioParameter* pEnable = nullptr;
+        juce::RangedAudioParameter* pType = nullptr;
+        const char* bandName = nullptr;
+
+        switch (hover)
         {
-            beginGesture (pEn);
-            setParamActual (pEn, 0.0f);
-            endGesture (pEn);
-            repaint();
+            case DragTarget::peak1: pEnable = params.peak1Enable; pType = params.peak1Type; bandName = "Peak 1"; break;
+            case DragTarget::peak2: pEnable = params.peak2Enable; pType = params.peak2Type; bandName = "Peak 2"; break;
+            case DragTarget::peak3: pEnable = params.peak3Enable; pType = params.peak3Type; bandName = "Peak 3"; break;
+            case DragTarget::peak4: pEnable = params.peak4Enable; pType = params.peak4Type; bandName = "Peak 4"; break;
+            case DragTarget::peak5: pEnable = params.peak5Enable; pType = params.peak5Type; bandName = "Peak 5"; break;
+            case DragTarget::peak6: pEnable = params.peak6Enable; pType = params.peak6Type; bandName = "Peak 6"; break;
+            case DragTarget::peak7: pEnable = params.peak7Enable; pType = params.peak7Type; bandName = "Peak 7"; break;
+            case DragTarget::peak8: pEnable = params.peak8Enable; pType = params.peak8Type; bandName = "Peak 8"; break;
+            case DragTarget::none:
+            case DragTarget::lowCut:
+            case DragTarget::highCut:
+            default: break;
         }
 
+        if (pEnable == nullptr)
+            return;
+
+        juce::PopupMenu menu;
+        juce::PopupMenu types;
+        types.addItem (1001, "Bell");
+        types.addItem (1002, "Notch");
+        types.addItem (1003, "Low Shelf");
+        types.addItem (1004, "High Shelf");
+        types.addItem (1005, "Band Pass");
+        menu.addSubMenu (juce::String (bandName) + " Type", types, true);
+        menu.addSeparator();
+        menu.addItem (2001, "Disable Band");
+
+        auto options = juce::PopupMenu::Options().withTargetComponent (this);
+        menu.showMenuAsync (options, [this, pEnable, pType] (int result)
+        {
+            if (result >= 1001 && result <= 1005 && pType != nullptr)
+            {
+                const int typeIndex = result - 1001;
+                beginGesture (pType);
+                setParamActual (pType, (float) typeIndex);
+                endGesture (pType);
+            }
+            else if (result == 2001 && pEnable != nullptr)
+            {
+                beginGesture (pEnable);
+                setParamActual (pEnable, 0.0f);
+                endGesture (pEnable);
+            }
+
+            repaint();
+        });
         return;
     }
 

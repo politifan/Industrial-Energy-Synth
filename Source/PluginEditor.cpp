@@ -3074,34 +3074,42 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                          params::tone::lowCutHz,
                          params::tone::highCutHz,
                          params::tone::peak1Enable,
+                         params::tone::peak1Type,
                          params::tone::peak1FreqHz,
                          params::tone::peak1GainDb,
                          params::tone::peak1Q,
                          params::tone::peak2Enable,
+                         params::tone::peak2Type,
                          params::tone::peak2FreqHz,
                          params::tone::peak2GainDb,
                          params::tone::peak2Q,
                          params::tone::peak3Enable,
+                         params::tone::peak3Type,
                          params::tone::peak3FreqHz,
                          params::tone::peak3GainDb,
                          params::tone::peak3Q,
                          params::tone::peak4Enable,
+                         params::tone::peak4Type,
                          params::tone::peak4FreqHz,
                          params::tone::peak4GainDb,
                          params::tone::peak4Q,
                          params::tone::peak5Enable,
+                         params::tone::peak5Type,
                          params::tone::peak5FreqHz,
                          params::tone::peak5GainDb,
                          params::tone::peak5Q,
                          params::tone::peak6Enable,
+                         params::tone::peak6Type,
                          params::tone::peak6FreqHz,
                          params::tone::peak6GainDb,
                          params::tone::peak6Q,
                          params::tone::peak7Enable,
+                         params::tone::peak7Type,
                          params::tone::peak7FreqHz,
                          params::tone::peak7GainDb,
                          params::tone::peak7Q,
                          params::tone::peak8Enable,
+                         params::tone::peak8Type,
                          params::tone::peak8FreqHz,
                          params::tone::peak8GainDb,
                          params::tone::peak8Q);
@@ -3169,12 +3177,18 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     destroyGroup.getProperties().set ("tintBase", 0.03);
     destroyGroup.getProperties().set ("tintAct", 0.06);
     setGroupAccent (shaperGroup, cShaper);
-    shaperGroup.getProperties().set ("fillAlpha", 0.84);
-    shaperGroup.getProperties().set ("tintBase", 0.02);
-    shaperGroup.getProperties().set ("tintAct", 0.04);
+    shaperGroup.getProperties().set ("fillAlpha", 0.0);
+    shaperGroup.getProperties().set ("tintBase", 0.0);
+    shaperGroup.getProperties().set ("tintAct", 0.0);
     setGroupAccent (filterGroup, cFilter);
     setGroupAccent (filterEnvGroup, cFilter);
+    filterEnvGroup.getProperties().set ("fillAlpha", 0.0);
+    filterEnvGroup.getProperties().set ("tintBase", 0.0);
+    filterEnvGroup.getProperties().set ("tintAct", 0.0);
     setGroupAccent (ampGroup, cEnv);
+    ampGroup.getProperties().set ("fillAlpha", 0.0);
+    ampGroup.getProperties().set ("tintBase", 0.0);
+    ampGroup.getProperties().set ("tintAct", 0.0);
     setGroupAccent (toneGroup, cTone);
     setGroupAccent (toneEnable, cTone);
     setGroupAccent (spectrumSource, cTone);
@@ -4376,19 +4390,38 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         labKeyboard.setKeyWidth ((float) labKeyWidth.getSlider().getValue());
         updateLabKeyboardRange();
 
-        const int trioH = juce::jlimit (120, 210, gr.getHeight() / 3);
-        auto trioRow = gr.removeFromBottom (trioH);
-        gr.removeFromBottom (panelGap);
+        // Main Lab work area: Shaper + Filter Env + Amp Env
+        // Wide mode: all three visible in one row (requested workflow).
+        // Narrow mode: keep previous stacked fallback for readability.
+        auto work = gr;
+        if (work.getWidth() >= 1180 && work.getHeight() >= 170)
+        {
+            const int gapW = panelGap;
+            const int shaperW = juce::jlimit (460, work.getWidth() - 440, (int) std::round ((float) work.getWidth() * 0.54f));
+            auto shArea = work.removeFromLeft (shaperW);
+            work.removeFromLeft (gapW);
+            auto feArea = work.removeFromLeft (juce::jmax (180, (work.getWidth() - gapW) / 2));
+            work.removeFromLeft (gapW);
+            auto aeArea = work;
 
-        // Main area: Shaper (Tone EQ is now a floating window).
-        shaperGroup.setBounds (gr);
+            shaperGroup.setBounds (shArea);
+            filterEnvGroup.setBounds (feArea);
+            ampGroup.setBounds (aeArea);
+        }
+        else
+        {
+            const int trioH = juce::jlimit (120, 210, work.getHeight() / 3);
+            auto trioRow = work.removeFromBottom (trioH);
+            work.removeFromBottom (panelGap);
 
-        // Bottom row: envelopes side-by-side (wider).
-        auto leftEnv = trioRow.removeFromLeft (trioRow.getWidth() / 2);
-        trioRow.removeFromLeft (panelGap);
-        auto rightEnv = trioRow;
-        filterEnvGroup.setBounds (leftEnv);
-        ampGroup.setBounds (rightEnv);
+            shaperGroup.setBounds (work);
+
+            auto leftEnv = trioRow.removeFromLeft (trioRow.getWidth() / 2);
+            trioRow.removeFromLeft (panelGap);
+            auto rightEnv = trioRow;
+            filterEnvGroup.setBounds (leftEnv);
+            ampGroup.setBounds (rightEnv);
+        }
     }
 
     // FX page internal
@@ -4507,26 +4540,26 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
             if (on)
             {
                 auto dd = dt;
-                const int gap = 8;
+                const int delayGap = 8;
 
                 const int row1H = juce::jlimit (96, 146, dd.getHeight() / 2);
-                auto row1 = dd.removeFromTop (row1H);
-                dd.removeFromTop (gap);
-                auto row2 = dd;
+                auto delayTopRow = dd.removeFromTop (row1H);
+                dd.removeFromTop (delayGap);
+                auto delayBottomRow = dd;
 
                 {
-                    const int toggleW = juce::jlimit (88, 108, row1.getWidth() / 7);
+                    const int toggleW = juce::jlimit (88, 108, delayTopRow.getWidth() / 7);
                     const int toggleH = 26;
-                    auto toggles = row1.removeFromRight (toggleW * 2 + gap);
-                    fxDelaySync.setBounds (toggles.removeFromLeft (toggleW).withHeight (toggleH).withY (row1.getY() + 8));
-                    toggles.removeFromLeft (gap);
-                    fxDelayPingPong.setBounds (toggles.removeFromLeft (toggleW).withHeight (toggleH).withY (row1.getY() + 8));
-                    row1.removeFromRight (gap);
+                    auto toggles = delayTopRow.removeFromRight (toggleW * 2 + delayGap);
+                    fxDelaySync.setBounds (toggles.removeFromLeft (toggleW).withHeight (toggleH).withY (delayTopRow.getY() + 8));
+                    toggles.removeFromLeft (delayGap);
+                    fxDelayPingPong.setBounds (toggles.removeFromLeft (toggleW).withHeight (toggleH).withY (delayTopRow.getY() + 8));
+                    delayTopRow.removeFromRight (delayGap);
 
-                    layoutFxControls (row1, { &fxDelayMix, &fxDelayTime, &fxDelayFeedback });
+                    layoutFxControls (delayTopRow, { &fxDelayMix, &fxDelayTime, &fxDelayFeedback });
                 }
 
-                layoutFxControls (row2, { &fxDelayDivL, &fxDelayDivR, &fxDelayFilter, &fxDelayModRate, &fxDelayModDepth, &fxDelayDuck });
+                layoutFxControls (delayBottomRow, { &fxDelayDivL, &fxDelayDivR, &fxDelayFilter, &fxDelayModRate, &fxDelayModDepth, &fxDelayDuck });
             }
         }
         setVisibleForBlock (fxReverb, { &fxReverbMix, &fxReverbSize, &fxReverbDecay, &fxReverbDamp, &fxReverbPreDelay, &fxReverbWidth,
@@ -6773,8 +6806,8 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
     setActivity (destroyGroup, juce::jmax (juce::jmax (foldAct, clipAct), juce::jmax (juce::jmax (modAct, crushAct), lockAct)));
 
     const float shaperAct = shaperEnable.getToggleState()
-        ? juce::jlimit (0.0f, 1.0f, 0.35f + 0.65f * (float) shaperMix.getSlider().getValue())
-        : 0.0f;
+        ? juce::jlimit (0.0f, 1.0f, 0.38f + 0.62f * (float) shaperMix.getSlider().getValue())
+        : 0.22f;
     setActivity (shaperGroup, shaperAct);
 
     const float filterAct = juce::jlimit (0.0f, 1.0f,
@@ -6782,8 +6815,8 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
                                           0.35f * abs01 (filterEnvAmount.getSlider().getValue() / 24.0) +
                                           0.20f * (filterKeyTrack.getToggleState() ? 1.0f : 0.0f));
     setActivity (filterGroup, filterAct);
-    setActivity (filterEnvGroup, abs01 ((filterAttack.getSlider().getValue() + filterDecay.getSlider().getValue() + filterRelease.getSlider().getValue()) / 3000.0));
-    setActivity (ampGroup, abs01 ((ampAttack.getSlider().getValue() + ampDecay.getSlider().getValue() + ampRelease.getSlider().getValue()) / 3000.0));
+    setActivity (filterEnvGroup, juce::jmax (0.20f, abs01 ((filterAttack.getSlider().getValue() + filterDecay.getSlider().getValue() + filterRelease.getSlider().getValue()) / 3000.0)));
+    setActivity (ampGroup, juce::jmax (0.20f, abs01 ((ampAttack.getSlider().getValue() + ampDecay.getSlider().getValue() + ampRelease.getSlider().getValue()) / 3000.0)));
 
     const float toneAct = toneEnable.getToggleState() ? 0.85f : 0.0f;
     setActivity (toneGroup, toneAct);

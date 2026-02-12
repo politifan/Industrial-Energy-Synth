@@ -104,41 +104,49 @@ public:
         std::atomic<float>* toneHighCutHz = nullptr;
 
         std::atomic<float>* tonePeak1Enable = nullptr;
+        std::atomic<float>* tonePeak1Type = nullptr;
         std::atomic<float>* tonePeak1FreqHz = nullptr;
         std::atomic<float>* tonePeak1GainDb = nullptr;
         std::atomic<float>* tonePeak1Q = nullptr;
 
         std::atomic<float>* tonePeak2Enable = nullptr;
+        std::atomic<float>* tonePeak2Type = nullptr;
         std::atomic<float>* tonePeak2FreqHz = nullptr;
         std::atomic<float>* tonePeak2GainDb = nullptr;
         std::atomic<float>* tonePeak2Q = nullptr;
 
         std::atomic<float>* tonePeak3Enable = nullptr;
+        std::atomic<float>* tonePeak3Type = nullptr;
         std::atomic<float>* tonePeak3FreqHz = nullptr;
         std::atomic<float>* tonePeak3GainDb = nullptr;
         std::atomic<float>* tonePeak3Q = nullptr;
 
         std::atomic<float>* tonePeak4Enable = nullptr;
+        std::atomic<float>* tonePeak4Type = nullptr;
         std::atomic<float>* tonePeak4FreqHz = nullptr;
         std::atomic<float>* tonePeak4GainDb = nullptr;
         std::atomic<float>* tonePeak4Q = nullptr;
 
         std::atomic<float>* tonePeak5Enable = nullptr;
+        std::atomic<float>* tonePeak5Type = nullptr;
         std::atomic<float>* tonePeak5FreqHz = nullptr;
         std::atomic<float>* tonePeak5GainDb = nullptr;
         std::atomic<float>* tonePeak5Q = nullptr;
 
         std::atomic<float>* tonePeak6Enable = nullptr;
+        std::atomic<float>* tonePeak6Type = nullptr;
         std::atomic<float>* tonePeak6FreqHz = nullptr;
         std::atomic<float>* tonePeak6GainDb = nullptr;
         std::atomic<float>* tonePeak6Q = nullptr;
 
         std::atomic<float>* tonePeak7Enable = nullptr;
+        std::atomic<float>* tonePeak7Type = nullptr;
         std::atomic<float>* tonePeak7FreqHz = nullptr;
         std::atomic<float>* tonePeak7GainDb = nullptr;
         std::atomic<float>* tonePeak7Q = nullptr;
 
         std::atomic<float>* tonePeak8Enable = nullptr;
+        std::atomic<float>* tonePeak8Type = nullptr;
         std::atomic<float>* tonePeak8FreqHz = nullptr;
         std::atomic<float>* tonePeak8GainDb = nullptr;
         std::atomic<float>* tonePeak8Q = nullptr;
@@ -365,41 +373,49 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak1GainDbSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak1QSm;
     bool tonePeak1On = true;
+    int tonePeak1Type = (int) params::tone::peakBell;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak2FreqHzSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak2GainDbSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak2QSm;
     bool tonePeak2On = true;
+    int tonePeak2Type = (int) params::tone::peakBell;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak3FreqHzSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak3GainDbSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak3QSm;
     bool tonePeak3On = true;
+    int tonePeak3Type = (int) params::tone::peakBell;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak4FreqHzSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak4GainDbSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak4QSm;
     bool tonePeak4On = false;
+    int tonePeak4Type = (int) params::tone::peakBell;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak5FreqHzSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak5GainDbSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak5QSm;
     bool tonePeak5On = false;
+    int tonePeak5Type = (int) params::tone::peakBell;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak6FreqHzSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak6GainDbSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak6QSm;
     bool tonePeak6On = false;
+    int tonePeak6Type = (int) params::tone::peakBell;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak7FreqHzSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak7GainDbSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak7QSm;
     bool tonePeak7On = false;
+    int tonePeak7Type = (int) params::tone::peakBell;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak8FreqHzSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak8GainDbSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak8QSm;
     bool tonePeak8On = false;
+    int tonePeak8Type = (int) params::tone::peakBell;
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> noiseLevelSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> noiseColorSm;

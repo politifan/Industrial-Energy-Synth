@@ -475,46 +475,63 @@ inline constexpr const char* enable      = "tone.enable";      // bool
 inline constexpr const char* lowCutHz    = "tone.lowCutHz";    // float Hz
 inline constexpr const char* highCutHz   = "tone.highCutHz";   // float Hz
 
+enum PeakType
+{
+    peakBell = 0,
+    peakNotch = 1,
+    peakLowShelf = 2,
+    peakHighShelf = 3,
+    peakBandPass = 4
+};
+
 // Multiple peak nodes (Serum-like EQ editing). Keep IDs stable once shipped.
 // NOTE: Peaks beyond #3 default to disabled. UI can enable/disable nodes.
 inline constexpr int maxPeaks = 8;
 
 inline constexpr const char* peak1Enable  = "tone.peak1Enable";
+inline constexpr const char* peak1Type    = "tone.peak1Type";
 inline constexpr const char* peak1FreqHz  = "tone.peak1FreqHz";
 inline constexpr const char* peak1GainDb  = "tone.peak1GainDb";
 inline constexpr const char* peak1Q       = "tone.peak1Q";
 
 inline constexpr const char* peak2Enable  = "tone.peak2Enable";
+inline constexpr const char* peak2Type    = "tone.peak2Type";
 inline constexpr const char* peak2FreqHz  = "tone.peak2FreqHz";
 inline constexpr const char* peak2GainDb  = "tone.peak2GainDb";
 inline constexpr const char* peak2Q       = "tone.peak2Q";
 
 inline constexpr const char* peak3Enable  = "tone.peak3Enable";
+inline constexpr const char* peak3Type    = "tone.peak3Type";
 inline constexpr const char* peak3FreqHz  = "tone.peak3FreqHz";
 inline constexpr const char* peak3GainDb  = "tone.peak3GainDb";
 inline constexpr const char* peak3Q       = "tone.peak3Q";
 
 inline constexpr const char* peak4Enable  = "tone.peak4Enable";
+inline constexpr const char* peak4Type    = "tone.peak4Type";
 inline constexpr const char* peak4FreqHz  = "tone.peak4FreqHz";
 inline constexpr const char* peak4GainDb  = "tone.peak4GainDb";
 inline constexpr const char* peak4Q       = "tone.peak4Q";
 
 inline constexpr const char* peak5Enable  = "tone.peak5Enable";
+inline constexpr const char* peak5Type    = "tone.peak5Type";
 inline constexpr const char* peak5FreqHz  = "tone.peak5FreqHz";
 inline constexpr const char* peak5GainDb  = "tone.peak5GainDb";
 inline constexpr const char* peak5Q       = "tone.peak5Q";
 
 inline constexpr const char* peak6Enable  = "tone.peak6Enable";
+inline constexpr const char* peak6Type    = "tone.peak6Type";
 inline constexpr const char* peak6FreqHz  = "tone.peak6FreqHz";
 inline constexpr const char* peak6GainDb  = "tone.peak6GainDb";
 inline constexpr const char* peak6Q       = "tone.peak6Q";
 
 inline constexpr const char* peak7Enable  = "tone.peak7Enable";
+inline constexpr const char* peak7Type    = "tone.peak7Type";
 inline constexpr const char* peak7FreqHz  = "tone.peak7FreqHz";
 inline constexpr const char* peak7GainDb  = "tone.peak7GainDb";
 inline constexpr const char* peak7Q       = "tone.peak7Q";
 
 inline constexpr const char* peak8Enable  = "tone.peak8Enable";
+inline constexpr const char* peak8Type    = "tone.peak8Type";
 inline constexpr const char* peak8FreqHz  = "tone.peak8FreqHz";
 inline constexpr const char* peak8GainDb  = "tone.peak8GainDb";
 inline constexpr const char* peak8Q       = "tone.peak8Q";
