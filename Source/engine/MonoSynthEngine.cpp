@@ -52,6 +52,7 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     filter.prepare (sampleRateHz);
     toneEq.prepare (sampleRateHz);
     shaper.prepare (sampleRateHz);
+    fxChain.prepare (sampleRateHz, maxBlockSize, 2);
 
     // Oversampling/scratch buffers are allocated up-front (no audio-thread allocations).
     const auto maxN = juce::jmax (1, maxBlockSize);
@@ -223,6 +224,7 @@ void MonoSynthEngine::reset()
     filter.reset();
     toneEq.reset();
     shaper.reset();
+    fxChain.reset();
     toneCoeffCountdown = 0;
     toneEnabledPrev = false;
 
@@ -777,7 +779,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         const auto dep = params->modSlotDepth[(size_t) s] != nullptr ? params->modSlotDepth[(size_t) s]->load() : 0.0f;
 
         slots[(size_t) s].src = juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, src);
-        slots[(size_t) s].dst = juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, dst);
+        slots[(size_t) s].dst = juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstFxOctaverMix, dst);
         slots[(size_t) s].depth = juce::jlimit (-1.0f, 1.0f, dep);
     }
 
@@ -794,6 +796,24 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
     };
 
     // 1) Generate oscillator mix + per-sample params for the Destroy chain.
+    float fxModChorusRateSum = 0.0f;
+    float fxModChorusDepthSum = 0.0f;
+    float fxModChorusMixSum = 0.0f;
+    float fxModDelayTimeSum = 0.0f;
+    float fxModDelayFeedbackSum = 0.0f;
+    float fxModDelayMixSum = 0.0f;
+    float fxModReverbSizeSum = 0.0f;
+    float fxModReverbDampSum = 0.0f;
+    float fxModReverbMixSum = 0.0f;
+    float fxModDistDriveSum = 0.0f;
+    float fxModDistToneSum = 0.0f;
+    float fxModDistMixSum = 0.0f;
+    float fxModPhaserRateSum = 0.0f;
+    float fxModPhaserDepthSum = 0.0f;
+    float fxModPhaserFeedbackSum = 0.0f;
+    float fxModPhaserMixSum = 0.0f;
+    float fxModOctAmountSum = 0.0f;
+    float fxModOctMixSum = 0.0f;
     for (int i = 0; i < numSamples; ++i)
     {
         const auto midiNote = noteGlide.getNext();
@@ -826,6 +846,24 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         float modCrushAdd  = 0.0f;
         float modShaperDriveAdd = 0.0f;
         float modShaperMixAdd   = 0.0f;
+        float modFxChorusRateAdd = 0.0f;
+        float modFxChorusDepthAdd = 0.0f;
+        float modFxChorusMixAdd = 0.0f;
+        float modFxDelayTimeAdd = 0.0f;
+        float modFxDelayFeedbackAdd = 0.0f;
+        float modFxDelayMixAdd = 0.0f;
+        float modFxReverbSizeAdd = 0.0f;
+        float modFxReverbDampAdd = 0.0f;
+        float modFxReverbMixAdd = 0.0f;
+        float modFxDistDriveAdd = 0.0f;
+        float modFxDistToneAdd = 0.0f;
+        float modFxDistMixAdd = 0.0f;
+        float modFxPhaserRateAdd = 0.0f;
+        float modFxPhaserDepthAdd = 0.0f;
+        float modFxPhaserFeedbackAdd = 0.0f;
+        float modFxPhaserMixAdd = 0.0f;
+        float modFxOctAmountAdd = 0.0f;
+        float modFxOctMixAdd = 0.0f;
 
         // Slot depths are in [-1..1]. Dest scaling is per-destination.
         constexpr float cutoffMaxSemis = 48.0f;
@@ -867,8 +905,45 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
                 case params::mod::dstCrushMix: modCrushAdd += amt; break;
                 case params::mod::dstShaperDrive: modShaperDriveAdd += (amt * 18.0f); break; // dB span
                 case params::mod::dstShaperMix: modShaperMixAdd += amt; break;
+                case params::mod::dstFxChorusRate: modFxChorusRateAdd += amt; break;
+                case params::mod::dstFxChorusDepth: modFxChorusDepthAdd += amt; break;
+                case params::mod::dstFxChorusMix: modFxChorusMixAdd += amt; break;
+                case params::mod::dstFxDelayTime: modFxDelayTimeAdd += amt; break;
+                case params::mod::dstFxDelayFeedback: modFxDelayFeedbackAdd += amt; break;
+                case params::mod::dstFxDelayMix: modFxDelayMixAdd += amt; break;
+                case params::mod::dstFxReverbSize: modFxReverbSizeAdd += amt; break;
+                case params::mod::dstFxReverbDamp: modFxReverbDampAdd += amt; break;
+                case params::mod::dstFxReverbMix: modFxReverbMixAdd += amt; break;
+                case params::mod::dstFxDistDrive: modFxDistDriveAdd += amt; break;
+                case params::mod::dstFxDistTone: modFxDistToneAdd += amt; break;
+                case params::mod::dstFxDistMix: modFxDistMixAdd += amt; break;
+                case params::mod::dstFxPhaserRate: modFxPhaserRateAdd += amt; break;
+                case params::mod::dstFxPhaserDepth: modFxPhaserDepthAdd += amt; break;
+                case params::mod::dstFxPhaserFeedback: modFxPhaserFeedbackAdd += amt; break;
+                case params::mod::dstFxPhaserMix: modFxPhaserMixAdd += amt; break;
+                case params::mod::dstFxOctaverAmount: modFxOctAmountAdd += amt; break;
+                case params::mod::dstFxOctaverMix: modFxOctMixAdd += amt; break;
             }
         }
+
+        fxModChorusRateSum += modFxChorusRateAdd;
+        fxModChorusDepthSum += modFxChorusDepthAdd;
+        fxModChorusMixSum += modFxChorusMixAdd;
+        fxModDelayTimeSum += modFxDelayTimeAdd;
+        fxModDelayFeedbackSum += modFxDelayFeedbackAdd;
+        fxModDelayMixSum += modFxDelayMixAdd;
+        fxModReverbSizeSum += modFxReverbSizeAdd;
+        fxModReverbDampSum += modFxReverbDampAdd;
+        fxModReverbMixSum += modFxReverbMixAdd;
+        fxModDistDriveSum += modFxDistDriveAdd;
+        fxModDistToneSum += modFxDistToneAdd;
+        fxModDistMixSum += modFxDistMixAdd;
+        fxModPhaserRateSum += modFxPhaserRateAdd;
+        fxModPhaserDepthSum += modFxPhaserDepthAdd;
+        fxModPhaserFeedbackSum += modFxPhaserFeedbackAdd;
+        fxModPhaserMixSum += modFxPhaserMixAdd;
+        fxModOctAmountSum += modFxOctAmountAdd;
+        fxModOctMixSum += modFxOctMixAdd;
 
         filterModCutoffSemis[(size_t) i] = juce::jlimit (-96.0f, 96.0f, modCutSemis);
         filterModResAdd[(size_t) i] = modResAdd;
@@ -1235,6 +1310,79 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         const auto sampleIndex = startSample + i;
         for (int ch = 0; ch < chs; ++ch)
             buffer.setSample (ch, sampleIndex, sig);
+    }
+
+    // 8) FX Rack (post synth signal, stereo domain).
+    {
+        const float invN = 1.0f / (float) juce::jmax (1, numSamples);
+        const auto avg = [&] (float s) noexcept { return s * invN; };
+        const auto loadf = [&] (std::atomic<float>* p, float d) noexcept { return p != nullptr ? p->load() : d; };
+        const auto loadb = [&] (std::atomic<float>* p, bool d) noexcept { return p != nullptr ? (p->load() >= 0.5f) : d; };
+        const auto loadi = [&] (std::atomic<float>* p, int d) noexcept { return p != nullptr ? (int) std::lround (p->load()) : d; };
+
+        ies::dsp::FxChain::RuntimeParams fxp;
+        fxp.globalMix01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxGlobalMix, 0.0f));
+
+        fxp.chorusEnable = loadb (params->fxChorusEnable, false);
+        fxp.chorusMix01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxChorusMix, 0.0f) + avg (fxModChorusMixSum));
+        fxp.chorusRateHz = juce::jlimit (0.01f, 10.0f, loadf (params->fxChorusRateHz, 0.6f) * std::exp2 (avg (fxModChorusRateSum) * 2.0f));
+        fxp.chorusDepthMs = juce::jlimit (0.0f, 25.0f, loadf (params->fxChorusDepthMs, 8.0f) + avg (fxModChorusDepthSum) * 8.0f);
+        fxp.chorusDelayMs = juce::jlimit (0.5f, 45.0f, loadf (params->fxChorusDelayMs, 10.0f));
+        fxp.chorusFeedback = juce::jlimit (-0.98f, 0.98f, loadf (params->fxChorusFeedback, 0.0f));
+        fxp.chorusStereo01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxChorusStereo, 1.0f));
+        fxp.chorusHpHz = juce::jlimit (10.0f, 2000.0f, loadf (params->fxChorusHpHz, 40.0f));
+
+        fxp.delayEnable = loadb (params->fxDelayEnable, false);
+        fxp.delayMix01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxDelayMix, 0.0f) + avg (fxModDelayMixSum));
+        fxp.delaySync = loadb (params->fxDelaySync, true);
+        fxp.delayDivL = loadi (params->fxDelayDivL, (int) params::lfo::div1_4);
+        fxp.delayDivR = loadi (params->fxDelayDivR, (int) params::lfo::div1_4);
+        fxp.delayTimeMs = juce::jlimit (1.0f, 4000.0f, loadf (params->fxDelayTimeMs, 320.0f) * std::exp2 (avg (fxModDelayTimeSum) * 2.0f));
+        fxp.delayFeedback01 = juce::jlimit (0.0f, 0.98f, loadf (params->fxDelayFeedback, 0.35f) + avg (fxModDelayFeedbackSum) * 0.35f);
+        fxp.delayFilterHz = juce::jlimit (200.0f, 20000.0f, loadf (params->fxDelayFilterHz, 12000.0f));
+        fxp.delayModRateHz = juce::jlimit (0.01f, 20.0f, loadf (params->fxDelayModRate, 0.35f));
+        fxp.delayModDepthMs = juce::jlimit (0.0f, 25.0f, loadf (params->fxDelayModDepth, 2.0f));
+        fxp.delayPingpong = loadb (params->fxDelayPingpong, false);
+        fxp.delayDuck01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxDelayDuck, 0.0f));
+
+        fxp.reverbEnable = loadb (params->fxReverbEnable, false);
+        fxp.reverbMix01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxReverbMix, 0.0f) + avg (fxModReverbMixSum));
+        fxp.reverbSize01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxReverbSize, 0.5f) + avg (fxModReverbSizeSum) * 0.35f);
+        fxp.reverbDecay01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxReverbDecay, 0.4f));
+        fxp.reverbDamp01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxReverbDamp, 0.4f) + avg (fxModReverbDampSum) * 0.35f);
+        fxp.reverbPreDelayMs = juce::jlimit (0.0f, 200.0f, loadf (params->fxReverbPreDelayMs, 0.0f));
+        fxp.reverbWidth01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxReverbWidth, 1.0f));
+        fxp.reverbLowCutHz = juce::jlimit (20.0f, 2000.0f, loadf (params->fxReverbLowCutHz, 40.0f));
+        fxp.reverbHighCutHz = juce::jlimit (2000.0f, 20000.0f, loadf (params->fxReverbHighCutHz, 16000.0f));
+        fxp.reverbQuality = loadi (params->fxReverbQuality, (int) params::fx::reverb::hi);
+
+        fxp.distEnable = loadb (params->fxDistEnable, false);
+        fxp.distMix01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxDistMix, 0.0f) + avg (fxModDistMixSum));
+        fxp.distType = loadi (params->fxDistType, (int) params::fx::dist::tanh);
+        fxp.distDriveDb = juce::jlimit (-24.0f, 36.0f, loadf (params->fxDistDriveDb, 0.0f) + avg (fxModDistDriveSum) * 12.0f);
+        fxp.distTone01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxDistTone, 0.5f) + avg (fxModDistToneSum) * 0.35f);
+        fxp.distPostLPHz = juce::jlimit (800.0f, 20000.0f, loadf (params->fxDistPostLPHz, 18000.0f));
+        fxp.distOutputTrimDb = juce::jlimit (-24.0f, 24.0f, loadf (params->fxDistOutputTrimDb, 0.0f));
+
+        fxp.phaserEnable = loadb (params->fxPhaserEnable, false);
+        fxp.phaserMix01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxPhaserMix, 0.0f) + avg (fxModPhaserMixSum));
+        fxp.phaserRateHz = juce::jlimit (0.01f, 20.0f, loadf (params->fxPhaserRateHz, 0.35f) * std::exp2 (avg (fxModPhaserRateSum) * 2.0f));
+        fxp.phaserDepth01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxPhaserDepth, 0.6f) + avg (fxModPhaserDepthSum) * 0.35f);
+        fxp.phaserCentreHz = juce::jlimit (20.0f, 18000.0f, loadf (params->fxPhaserCentreHz, 1000.0f));
+        fxp.phaserFeedback = juce::jlimit (-0.95f, 0.95f, loadf (params->fxPhaserFeedback, 0.2f) + avg (fxModPhaserFeedbackSum) * 0.3f);
+        fxp.phaserStages = loadi (params->fxPhaserStages, 1);
+        fxp.phaserStereo01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxPhaserStereo, 1.0f));
+
+        fxp.octaverEnable = loadb (params->fxOctEnable, false);
+        fxp.octaverMix01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxOctMix, 0.0f) + avg (fxModOctMixSum));
+        fxp.octaverSubLevel01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxOctSubLevel, 0.5f) + avg (fxModOctAmountSum) * 0.4f);
+        fxp.octaverBlend01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxOctBlend, 0.5f));
+        fxp.octaverSensitivity01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxOctSensitivity, 0.5f));
+        fxp.octaverTone01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxOctTone, 0.5f));
+
+        const auto fxOrder = loadi (params->fxGlobalOrder, (int) params::fx::global::orderFixedA);
+        const auto fxOs = loadi (params->fxGlobalOversample, (int) params::fx::global::osOff);
+        fxChain.process (buffer, startSample, numSamples, fxOs, fxOrder, fxp);
     }
 }
 } // namespace ies::engine

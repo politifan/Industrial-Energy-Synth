@@ -29,6 +29,22 @@ public:
     float getUiPreClipRisk() const noexcept { return uiPreClipRisk.load (std::memory_order_relaxed); }
     float getUiOutClipRisk() const noexcept { return uiOutClipRisk.load (std::memory_order_relaxed); }
     float getUiCpuRisk() const noexcept { return uiCpuRisk.load (std::memory_order_relaxed); }
+    float getUiFxBlockPrePeak (int blockIndex) const noexcept
+    {
+        if (blockIndex < 0 || blockIndex >= (int) ies::dsp::FxChain::numBlocks)
+            return 0.0f;
+        return engine.getFxMeters().prePeak[(size_t) blockIndex].load (std::memory_order_relaxed);
+    }
+    float getUiFxBlockPostPeak (int blockIndex) const noexcept
+    {
+        if (blockIndex < 0 || blockIndex >= (int) ies::dsp::FxChain::numBlocks)
+            return 0.0f;
+        return engine.getFxMeters().postPeak[(size_t) blockIndex].load (std::memory_order_relaxed);
+    }
+    float getUiFxOutPeak() const noexcept
+    {
+        return engine.getFxMeters().outPeak.load (std::memory_order_relaxed);
+    }
     void requestPanic() noexcept { uiPanicRequested.store (true, std::memory_order_release); }
     void enqueueUiNoteOn (int midiNoteNumber, int velocity) noexcept;
     void enqueueUiNoteOff (int midiNoteNumber) noexcept;

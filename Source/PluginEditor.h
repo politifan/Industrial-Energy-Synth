@@ -93,6 +93,7 @@ private:
     juce::TextButton pageSynthButton;
     juce::TextButton pageModButton;
     juce::TextButton pageLabButton;
+    juce::TextButton pageFxButton;
     juce::TextButton pageSeqButton;
     juce::Label lastTouchedLabel;
     juce::TextButton quickAssignMacro1;
@@ -124,7 +125,8 @@ private:
         pageSynth = 0,
         pageMod = 1,
         pageLab = 2,
-        pageSeq = 3
+        pageFx = 3,
+        pageSeq = 4
     };
     UiPage uiPage = pageSynth;
 
@@ -376,7 +378,7 @@ private:
     juce::TextEditor modQuickBody;
 
     // Drag-ring depth editing: we keep track of the most recently assigned slot per destination.
-    std::array<int, 12> modLastSlotByDest { { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 } };
+    std::array<int, (size_t) params::mod::dstFxOctaverMix + 1> modLastSlotByDest {};
     int modDepthDragSlot = -1;
     params::mod::Dest modDepthDragDest = params::mod::dstOff;
     float modDepthDragStart = 0.0f;
@@ -385,6 +387,107 @@ private:
     // Output gain (moved into Mono group for tighter layout).
     ies::ui::KnobWithLabel outGain;
     std::unique_ptr<APVTS::SliderAttachment> outGainAttachment;
+
+    // FX page (V2): compact rack on the left + selected block panel on the right.
+    juce::GroupComponent fxGroup;
+    juce::GroupComponent fxRackPanel;
+    juce::GroupComponent fxDetailPanel;
+    juce::TextButton fxBlockChorus;
+    juce::TextButton fxBlockDelay;
+    juce::TextButton fxBlockReverb;
+    juce::TextButton fxBlockDist;
+    juce::TextButton fxBlockPhaser;
+    juce::TextButton fxBlockOctaver;
+    juce::ToggleButton fxChorusEnable;
+    juce::ToggleButton fxDelayEnable;
+    juce::ToggleButton fxReverbEnable;
+    juce::ToggleButton fxDistEnable;
+    juce::ToggleButton fxPhaserEnable;
+    juce::ToggleButton fxOctaverEnable;
+    std::array<ies::ui::LevelMeter, 6> fxPreMeters;
+    std::array<ies::ui::LevelMeter, 6> fxPostMeters;
+    ies::ui::LevelMeter fxOutMeter;
+    juce::Label fxOutLabel;
+
+    ies::ui::KnobWithLabel fxGlobalMix;
+    ies::ui::ComboWithLabel fxGlobalOrder;
+    ies::ui::ComboWithLabel fxGlobalOversample;
+    std::unique_ptr<APVTS::SliderAttachment> fxGlobalMixAttachment;
+    std::unique_ptr<APVTS::ComboBoxAttachment> fxGlobalOrderAttachment;
+    std::unique_ptr<APVTS::ComboBoxAttachment> fxGlobalOversampleAttachment;
+
+    ies::ui::KnobWithLabel fxChorusMix;
+    ies::ui::KnobWithLabel fxChorusRate;
+    ies::ui::KnobWithLabel fxChorusDepth;
+    ies::ui::KnobWithLabel fxChorusDelay;
+    std::unique_ptr<APVTS::ButtonAttachment> fxChorusEnableAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxChorusMixAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxChorusRateAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxChorusDepthAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxChorusDelayAttachment;
+
+    ies::ui::KnobWithLabel fxDelayMix;
+    ies::ui::KnobWithLabel fxDelayTime;
+    ies::ui::KnobWithLabel fxDelayFeedback;
+    juce::ToggleButton fxDelaySync;
+    juce::ToggleButton fxDelayPingPong;
+    std::unique_ptr<APVTS::ButtonAttachment> fxDelayEnableAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxDelayMixAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxDelayTimeAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxDelayFeedbackAttachment;
+    std::unique_ptr<APVTS::ButtonAttachment> fxDelaySyncAttachment;
+    std::unique_ptr<APVTS::ButtonAttachment> fxDelayPingPongAttachment;
+
+    ies::ui::KnobWithLabel fxReverbMix;
+    ies::ui::KnobWithLabel fxReverbSize;
+    ies::ui::KnobWithLabel fxReverbDecay;
+    ies::ui::KnobWithLabel fxReverbDamp;
+    std::unique_ptr<APVTS::ButtonAttachment> fxReverbEnableAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxReverbMixAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxReverbSizeAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxReverbDecayAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxReverbDampAttachment;
+
+    ies::ui::KnobWithLabel fxDistMix;
+    ies::ui::KnobWithLabel fxDistDrive;
+    ies::ui::KnobWithLabel fxDistTone;
+    ies::ui::ComboWithLabel fxDistType;
+    std::unique_ptr<APVTS::ButtonAttachment> fxDistEnableAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxDistMixAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxDistDriveAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxDistToneAttachment;
+    std::unique_ptr<APVTS::ComboBoxAttachment> fxDistTypeAttachment;
+
+    ies::ui::KnobWithLabel fxPhaserMix;
+    ies::ui::KnobWithLabel fxPhaserRate;
+    ies::ui::KnobWithLabel fxPhaserDepth;
+    ies::ui::KnobWithLabel fxPhaserFeedback;
+    std::unique_ptr<APVTS::ButtonAttachment> fxPhaserEnableAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxPhaserMixAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxPhaserRateAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxPhaserDepthAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxPhaserFeedbackAttachment;
+
+    ies::ui::KnobWithLabel fxOctMix;
+    ies::ui::KnobWithLabel fxOctSub;
+    ies::ui::KnobWithLabel fxOctBlend;
+    ies::ui::KnobWithLabel fxOctTone;
+    std::unique_ptr<APVTS::ButtonAttachment> fxOctEnableAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxOctMixAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxOctSubAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxOctBlendAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxOctToneAttachment;
+
+    enum FxBlockIndex
+    {
+        fxChorus = 0,
+        fxDelay = 1,
+        fxReverb = 2,
+        fxDist = 3,
+        fxPhaser = 4,
+        fxOctaver = 5
+    };
+    FxBlockIndex selectedFxBlock = fxChorus;
 
     // Sequencer / Arp page (fourth page): performance helpers (Serum-ish ARP).
     juce::GroupComponent seqGroup;

@@ -1005,6 +1005,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 {
     setLookAndFeel (&lnf);
     toneEqWindowContent.setLookAndFeel (&lnf);
+    modLastSlotByDest.fill (-1);
 
     // Resizable + minimum constraints.
     // Keep a sane minimum: the UI is dense (Serum-like panels) and includes a spectrum editor.
@@ -1233,7 +1234,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         m.addItem (1001, T ("Synth", u8"Синт"), true, uiPage == pageSynth);
         m.addItem (1002, T ("Mod", u8"Мод"), true, uiPage == pageMod);
         m.addItem (1003, T ("Lab", u8"Лаб"), true, uiPage == pageLab);
-        m.addItem (1004, T ("Seq", u8"Сек"), true, uiPage == pageSeq);
+        m.addItem (1004, "FX", true, uiPage == pageFx);
+        m.addItem (1005, T ("Seq", u8"Сек"), true, uiPage == pageSeq);
 
         m.addSeparator();
         m.addItem (2001, T ("Panic (All Notes Off)", u8"Стоп (снять все ноты)"));
@@ -1283,7 +1285,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                  case 1001: safeThis->setUiPage (pageSynth); break;
                                  case 1002: safeThis->setUiPage (pageMod); break;
                                  case 1003: safeThis->setUiPage (pageLab); break;
-                                 case 1004: safeThis->setUiPage (pageSeq); break;
+                                 case 1004: safeThis->setUiPage (pageFx); break;
+                                 case 1005: safeThis->setUiPage (pageSeq); break;
 
                                  case 2001: safeThis->panicButton.triggerClick(); break;
                                  case 2002: safeThis->initButton.triggerClick(); break;
@@ -1319,6 +1322,9 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     addAndMakeVisible (pageLabButton);
     pageLabButton.onClick = [this] { setUiPage (pageLab); };
+
+    addAndMakeVisible (pageFxButton);
+    pageFxButton.onClick = [this] { setUiPage (pageFx); };
 
     addAndMakeVisible (pageSeqButton);
     pageSeqButton.onClick = [this] { setUiPage (pageSeq); };
@@ -2620,6 +2626,124 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     updateLabKeyboardRange();
     updateLabKeyboardInfo();
 
+    // --- FX page ---
+    fxGroup.setText ("FX");
+    addAndMakeVisible (fxGroup);
+    fxRackPanel.setText ("Rack");
+    addAndMakeVisible (fxRackPanel);
+    fxDetailPanel.setText ("Block");
+    addAndMakeVisible (fxDetailPanel);
+
+    auto initFxBlockButton = [this] (juce::TextButton& b, const char* name, FxBlockIndex idx)
+    {
+        addAndMakeVisible (b);
+        b.setButtonText (name);
+        b.onClick = [this, idx] { selectedFxBlock = idx; resized(); };
+    };
+    initFxBlockButton (fxBlockChorus, "Chorus", fxChorus);
+    initFxBlockButton (fxBlockDelay, "Delay", fxDelay);
+    initFxBlockButton (fxBlockReverb, "Reverb", fxReverb);
+    initFxBlockButton (fxBlockDist, "Dist", fxDist);
+    initFxBlockButton (fxBlockPhaser, "Phaser", fxPhaser);
+    initFxBlockButton (fxBlockOctaver, "Octaver", fxOctaver);
+
+    auto initFxEnable = [this] (juce::ToggleButton& b, const char* text, const char* id, std::unique_ptr<APVTS::ButtonAttachment>& a)
+    {
+        addAndMakeVisible (b);
+        b.setButtonText (text);
+        a = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(), id, b);
+    };
+    initFxEnable (fxChorusEnable, "On", params::fx::chorus::enable, fxChorusEnableAttachment);
+    initFxEnable (fxDelayEnable, "On", params::fx::delay::enable, fxDelayEnableAttachment);
+    initFxEnable (fxReverbEnable, "On", params::fx::reverb::enable, fxReverbEnableAttachment);
+    initFxEnable (fxDistEnable, "On", params::fx::dist::enable, fxDistEnableAttachment);
+    initFxEnable (fxPhaserEnable, "On", params::fx::phaser::enable, fxPhaserEnableAttachment);
+    initFxEnable (fxOctaverEnable, "On", params::fx::octaver::enable, fxOctEnableAttachment);
+
+    addAndMakeVisible (fxGlobalMix);
+    fxGlobalMixAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::fx::global::mix, fxGlobalMix.getSlider());
+    fxGlobalMix.setLabelText ("FX Mix");
+    setupSliderDoubleClickDefault (fxGlobalMix.getSlider(), params::fx::global::mix);
+
+    addAndMakeVisible (fxGlobalOrder);
+    fxGlobalOrder.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    fxGlobalOrder.getCombo().addItem ("Order A", 1);
+    fxGlobalOrder.getCombo().addItem ("Order B", 2);
+    fxGlobalOrderAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::global::order, fxGlobalOrder.getCombo());
+
+    addAndMakeVisible (fxGlobalOversample);
+    fxGlobalOversample.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    fxGlobalOversample.getCombo().addItem ("Off", 1);
+    fxGlobalOversample.getCombo().addItem ("2x", 2);
+    fxGlobalOversample.getCombo().addItem ("4x", 3);
+    fxGlobalOversampleAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::global::oversample, fxGlobalOversample.getCombo());
+
+    auto initFxKnob = [this] (ies::ui::KnobWithLabel& k, const char* label, const char* paramId, std::unique_ptr<APVTS::SliderAttachment>& a)
+    {
+        addAndMakeVisible (k);
+        k.setLabelText (label);
+        a = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), paramId, k.getSlider());
+        setupSliderDoubleClickDefault (k.getSlider(), paramId);
+    };
+
+    initFxKnob (fxChorusMix, "Mix", params::fx::chorus::mix, fxChorusMixAttachment);
+    initFxKnob (fxChorusRate, "Rate", params::fx::chorus::rateHz, fxChorusRateAttachment);
+    fxChorusRate.getSlider().setTextValueSuffix (" Hz");
+    initFxKnob (fxChorusDepth, "Depth", params::fx::chorus::depthMs, fxChorusDepthAttachment);
+    fxChorusDepth.getSlider().setTextValueSuffix (" ms");
+    initFxKnob (fxChorusDelay, "Delay", params::fx::chorus::delayMs, fxChorusDelayAttachment);
+    fxChorusDelay.getSlider().setTextValueSuffix (" ms");
+
+    initFxKnob (fxDelayMix, "Mix", params::fx::delay::mix, fxDelayMixAttachment);
+    initFxKnob (fxDelayTime, "Time", params::fx::delay::timeMs, fxDelayTimeAttachment);
+    fxDelayTime.getSlider().setTextValueSuffix (" ms");
+    initFxKnob (fxDelayFeedback, "Feedback", params::fx::delay::feedback, fxDelayFeedbackAttachment);
+    addAndMakeVisible (fxDelaySync);
+    fxDelaySync.setButtonText ("Sync");
+    fxDelaySyncAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(), params::fx::delay::sync, fxDelaySync);
+    addAndMakeVisible (fxDelayPingPong);
+    fxDelayPingPong.setButtonText ("PingPong");
+    fxDelayPingPongAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(), params::fx::delay::pingpong, fxDelayPingPong);
+
+    initFxKnob (fxReverbMix, "Mix", params::fx::reverb::mix, fxReverbMixAttachment);
+    initFxKnob (fxReverbSize, "Size", params::fx::reverb::size, fxReverbSizeAttachment);
+    initFxKnob (fxReverbDecay, "Decay", params::fx::reverb::decay, fxReverbDecayAttachment);
+    initFxKnob (fxReverbDamp, "Damp", params::fx::reverb::damp, fxReverbDampAttachment);
+
+    initFxKnob (fxDistMix, "Mix", params::fx::dist::mix, fxDistMixAttachment);
+    initFxKnob (fxDistDrive, "Drive", params::fx::dist::driveDb, fxDistDriveAttachment);
+    fxDistDrive.getSlider().setTextValueSuffix (" dB");
+    initFxKnob (fxDistTone, "Tone", params::fx::dist::tone, fxDistToneAttachment);
+    addAndMakeVisible (fxDistType);
+    fxDistType.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    fxDistType.setLabelText ("Type");
+    fxDistType.getCombo().addItem ("Soft", 1);
+    fxDistType.getCombo().addItem ("Hard", 2);
+    fxDistType.getCombo().addItem ("Tanh", 3);
+    fxDistType.getCombo().addItem ("Diode", 4);
+    fxDistTypeAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::dist::type, fxDistType.getCombo());
+
+    initFxKnob (fxPhaserMix, "Mix", params::fx::phaser::mix, fxPhaserMixAttachment);
+    initFxKnob (fxPhaserRate, "Rate", params::fx::phaser::rateHz, fxPhaserRateAttachment);
+    fxPhaserRate.getSlider().setTextValueSuffix (" Hz");
+    initFxKnob (fxPhaserDepth, "Depth", params::fx::phaser::depth, fxPhaserDepthAttachment);
+    initFxKnob (fxPhaserFeedback, "Feedback", params::fx::phaser::feedback, fxPhaserFeedbackAttachment);
+
+    initFxKnob (fxOctMix, "Mix", params::fx::octaver::mix, fxOctMixAttachment);
+    initFxKnob (fxOctSub, "Sub", params::fx::octaver::subLevel, fxOctSubAttachment);
+    initFxKnob (fxOctBlend, "Blend", params::fx::octaver::blend, fxOctBlendAttachment);
+    initFxKnob (fxOctTone, "Tone", params::fx::octaver::tone, fxOctToneAttachment);
+
+    for (int i = 0; i < (int) fxPreMeters.size(); ++i)
+    {
+        addAndMakeVisible (fxPreMeters[(size_t) i]);
+        addAndMakeVisible (fxPostMeters[(size_t) i]);
+    }
+    addAndMakeVisible (fxOutMeter);
+    addAndMakeVisible (fxOutLabel);
+    fxOutLabel.setJustificationType (juce::Justification::centredLeft);
+    fxOutLabel.setColour (juce::Label::textColourId, juce::Colour (0xffd9e0ee).withAlpha (0.8f));
+
     // --- Filter ---
     filterGroup.setText ("Filter");
     addAndMakeVisible (filterGroup);
@@ -2862,6 +2986,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (pageSynthButton, cOsc1);
     setGroupAccent (pageModButton, cMod);
     setGroupAccent (pageLabButton, cTone);
+    setGroupAccent (pageFxButton, cOut);
     setGroupAccent (pageSeqButton, cOut);
     setGroupAccent (quickAssignMacro1, cMod);
     setGroupAccent (quickAssignMacro2, cMod);
@@ -2909,6 +3034,21 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (modInsightsPanel, cMod);
     setGroupAccent (modQuickPanel, cMod);
     setGroupAccent (labGroup, cMod);
+    setGroupAccent (fxGroup, cOut);
+    setGroupAccent (fxRackPanel, cOut);
+    setGroupAccent (fxDetailPanel, cOut);
+    setGroupAccent (fxBlockChorus, cOut);
+    setGroupAccent (fxBlockDelay, cOut);
+    setGroupAccent (fxBlockReverb, cOut);
+    setGroupAccent (fxBlockDist, cOut);
+    setGroupAccent (fxBlockPhaser, cOut);
+    setGroupAccent (fxBlockOctaver, cOut);
+    setGroupAccent (fxChorusEnable, cOut);
+    setGroupAccent (fxDelayEnable, cOut);
+    setGroupAccent (fxReverbEnable, cOut);
+    setGroupAccent (fxDistEnable, cOut);
+    setGroupAccent (fxPhaserEnable, cOut);
+    setGroupAccent (fxOctaverEnable, cOut);
     setGroupAccent (seqGroup, cOut);
     setGroupAccent (arpEnable, cOut);
     setGroupAccent (arpLatch, cOut);
@@ -2989,6 +3129,13 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     for (auto* s : { &arpRate.getSlider(), &arpGate.getSlider(), &arpOctaves.getSlider(), &arpSwing.getSlider() })
         setSliderAccent (*s, cOut);
+    for (auto* s : { &fxGlobalMix.getSlider(), &fxChorusMix.getSlider(), &fxChorusRate.getSlider(), &fxChorusDepth.getSlider(), &fxChorusDelay.getSlider(),
+                     &fxDelayMix.getSlider(), &fxDelayTime.getSlider(), &fxDelayFeedback.getSlider(),
+                     &fxReverbMix.getSlider(), &fxReverbSize.getSlider(), &fxReverbDecay.getSlider(), &fxReverbDamp.getSlider(),
+                     &fxDistMix.getSlider(), &fxDistDrive.getSlider(), &fxDistTone.getSlider(),
+                     &fxPhaserMix.getSlider(), &fxPhaserRate.getSlider(), &fxPhaserDepth.getSlider(), &fxPhaserFeedback.getSlider(),
+                     &fxOctMix.getSlider(), &fxOctSub.getSlider(), &fxOctBlend.getSlider(), &fxOctTone.getSlider() })
+        setSliderAccent (*s, cOut);
 
     for (auto* s : { &labVelocity.getSlider(), &labKeyWidth.getSlider(), &labPitchBend.getSlider() })
         setSliderAccent (*s, cTone);
@@ -3008,6 +3155,12 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     ampEnvPreview.setAccentColour (cEnv);
     spectrumEditor.setAccentColour (cTone);
     shaperEditor.setAccentColour (cShaper);
+    fxOutMeter.setAccentColour (cOut);
+    for (int i = 0; i < (int) fxPreMeters.size(); ++i)
+    {
+        fxPreMeters[(size_t) i].setAccentColour (juce::Colour (0xff6ea3ff));
+        fxPostMeters[(size_t) i].setAccentColour (juce::Colour (0xff00e8c6));
+    }
 
     // Update labels when language changes.
     language.getCombo().onChange = [this]
@@ -3052,6 +3205,13 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                      &lfo2Rate.getSlider(), &lfo2Phase.getSlider(),
                      &labVelocity.getSlider(), &labKeyWidth.getSlider(),
                      &labPitchBend.getSlider(), &labModWheel.getSlider(), &labAftertouch.getSlider() })
+        refreshSliderText (*s);
+    for (auto* s : { &fxGlobalMix.getSlider(), &fxChorusMix.getSlider(), &fxChorusRate.getSlider(), &fxChorusDepth.getSlider(), &fxChorusDelay.getSlider(),
+                     &fxDelayMix.getSlider(), &fxDelayTime.getSlider(), &fxDelayFeedback.getSlider(),
+                     &fxReverbMix.getSlider(), &fxReverbSize.getSlider(), &fxReverbDecay.getSlider(), &fxReverbDamp.getSlider(),
+                     &fxDistMix.getSlider(), &fxDistDrive.getSlider(), &fxDistTone.getSlider(),
+                     &fxPhaserMix.getSlider(), &fxPhaserRate.getSlider(), &fxPhaserDepth.getSlider(), &fxPhaserFeedback.getSlider(),
+                     &fxOctMix.getSlider(), &fxOctSub.getSlider(), &fxOctBlend.getSlider(), &fxOctTone.getSlider() })
         refreshSliderText (*s);
     for (int i = 0; i < params::mod::numSlots; ++i)
         refreshSliderText (modSlotDepth[(size_t) i]);
@@ -3259,20 +3419,23 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     pageSynthButton.setVisible (showPageButtons);
     pageModButton.setVisible (showPageButtons);
     pageLabButton.setVisible (showPageButtons);
+    pageFxButton.setVisible (showPageButtons);
     pageSeqButton.setVisible (showPageButtons);
 
     if (showPageButtons)
     {
-        pageSynthButton.setBounds (top.removeFromLeft (60).reduced (3, 7));
-        pageModButton.setBounds (top.removeFromLeft (52).reduced (3, 7));
-        pageLabButton.setBounds (top.removeFromLeft (52).reduced (3, 7));
-        pageSeqButton.setBounds (top.removeFromLeft (52).reduced (3, 7));
+        pageSynthButton.setBounds (top.removeFromLeft (56).reduced (3, 7));
+        pageModButton.setBounds (top.removeFromLeft (48).reduced (3, 7));
+        pageLabButton.setBounds (top.removeFromLeft (48).reduced (3, 7));
+        pageFxButton.setBounds (top.removeFromLeft (44).reduced (3, 7));
+        pageSeqButton.setBounds (top.removeFromLeft (48).reduced (3, 7));
     }
     else
     {
         pageSynthButton.setBounds (0, 0, 0, 0);
         pageModButton.setBounds (0, 0, 0, 0);
         pageLabButton.setBounds (0, 0, 0, 0);
+        pageFxButton.setBounds (0, 0, 0, 0);
         pageSeqButton.setBounds (0, 0, 0, 0);
     }
 
@@ -3347,6 +3510,7 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     const bool showSynth = (uiPage == pageSynth);
     const bool showMod = (uiPage == pageMod);
     const bool showLab = (uiPage == pageLab);
+    const bool showFx = (uiPage == pageFx);
     const bool showSeq = (uiPage == pageSeq);
 
     const int gap = 7;
@@ -3443,6 +3607,10 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     else if (showLab)
     {
         labGroup.setBounds (row1);
+    }
+    else if (showFx)
+    {
+        fxGroup.setBounds (row1);
     }
     else if (showSeq)
     {
@@ -4042,6 +4210,91 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         ampGroup.setBounds (rightEnv);
     }
 
+    // FX page internal
+    {
+        auto gr = fxGroup.getBounds().reduced (8, 22);
+        const int gap2 = 7;
+        const int rackW = juce::jlimit (220, 360, gr.getWidth() / 4);
+        auto rack = gr.removeFromLeft (rackW);
+        gr.removeFromLeft (gap2);
+        auto detail = gr;
+
+        fxRackPanel.setBounds (rack);
+        fxDetailPanel.setBounds (detail);
+
+        auto rk = rack.reduced (8, 22);
+        const int rowHFx = juce::jmax (24, juce::jmin (42, rk.getHeight() / 7));
+        const int blockGap = 4;
+
+        auto placeRackRow = [&] (juce::TextButton& blockBtn, juce::ToggleButton& en, ies::ui::LevelMeter& pre, ies::ui::LevelMeter& post)
+        {
+            auto row = rk.removeFromTop (rowHFx);
+            rk.removeFromTop (blockGap);
+            const int enW = 44;
+            const int meterW = juce::jmax (42, juce::jmin (56, row.getWidth() / 6));
+            blockBtn.setBounds (row.removeFromLeft (juce::jmax (64, row.getWidth() - enW - meterW * 2 - 10)));
+            row.removeFromLeft (4);
+            en.setBounds (row.removeFromLeft (enW).reduced (0, 4));
+            row.removeFromLeft (3);
+            pre.setBounds (row.removeFromLeft (meterW).reduced (0, 7));
+            row.removeFromLeft (3);
+            post.setBounds (row.removeFromLeft (meterW).reduced (0, 7));
+        };
+
+        placeRackRow (fxBlockChorus, fxChorusEnable, fxPreMeters[0], fxPostMeters[0]);
+        placeRackRow (fxBlockDelay, fxDelayEnable, fxPreMeters[1], fxPostMeters[1]);
+        placeRackRow (fxBlockReverb, fxReverbEnable, fxPreMeters[2], fxPostMeters[2]);
+        placeRackRow (fxBlockDist, fxDistEnable, fxPreMeters[3], fxPostMeters[3]);
+        placeRackRow (fxBlockPhaser, fxPhaserEnable, fxPreMeters[4], fxPostMeters[4]);
+        placeRackRow (fxBlockOctaver, fxOctaverEnable, fxPreMeters[5], fxPostMeters[5]);
+
+        fxOutLabel.setBounds (rk.removeFromTop (20));
+        fxOutMeter.setBounds (rk.removeFromTop (16).reduced (0, 1));
+
+        auto dt = detail.reduced (8, 22);
+        auto globalRow = dt.removeFromTop (84);
+        const int gw = juce::jmax (100, (globalRow.getWidth() - gap2 * 2) / 3);
+        fxGlobalMix.setBounds (globalRow.removeFromLeft (gw));
+        globalRow.removeFromLeft (gap2);
+        fxGlobalOrder.setBounds (globalRow.removeFromLeft (gw));
+        globalRow.removeFromLeft (gap2);
+        fxGlobalOversample.setBounds (globalRow);
+        dt.removeFromTop (6);
+
+        auto setVisibleForBlock = [&] (FxBlockIndex idx, std::initializer_list<juce::Component*> comps)
+        {
+            const bool on = (selectedFxBlock == idx);
+            for (auto* c : comps)
+                c->setVisible (on && showFx);
+            if (on && showFx)
+                layoutKnobGrid (dt, comps);
+        };
+
+        // Common controls are always visible on FX page.
+        fxGlobalMix.setVisible (showFx);
+        fxGlobalOrder.setVisible (showFx);
+        fxGlobalOversample.setVisible (showFx);
+
+        setVisibleForBlock (fxChorus, { &fxChorusMix, &fxChorusRate, &fxChorusDepth, &fxChorusDelay });
+        setVisibleForBlock (fxDelay, { &fxDelayMix, &fxDelayTime, &fxDelayFeedback, &fxDelaySync, &fxDelayPingPong });
+        setVisibleForBlock (fxReverb, { &fxReverbMix, &fxReverbSize, &fxReverbDecay, &fxReverbDamp });
+        setVisibleForBlock (fxDist, { &fxDistMix, &fxDistDrive, &fxDistTone, &fxDistType });
+        setVisibleForBlock (fxPhaser, { &fxPhaserMix, &fxPhaserRate, &fxPhaserDepth, &fxPhaserFeedback });
+        setVisibleForBlock (fxOctaver, { &fxOctMix, &fxOctSub, &fxOctBlend, &fxOctTone });
+
+        auto setTabVisual = [] (juce::TextButton& b, bool active)
+        {
+            b.setColour (juce::TextButton::buttonColourId, active ? juce::Colour (0xff2a3140) : juce::Colour (0xff141a24));
+            b.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffe8ebf1).withAlpha (active ? 0.95f : 0.75f));
+        };
+        setTabVisual (fxBlockChorus, selectedFxBlock == fxChorus);
+        setTabVisual (fxBlockDelay, selectedFxBlock == fxDelay);
+        setTabVisual (fxBlockReverb, selectedFxBlock == fxReverb);
+        setTabVisual (fxBlockDist, selectedFxBlock == fxDist);
+        setTabVisual (fxBlockPhaser, selectedFxBlock == fxPhaser);
+        setTabVisual (fxBlockOctaver, selectedFxBlock == fxOctaver);
+    }
+
     // Filter internal
     {
         auto gr = filterGroup.getBounds().reduced (8, 24);
@@ -4198,6 +4451,7 @@ void IndustrialEnergySynthAudioProcessorEditor::setUiPage (int newPageIndex)
     pageSynthButton.setToggleState (uiPage == pageSynth, juce::dontSendNotification);
     pageModButton.setToggleState (uiPage == pageMod, juce::dontSendNotification);
     pageLabButton.setToggleState (uiPage == pageLab, juce::dontSendNotification);
+    pageFxButton.setToggleState (uiPage == pageFx, juce::dontSendNotification);
     pageSeqButton.setToggleState (uiPage == pageSeq, juce::dontSendNotification);
 
     auto setTabVisual = [] (juce::TextButton& b, bool active)
@@ -4217,6 +4471,7 @@ void IndustrialEnergySynthAudioProcessorEditor::setUiPage (int newPageIndex)
     setTabVisual (pageSynthButton, uiPage == pageSynth);
     setTabVisual (pageModButton, uiPage == pageMod);
     setTabVisual (pageLabButton, uiPage == pageLab);
+    setTabVisual (pageFxButton, uiPage == pageFx);
     setTabVisual (pageSeqButton, uiPage == pageSeq);
 
     if (uiPage == pageLab)
@@ -4231,6 +4486,7 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     const bool showSynth = (uiPage == pageSynth);
     const bool showMod = (uiPage == pageMod);
     const bool showLab = (uiPage == pageLab);
+    const bool showFx = (uiPage == pageFx);
     const bool showSeq = (uiPage == pageSeq);
 
     // Always visible top/status controls.
@@ -4241,6 +4497,7 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     pageSynthButton.setVisible (true);
     pageModButton.setVisible (true);
     pageLabButton.setVisible (true);
+    pageFxButton.setVisible (true);
     pageSeqButton.setVisible (true);
     lastTouchedLabel.setVisible (showMod);
     quickAssignMacro1.setVisible (showMod);
@@ -4436,6 +4693,56 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     labKeyboardRangeLabel.setVisible (showLab);
     labKeyboardInfoLabel.setVisible (showLab);
     labKeyboard.setVisible (showLab);
+
+    fxGroup.setVisible (showFx);
+    fxRackPanel.setVisible (showFx);
+    fxDetailPanel.setVisible (showFx);
+    fxBlockChorus.setVisible (showFx);
+    fxBlockDelay.setVisible (showFx);
+    fxBlockReverb.setVisible (showFx);
+    fxBlockDist.setVisible (showFx);
+    fxBlockPhaser.setVisible (showFx);
+    fxBlockOctaver.setVisible (showFx);
+    fxChorusEnable.setVisible (showFx);
+    fxDelayEnable.setVisible (showFx);
+    fxReverbEnable.setVisible (showFx);
+    fxDistEnable.setVisible (showFx);
+    fxPhaserEnable.setVisible (showFx);
+    fxOctaverEnable.setVisible (showFx);
+    fxGlobalMix.setVisible (showFx);
+    fxGlobalOrder.setVisible (showFx);
+    fxGlobalOversample.setVisible (showFx);
+    fxChorusMix.setVisible (showFx && selectedFxBlock == fxChorus);
+    fxChorusRate.setVisible (showFx && selectedFxBlock == fxChorus);
+    fxChorusDepth.setVisible (showFx && selectedFxBlock == fxChorus);
+    fxChorusDelay.setVisible (showFx && selectedFxBlock == fxChorus);
+    fxDelayMix.setVisible (showFx && selectedFxBlock == fxDelay);
+    fxDelayTime.setVisible (showFx && selectedFxBlock == fxDelay);
+    fxDelayFeedback.setVisible (showFx && selectedFxBlock == fxDelay);
+    fxDelaySync.setVisible (showFx && selectedFxBlock == fxDelay);
+    fxDelayPingPong.setVisible (showFx && selectedFxBlock == fxDelay);
+    fxReverbMix.setVisible (showFx && selectedFxBlock == fxReverb);
+    fxReverbSize.setVisible (showFx && selectedFxBlock == fxReverb);
+    fxReverbDecay.setVisible (showFx && selectedFxBlock == fxReverb);
+    fxReverbDamp.setVisible (showFx && selectedFxBlock == fxReverb);
+    fxDistMix.setVisible (showFx && selectedFxBlock == fxDist);
+    fxDistDrive.setVisible (showFx && selectedFxBlock == fxDist);
+    fxDistTone.setVisible (showFx && selectedFxBlock == fxDist);
+    fxDistType.setVisible (showFx && selectedFxBlock == fxDist);
+    fxPhaserMix.setVisible (showFx && selectedFxBlock == fxPhaser);
+    fxPhaserRate.setVisible (showFx && selectedFxBlock == fxPhaser);
+    fxPhaserDepth.setVisible (showFx && selectedFxBlock == fxPhaser);
+    fxPhaserFeedback.setVisible (showFx && selectedFxBlock == fxPhaser);
+    fxOctMix.setVisible (showFx && selectedFxBlock == fxOctaver);
+    fxOctSub.setVisible (showFx && selectedFxBlock == fxOctaver);
+    fxOctBlend.setVisible (showFx && selectedFxBlock == fxOctaver);
+    fxOctTone.setVisible (showFx && selectedFxBlock == fxOctaver);
+    for (auto& m : fxPreMeters)
+        m.setVisible (showFx);
+    for (auto& m : fxPostMeters)
+        m.setVisible (showFx);
+    fxOutMeter.setVisible (showFx);
+    fxOutLabel.setVisible (showFx);
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::loadMacroNamesFromState()
@@ -4585,6 +4892,7 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     pageSynthButton.setButtonText (ies::ui::tr (ies::ui::Key::pageSynth, langIdx));
     pageModButton.setButtonText (ies::ui::tr (ies::ui::Key::pageMod, langIdx));
     pageLabButton.setButtonText (ies::ui::tr (ies::ui::Key::pageLab, langIdx));
+    pageFxButton.setButtonText (ies::ui::tr (ies::ui::Key::pageFx, langIdx));
     pageSeqButton.setButtonText (ies::ui::tr (ies::ui::Key::pageSeq, langIdx));
     setLastTouchedModDest (lastTouchedModDest, false);
 
@@ -4793,6 +5101,19 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     labKeyboard.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Клавиатура") : juce::String ("Keyboard"));
     updateLabKeyboardRange();
     updateLabKeyboardInfo();
+
+    fxGroup.setText ("FX");
+    fxRackPanel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Цепь") : juce::String ("Rack"));
+    fxDetailPanel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Параметры") : juce::String ("Block"));
+    fxGlobalMix.setLabelText ("FX Mix");
+    fxGlobalOrder.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Порядок") : juce::String ("Order"));
+    fxGlobalOversample.setLabelText ("OS");
+    fxOutLabel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"FX Выход") : juce::String ("FX Out"),
+                        juce::dontSendNotification);
+    fxDelaySync.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Синхр.") : juce::String ("Sync"));
+    fxDelayPingPong.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Пинг-понг") : juce::String ("PingPong"));
+    for (auto* b : { &fxChorusEnable, &fxDelayEnable, &fxReverbEnable, &fxDistEnable, &fxPhaserEnable, &fxOctaverEnable })
+        b->setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Вкл") : juce::String ("On"));
     modHeaderSlot.setText (ies::ui::tr (ies::ui::Key::modSlot, langIdx), juce::dontSendNotification);
     modHeaderSrc.setText (ies::ui::tr (ies::ui::Key::modSrc, langIdx), juce::dontSendNotification);
     modHeaderDst.setText (ies::ui::tr (ies::ui::Key::modDst, langIdx), juce::dontSendNotification);
@@ -4909,6 +5230,8 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
                                  u8"Показать страницу модуляции (макросы, LFO, матрица, drag-and-drop модуляция)."));
     pageLabButton.setTooltip (T ("Show Lab page (Destroy, big Tone EQ, Shaper + Envelopes, keyboard).",
                                  u8"Показать страницу Lab (Destroy, большой Tone EQ, Shaper + огибающие, клавиатура)."));
+    pageFxButton.setTooltip (T ("Show FX page (rack + selected block controls).",
+                                u8"Показать страницу FX (цепочка + параметры выбранного блока)."));
     pageSeqButton.setTooltip (T ("Show Seq page (Arp).",
                                  u8"Показать страницу Сек (арпеджиатор)."));
     lastTouchedLabel.setTooltip (T ("Last touched modulation destination knob.",
@@ -5725,6 +6048,12 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
     updateEnabledStates();
 
     outMeter.pushLevelLinear (audioProcessor.getUiOutputPeak());
+    for (int i = 0; i < (int) fxPreMeters.size(); ++i)
+    {
+        fxPreMeters[(size_t) i].pushLevelLinear (audioProcessor.getUiFxBlockPrePeak (i));
+        fxPostMeters[(size_t) i].pushLevelLinear (audioProcessor.getUiFxBlockPostPeak (i));
+    }
+    fxOutMeter.pushLevelLinear (audioProcessor.getUiFxOutPeak());
 
     {
         const auto langIdx = getLanguageIndex();
@@ -6484,6 +6813,24 @@ void IndustrialEnergySynthAudioProcessorEditor::assignModulation (params::mod::S
                 case params::mod::dstCrushMix:         return isRu ? juce::String::fromUTF8 (u8"Mix (crush)") : "Crush Mix";
                 case params::mod::dstShaperDrive:      return isRu ? juce::String::fromUTF8 (u8"Драйв (shaper)") : "Shaper Drive";
                 case params::mod::dstShaperMix:        return isRu ? juce::String::fromUTF8 (u8"Mix (shaper)") : "Shaper Mix";
+                case params::mod::dstFxChorusRate:     return "FX Chorus Rate";
+                case params::mod::dstFxChorusDepth:    return "FX Chorus Depth";
+                case params::mod::dstFxChorusMix:      return "FX Chorus Mix";
+                case params::mod::dstFxDelayTime:      return "FX Delay Time";
+                case params::mod::dstFxDelayFeedback:  return "FX Delay Feedback";
+                case params::mod::dstFxDelayMix:       return "FX Delay Mix";
+                case params::mod::dstFxReverbSize:     return "FX Reverb Size";
+                case params::mod::dstFxReverbDamp:     return "FX Reverb Damp";
+                case params::mod::dstFxReverbMix:      return "FX Reverb Mix";
+                case params::mod::dstFxDistDrive:      return "FX Dist Drive";
+                case params::mod::dstFxDistTone:       return "FX Dist Tone";
+                case params::mod::dstFxDistMix:        return "FX Dist Mix";
+                case params::mod::dstFxPhaserRate:     return "FX Phaser Rate";
+                case params::mod::dstFxPhaserDepth:    return "FX Phaser Depth";
+                case params::mod::dstFxPhaserFeedback: return "FX Phaser Feedback";
+                case params::mod::dstFxPhaserMix:      return "FX Phaser Mix";
+                case params::mod::dstFxOctaverAmount:  return "FX Octaver Amount";
+                case params::mod::dstFxOctaverMix:     return "FX Octaver Mix";
                 default: break;
             }
             return "Off";
@@ -6507,7 +6854,7 @@ void IndustrialEnergySynthAudioProcessorEditor::showModulationMenu (params::mod:
     juce::Array<int> matchingSlots;
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
-        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstFxOctaverMix, modSlotDst[(size_t) i].getSelectedItemIndex());
         const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
         if (d == dst && s != params::mod::srcOff)
             matchingSlots.add (i);
@@ -6570,6 +6917,146 @@ void IndustrialEnergySynthAudioProcessorEditor::applyFactoryPreset (int factoryI
 
     // Factory presets should be full snapshots: reset everything first so new parameters don't "leak" from previous patches.
     resetAllParamsKeepLanguage();
+
+    // FX baseline defaults for all factory presets.
+    auto setFxDefaults = [&]
+    {
+        setParamValue (params::fx::global::mix, 0.0f);
+        setParamValue (params::fx::global::order, (float) params::fx::global::orderFixedA);
+        setParamValue (params::fx::global::oversample, (float) params::fx::global::osOff);
+
+        setParamValue (params::fx::chorus::enable, 0.0f);
+        setParamValue (params::fx::chorus::mix, 0.0f);
+        setParamValue (params::fx::chorus::rateHz, 0.6f);
+        setParamValue (params::fx::chorus::depthMs, 8.0f);
+        setParamValue (params::fx::chorus::delayMs, 10.0f);
+        setParamValue (params::fx::chorus::feedback, 0.0f);
+        setParamValue (params::fx::chorus::stereo, 1.0f);
+        setParamValue (params::fx::chorus::hpHz, 40.0f);
+
+        setParamValue (params::fx::delay::enable, 0.0f);
+        setParamValue (params::fx::delay::mix, 0.0f);
+        setParamValue (params::fx::delay::sync, 1.0f);
+        setParamValue (params::fx::delay::divL, (float) params::lfo::div1_4);
+        setParamValue (params::fx::delay::divR, (float) params::lfo::div1_4);
+        setParamValue (params::fx::delay::timeMs, 320.0f);
+        setParamValue (params::fx::delay::feedback, 0.35f);
+        setParamValue (params::fx::delay::filterHz, 12000.0f);
+        setParamValue (params::fx::delay::modRate, 0.35f);
+        setParamValue (params::fx::delay::modDepth, 2.0f);
+        setParamValue (params::fx::delay::pingpong, 0.0f);
+        setParamValue (params::fx::delay::duck, 0.0f);
+
+        setParamValue (params::fx::reverb::enable, 0.0f);
+        setParamValue (params::fx::reverb::mix, 0.0f);
+        setParamValue (params::fx::reverb::size, 0.5f);
+        setParamValue (params::fx::reverb::decay, 0.4f);
+        setParamValue (params::fx::reverb::damp, 0.4f);
+        setParamValue (params::fx::reverb::preDelayMs, 0.0f);
+        setParamValue (params::fx::reverb::width, 1.0f);
+        setParamValue (params::fx::reverb::lowCutHz, 40.0f);
+        setParamValue (params::fx::reverb::highCutHz, 16000.0f);
+        setParamValue (params::fx::reverb::quality, (float) params::fx::reverb::hi);
+
+        setParamValue (params::fx::dist::enable, 0.0f);
+        setParamValue (params::fx::dist::mix, 0.0f);
+        setParamValue (params::fx::dist::type, (float) params::fx::dist::tanh);
+        setParamValue (params::fx::dist::driveDb, 0.0f);
+        setParamValue (params::fx::dist::tone, 0.5f);
+        setParamValue (params::fx::dist::postLPHz, 18000.0f);
+        setParamValue (params::fx::dist::outputTrimDb, 0.0f);
+
+        setParamValue (params::fx::phaser::enable, 0.0f);
+        setParamValue (params::fx::phaser::mix, 0.0f);
+        setParamValue (params::fx::phaser::rateHz, 0.35f);
+        setParamValue (params::fx::phaser::depth, 0.6f);
+        setParamValue (params::fx::phaser::centreHz, 1000.0f);
+        setParamValue (params::fx::phaser::feedback, 0.2f);
+        setParamValue (params::fx::phaser::stages, 1.0f);
+        setParamValue (params::fx::phaser::stereo, 1.0f);
+
+        setParamValue (params::fx::octaver::enable, 0.0f);
+        setParamValue (params::fx::octaver::mix, 0.0f);
+        setParamValue (params::fx::octaver::subLevel, 0.5f);
+        setParamValue (params::fx::octaver::blend, 0.5f);
+        setParamValue (params::fx::octaver::sensitivity, 0.5f);
+        setParamValue (params::fx::octaver::tone, 0.5f);
+    };
+    setFxDefaults();
+
+    // Minimal FX refresh across first 10 factory presets (ROADMAP_V2 requirement).
+    auto applyFxFlavor = [&] (int idx)
+    {
+        setParamValue (params::fx::global::mix, 0.42f);
+        switch (idx % 10)
+        {
+            case 0:
+                setParamValue (params::fx::chorus::enable, 1.0f);
+                setParamValue (params::fx::chorus::mix, 0.24f);
+                setParamValue (params::fx::chorus::rateHz, 0.32f);
+                setParamValue (params::fx::chorus::depthMs, 6.0f);
+                break;
+            case 1:
+                setParamValue (params::fx::delay::enable, 1.0f);
+                setParamValue (params::fx::delay::mix, 0.22f);
+                setParamValue (params::fx::delay::divL, (float) params::lfo::div1_8);
+                setParamValue (params::fx::delay::divR, (float) params::lfo::div1_8D);
+                setParamValue (params::fx::delay::feedback, 0.48f);
+                break;
+            case 2:
+                setParamValue (params::fx::reverb::enable, 1.0f);
+                setParamValue (params::fx::reverb::mix, 0.26f);
+                setParamValue (params::fx::reverb::size, 0.64f);
+                setParamValue (params::fx::reverb::decay, 0.58f);
+                break;
+            case 3:
+                setParamValue (params::fx::dist::enable, 1.0f);
+                setParamValue (params::fx::dist::mix, 0.35f);
+                setParamValue (params::fx::dist::driveDb, 9.0f);
+                setParamValue (params::fx::dist::tone, 0.65f);
+                break;
+            case 4:
+                setParamValue (params::fx::phaser::enable, 1.0f);
+                setParamValue (params::fx::phaser::mix, 0.28f);
+                setParamValue (params::fx::phaser::rateHz, 0.45f);
+                setParamValue (params::fx::phaser::depth, 0.72f);
+                break;
+            case 5:
+                setParamValue (params::fx::octaver::enable, 1.0f);
+                setParamValue (params::fx::octaver::mix, 0.34f);
+                setParamValue (params::fx::octaver::subLevel, 0.72f);
+                setParamValue (params::fx::octaver::blend, 0.78f);
+                break;
+            case 6:
+                setParamValue (params::fx::chorus::enable, 1.0f);
+                setParamValue (params::fx::chorus::mix, 0.20f);
+                setParamValue (params::fx::delay::enable, 1.0f);
+                setParamValue (params::fx::delay::mix, 0.18f);
+                break;
+            case 7:
+                setParamValue (params::fx::dist::enable, 1.0f);
+                setParamValue (params::fx::dist::mix, 0.30f);
+                setParamValue (params::fx::reverb::enable, 1.0f);
+                setParamValue (params::fx::reverb::mix, 0.18f);
+                break;
+            case 8:
+                setParamValue (params::fx::phaser::enable, 1.0f);
+                setParamValue (params::fx::phaser::mix, 0.22f);
+                setParamValue (params::fx::delay::enable, 1.0f);
+                setParamValue (params::fx::delay::mix, 0.20f);
+                break;
+            case 9:
+            default:
+                setParamValue (params::fx::octaver::enable, 1.0f);
+                setParamValue (params::fx::octaver::mix, 0.26f);
+                setParamValue (params::fx::dist::enable, 1.0f);
+                setParamValue (params::fx::dist::mix, 0.20f);
+                break;
+        }
+    };
+
+    if (factoryIndex < 10)
+        applyFxFlavor (factoryIndex);
 
     for (const auto& kv : kFactoryPresets[factoryIndex].values)
         setParamValue (kv.first, kv.second);
@@ -6654,6 +7141,24 @@ void IndustrialEnergySynthAudioProcessorEditor::setLastTouchedModDest (params::m
             case params::mod::dstCrushMix:         return isRu ? juce::String::fromUTF8 (u8"Mix (crush)") : "Crush Mix";
             case params::mod::dstShaperDrive:      return isRu ? juce::String::fromUTF8 (u8"Драйв (shaper)") : "Shaper Drive";
             case params::mod::dstShaperMix:        return isRu ? juce::String::fromUTF8 (u8"Mix (shaper)") : "Shaper Mix";
+            case params::mod::dstFxChorusRate:     return "FX Chorus Rate";
+            case params::mod::dstFxChorusDepth:    return "FX Chorus Depth";
+            case params::mod::dstFxChorusMix:      return "FX Chorus Mix";
+            case params::mod::dstFxDelayTime:      return "FX Delay Time";
+            case params::mod::dstFxDelayFeedback:  return "FX Delay Feedback";
+            case params::mod::dstFxDelayMix:       return "FX Delay Mix";
+            case params::mod::dstFxReverbSize:     return "FX Reverb Size";
+            case params::mod::dstFxReverbDamp:     return "FX Reverb Damp";
+            case params::mod::dstFxReverbMix:      return "FX Reverb Mix";
+            case params::mod::dstFxDistDrive:      return "FX Dist Drive";
+            case params::mod::dstFxDistTone:       return "FX Dist Tone";
+            case params::mod::dstFxDistMix:        return "FX Dist Mix";
+            case params::mod::dstFxPhaserRate:     return "FX Phaser Rate";
+            case params::mod::dstFxPhaserDepth:    return "FX Phaser Depth";
+            case params::mod::dstFxPhaserFeedback: return "FX Phaser Feedback";
+            case params::mod::dstFxPhaserMix:      return "FX Phaser Mix";
+            case params::mod::dstFxOctaverAmount:  return "FX Octaver Amount";
+            case params::mod::dstFxOctaverMix:     return "FX Octaver Mix";
             case params::mod::dstOff:              break;
         }
         return "-";
@@ -6663,7 +7168,7 @@ void IndustrialEnergySynthAudioProcessorEditor::setLastTouchedModDest (params::m
     float sumFE = 0.0f, sumAE = 0.0f, sumR = 0.0f;
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
-        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstFxOctaverMix, modSlotDst[(size_t) i].getSelectedItemIndex());
         if (d != dst)
             continue;
 

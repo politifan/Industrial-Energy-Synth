@@ -47,6 +47,7 @@ target_sources(IndustrialEnergySynth PRIVATE
   Source/PluginProcessor.h
   Source/Util/Math.h
   Source/dsp/DestroyChain.h
+  Source/dsp/FxChain.h
   Source/dsp/Lfo.h
   Source/dsp/PolyBlepOscillator.h
   Source/dsp/WavetableSet.h

@@ -307,9 +307,149 @@ enum Dest
     dstModAmount = 8,
     dstCrushMix = 9,
     dstShaperDrive = 10,
-    dstShaperMix = 11
+    dstShaperMix = 11,
+
+    // --- FX destinations (append-only; keep ordering stable once shipped) ---
+    dstFxChorusRate = 12,
+    dstFxChorusDepth = 13,
+    dstFxChorusMix = 14,
+
+    dstFxDelayTime = 15,
+    dstFxDelayFeedback = 16,
+    dstFxDelayMix = 17,
+
+    dstFxReverbSize = 18,
+    dstFxReverbDamp = 19,
+    dstFxReverbMix = 20,
+
+    dstFxDistDrive = 21,
+    dstFxDistTone = 22,
+    dstFxDistMix = 23,
+
+    dstFxPhaserRate = 24,
+    dstFxPhaserDepth = 25,
+    dstFxPhaserFeedback = 26,
+    dstFxPhaserMix = 27,
+
+    dstFxOctaverAmount = 28,
+    dstFxOctaverMix = 29
 };
 }
+
+// ---------------------------------------------------------------------------
+// FX stack (V2.x): chorus / delay / reverb / distortion / phaser / octaver
+// ---------------------------------------------------------------------------
+namespace fx
+{
+namespace global
+{
+inline constexpr const char* mix        = "fx.global.mix";        // 0..1
+inline constexpr const char* order      = "fx.global.order";      // choice
+inline constexpr const char* oversample = "fx.global.oversample"; // choice Off/2x/4x
+
+enum Order
+{
+    orderFixedA = 0,
+    orderFixedB = 1
+};
+
+enum Oversample
+{
+    osOff = 0,
+    os2x  = 1,
+    os4x  = 2
+};
+}
+
+namespace chorus
+{
+inline constexpr const char* enable   = "fx.chorus.enable";
+inline constexpr const char* mix      = "fx.chorus.mix";
+inline constexpr const char* rateHz   = "fx.chorus.rateHz";
+inline constexpr const char* depthMs  = "fx.chorus.depthMs";
+inline constexpr const char* delayMs  = "fx.chorus.delayMs";
+inline constexpr const char* feedback = "fx.chorus.feedback";
+inline constexpr const char* stereo   = "fx.chorus.stereo";
+inline constexpr const char* hpHz     = "fx.chorus.hpHz";
+}
+
+namespace delay
+{
+inline constexpr const char* enable   = "fx.delay.enable";
+inline constexpr const char* mix      = "fx.delay.mix";
+inline constexpr const char* sync     = "fx.delay.sync";
+inline constexpr const char* divL     = "fx.delay.divL";     // choice
+inline constexpr const char* divR     = "fx.delay.divR";     // choice
+inline constexpr const char* timeMs   = "fx.delay.timeMs";   // used when sync=Off
+inline constexpr const char* feedback = "fx.delay.feedback";
+inline constexpr const char* filterHz = "fx.delay.filterHz"; // feedback LP
+inline constexpr const char* modRate  = "fx.delay.modRate";
+inline constexpr const char* modDepth = "fx.delay.modDepth";
+inline constexpr const char* pingpong = "fx.delay.pingpong";
+inline constexpr const char* duck     = "fx.delay.duck";
+}
+
+namespace reverb
+{
+inline constexpr const char* enable     = "fx.reverb.enable";
+inline constexpr const char* mix        = "fx.reverb.mix";
+inline constexpr const char* size       = "fx.reverb.size";
+inline constexpr const char* decay      = "fx.reverb.decay";
+inline constexpr const char* damp       = "fx.reverb.damp";
+inline constexpr const char* preDelayMs = "fx.reverb.preDelayMs";
+inline constexpr const char* width      = "fx.reverb.width";
+inline constexpr const char* lowCutHz   = "fx.reverb.lowCutHz";
+inline constexpr const char* highCutHz  = "fx.reverb.highCutHz";
+inline constexpr const char* quality    = "fx.reverb.quality"; // choice
+
+enum Quality
+{
+    eco = 0,
+    hi  = 1
+};
+}
+
+namespace dist
+{
+inline constexpr const char* enable       = "fx.dist.enable";
+inline constexpr const char* mix          = "fx.dist.mix";
+inline constexpr const char* type         = "fx.dist.type"; // choice
+inline constexpr const char* driveDb      = "fx.dist.driveDb";
+inline constexpr const char* tone         = "fx.dist.tone";
+inline constexpr const char* postLPHz     = "fx.dist.postLPHz";
+inline constexpr const char* outputTrimDb = "fx.dist.outputTrimDb";
+
+enum Type
+{
+    softclip = 0,
+    hardclip = 1,
+    tanh     = 2,
+    diode    = 3
+};
+}
+
+namespace phaser
+{
+inline constexpr const char* enable    = "fx.phaser.enable";
+inline constexpr const char* mix       = "fx.phaser.mix";
+inline constexpr const char* rateHz    = "fx.phaser.rateHz";
+inline constexpr const char* depth     = "fx.phaser.depth";
+inline constexpr const char* centreHz  = "fx.phaser.centreHz";
+inline constexpr const char* feedback  = "fx.phaser.feedback";
+inline constexpr const char* stages    = "fx.phaser.stages"; // choice
+inline constexpr const char* stereo    = "fx.phaser.stereo";
+}
+
+namespace octaver
+{
+inline constexpr const char* enable      = "fx.octaver.enable";
+inline constexpr const char* mix         = "fx.octaver.mix";
+inline constexpr const char* subLevel    = "fx.octaver.subLevel";
+inline constexpr const char* blend       = "fx.octaver.blend";
+inline constexpr const char* sensitivity = "fx.octaver.sensitivity";
+inline constexpr const char* tone        = "fx.octaver.tone";
+}
+} // namespace fx
 
 namespace filter
 {

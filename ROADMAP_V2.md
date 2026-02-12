@@ -111,3 +111,19 @@
 - Сглаживание для всех автоматируемых “опасных” параметров (cutoff/drive/mix/eq nodes).
 - UI: FFT/анализаторы только в message thread, данные через lock‑free ring buffer.
 - Билингвальность RU/EN: все строки через единый i18n слой; подписи должны помещаться.
+
+## Changelog (work-in-progress)
+### 2026-02-12
+- Добавлен каркас `FXChain` (Chorus / Delay / Reverb / Distortion / Phaser / Octaver) с per-block mix + global FX mix.
+- Добавлены параметры APVTS:
+  - `fx.global.*`
+  - `fx.chorus.*`
+  - `fx.delay.*`
+  - `fx.reverb.*`
+  - `fx.dist.*`
+  - `fx.phaser.*`
+  - `fx.octaver.*`
+- Расширен Mod Matrix destinations под FX (rate/depth/mix/drive/feedback/amount).
+- Интеграция FX-стека в аудио-движок после основной synth/destroy/filter/tone цепочки.
+- Добавлены UI-метры данных по FX (pre/post per block + out peak) на уровне процессора/движка.
+- Обновлён QA чеклист (`IES_QA.md`) с отдельным FX smoke/stress прогоном.

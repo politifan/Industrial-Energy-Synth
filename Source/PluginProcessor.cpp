@@ -912,6 +912,68 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
         paramPointers.modSlotDepth[(size_t) i] = apvts.getRawParameterValue (slotDepthIds[i]);
     }
 
+    // --- FX chain ---
+    paramPointers.fxGlobalMix = apvts.getRawParameterValue (params::fx::global::mix);
+    paramPointers.fxGlobalOrder = apvts.getRawParameterValue (params::fx::global::order);
+    paramPointers.fxGlobalOversample = apvts.getRawParameterValue (params::fx::global::oversample);
+
+    paramPointers.fxChorusEnable = apvts.getRawParameterValue (params::fx::chorus::enable);
+    paramPointers.fxChorusMix = apvts.getRawParameterValue (params::fx::chorus::mix);
+    paramPointers.fxChorusRateHz = apvts.getRawParameterValue (params::fx::chorus::rateHz);
+    paramPointers.fxChorusDepthMs = apvts.getRawParameterValue (params::fx::chorus::depthMs);
+    paramPointers.fxChorusDelayMs = apvts.getRawParameterValue (params::fx::chorus::delayMs);
+    paramPointers.fxChorusFeedback = apvts.getRawParameterValue (params::fx::chorus::feedback);
+    paramPointers.fxChorusStereo = apvts.getRawParameterValue (params::fx::chorus::stereo);
+    paramPointers.fxChorusHpHz = apvts.getRawParameterValue (params::fx::chorus::hpHz);
+
+    paramPointers.fxDelayEnable = apvts.getRawParameterValue (params::fx::delay::enable);
+    paramPointers.fxDelayMix = apvts.getRawParameterValue (params::fx::delay::mix);
+    paramPointers.fxDelaySync = apvts.getRawParameterValue (params::fx::delay::sync);
+    paramPointers.fxDelayDivL = apvts.getRawParameterValue (params::fx::delay::divL);
+    paramPointers.fxDelayDivR = apvts.getRawParameterValue (params::fx::delay::divR);
+    paramPointers.fxDelayTimeMs = apvts.getRawParameterValue (params::fx::delay::timeMs);
+    paramPointers.fxDelayFeedback = apvts.getRawParameterValue (params::fx::delay::feedback);
+    paramPointers.fxDelayFilterHz = apvts.getRawParameterValue (params::fx::delay::filterHz);
+    paramPointers.fxDelayModRate = apvts.getRawParameterValue (params::fx::delay::modRate);
+    paramPointers.fxDelayModDepth = apvts.getRawParameterValue (params::fx::delay::modDepth);
+    paramPointers.fxDelayPingpong = apvts.getRawParameterValue (params::fx::delay::pingpong);
+    paramPointers.fxDelayDuck = apvts.getRawParameterValue (params::fx::delay::duck);
+
+    paramPointers.fxReverbEnable = apvts.getRawParameterValue (params::fx::reverb::enable);
+    paramPointers.fxReverbMix = apvts.getRawParameterValue (params::fx::reverb::mix);
+    paramPointers.fxReverbSize = apvts.getRawParameterValue (params::fx::reverb::size);
+    paramPointers.fxReverbDecay = apvts.getRawParameterValue (params::fx::reverb::decay);
+    paramPointers.fxReverbDamp = apvts.getRawParameterValue (params::fx::reverb::damp);
+    paramPointers.fxReverbPreDelayMs = apvts.getRawParameterValue (params::fx::reverb::preDelayMs);
+    paramPointers.fxReverbWidth = apvts.getRawParameterValue (params::fx::reverb::width);
+    paramPointers.fxReverbLowCutHz = apvts.getRawParameterValue (params::fx::reverb::lowCutHz);
+    paramPointers.fxReverbHighCutHz = apvts.getRawParameterValue (params::fx::reverb::highCutHz);
+    paramPointers.fxReverbQuality = apvts.getRawParameterValue (params::fx::reverb::quality);
+
+    paramPointers.fxDistEnable = apvts.getRawParameterValue (params::fx::dist::enable);
+    paramPointers.fxDistMix = apvts.getRawParameterValue (params::fx::dist::mix);
+    paramPointers.fxDistType = apvts.getRawParameterValue (params::fx::dist::type);
+    paramPointers.fxDistDriveDb = apvts.getRawParameterValue (params::fx::dist::driveDb);
+    paramPointers.fxDistTone = apvts.getRawParameterValue (params::fx::dist::tone);
+    paramPointers.fxDistPostLPHz = apvts.getRawParameterValue (params::fx::dist::postLPHz);
+    paramPointers.fxDistOutputTrimDb = apvts.getRawParameterValue (params::fx::dist::outputTrimDb);
+
+    paramPointers.fxPhaserEnable = apvts.getRawParameterValue (params::fx::phaser::enable);
+    paramPointers.fxPhaserMix = apvts.getRawParameterValue (params::fx::phaser::mix);
+    paramPointers.fxPhaserRateHz = apvts.getRawParameterValue (params::fx::phaser::rateHz);
+    paramPointers.fxPhaserDepth = apvts.getRawParameterValue (params::fx::phaser::depth);
+    paramPointers.fxPhaserCentreHz = apvts.getRawParameterValue (params::fx::phaser::centreHz);
+    paramPointers.fxPhaserFeedback = apvts.getRawParameterValue (params::fx::phaser::feedback);
+    paramPointers.fxPhaserStages = apvts.getRawParameterValue (params::fx::phaser::stages);
+    paramPointers.fxPhaserStereo = apvts.getRawParameterValue (params::fx::phaser::stereo);
+
+    paramPointers.fxOctEnable = apvts.getRawParameterValue (params::fx::octaver::enable);
+    paramPointers.fxOctMix = apvts.getRawParameterValue (params::fx::octaver::mix);
+    paramPointers.fxOctSubLevel = apvts.getRawParameterValue (params::fx::octaver::subLevel);
+    paramPointers.fxOctBlend = apvts.getRawParameterValue (params::fx::octaver::blend);
+    paramPointers.fxOctSensitivity = apvts.getRawParameterValue (params::fx::octaver::sensitivity);
+    paramPointers.fxOctTone = apvts.getRawParameterValue (params::fx::octaver::tone);
+
     // --- Arp (Sequencer) ---
     arpParams.enable  = apvts.getRawParameterValue (params::arp::enable);
     arpParams.latch   = apvts.getRawParameterValue (params::arp::latch);
@@ -1545,9 +1607,17 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
     const auto modSrcChoices = juce::StringArray { "Off", "LFO 1", "LFO 2", "Macro 1", "Macro 2",
                                                    "Mod Wheel", "Aftertouch", "Velocity", "Note",
                                                    "Filter Env", "Amp Env", "Random" };
-    const auto modDstChoices = juce::StringArray { "Off", "Osc1 Level", "Osc2 Level", "Osc3 Level", "Filter Cutoff", "Filter Reso",
-                                                   "Fold Amount", "Clip Amount", "Mod Amount", "Crush Mix",
-                                                   "Shaper Drive", "Shaper Mix" };
+    const auto modDstChoices = juce::StringArray {
+        "Off", "Osc1 Level", "Osc2 Level", "Osc3 Level", "Filter Cutoff", "Filter Reso",
+        "Fold Amount", "Clip Amount", "Mod Amount", "Crush Mix",
+        "Shaper Drive", "Shaper Mix",
+        "FX Chorus Rate", "FX Chorus Depth", "FX Chorus Mix",
+        "FX Delay Time", "FX Delay Feedback", "FX Delay Mix",
+        "FX Reverb Size", "FX Reverb Damp", "FX Reverb Mix",
+        "FX Dist Drive", "FX Dist Tone", "FX Dist Mix",
+        "FX Phaser Rate", "FX Phaser Depth", "FX Phaser Feedback", "FX Phaser Mix",
+        "FX Octaver Amount", "FX Octaver Mix"
+    };
 
     auto addModSlot = [&] (const char* srcId, const char* dstId, const char* depthId, int slotIndex)
     {
@@ -1809,6 +1879,181 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
     addPeak (params::tone::peak8Enable, params::tone::peak8FreqHz, params::tone::peak8GainDb, params::tone::peak8Q, "Peak 8", false, 9500.0f, 0.90f);
 
     layout.add (std::move (toneGroup));
+
+    // --- FX Global ---
+    {
+        auto g = std::make_unique<juce::AudioProcessorParameterGroup> ("fx.global", "FX Global", "|");
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::global::mix), "FX Mix",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::global::order), "FX Order",
+                                                                   juce::StringArray { "Fixed A", "Fixed B" },
+                                                                   (int) params::fx::global::orderFixedA));
+        g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::global::oversample), "FX Oversampling",
+                                                                   juce::StringArray { "Off", "2x", "4x" },
+                                                                   (int) params::fx::global::osOff));
+        layout.add (std::move (g));
+    }
+
+    // --- FX Chorus ---
+    {
+        auto g = std::make_unique<juce::AudioProcessorParameterGroup> ("fx.chorus", "FX Chorus", "|");
+        g->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::fx::chorus::enable), "Enable", false));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::chorus::mix), "Mix",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        {
+            juce::NormalisableRange<float> r (0.01f, 10.0f);
+            r.setSkewForCentre (0.6f);
+            g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::chorus::rateHz), "Rate", r, 0.6f, "Hz"));
+        }
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::chorus::depthMs), "Depth",
+                                                                  juce::NormalisableRange<float> (0.0f, 25.0f), 8.0f, "ms"));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::chorus::delayMs), "Delay",
+                                                                  juce::NormalisableRange<float> (0.5f, 45.0f), 10.0f, "ms"));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::chorus::feedback), "Feedback",
+                                                                  juce::NormalisableRange<float> (-0.98f, 0.98f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::chorus::stereo), "Stereo",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 1.0f));
+        {
+            juce::NormalisableRange<float> r (10.0f, 2000.0f);
+            r.setSkewForCentre (120.0f);
+            g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::chorus::hpHz), "HP",
+                                                                      r, 40.0f, "Hz"));
+        }
+        layout.add (std::move (g));
+    }
+
+    // --- FX Delay ---
+    {
+        auto g = std::make_unique<juce::AudioProcessorParameterGroup> ("fx.delay", "FX Delay", "|");
+        g->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::fx::delay::enable), "Enable", false));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::delay::mix), "Mix",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::fx::delay::sync), "Sync", true));
+        g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::delay::divL), "Div L", lfoDivChoices, (int) params::lfo::div1_4));
+        g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::delay::divR), "Div R", lfoDivChoices, (int) params::lfo::div1_4));
+        {
+            juce::NormalisableRange<float> r (1.0f, 4000.0f);
+            r.setSkewForCentre (320.0f);
+            g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::delay::timeMs), "Time",
+                                                                      r, 320.0f, "ms"));
+        }
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::delay::feedback), "Feedback",
+                                                                  juce::NormalisableRange<float> (0.0f, 0.98f), 0.35f));
+        {
+            juce::NormalisableRange<float> r (200.0f, 20000.0f);
+            r.setSkewForCentre (3000.0f);
+            g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::delay::filterHz), "Filter",
+                                                                      r, 12000.0f, "Hz"));
+        }
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::delay::modRate), "Mod Rate",
+                                                                  juce::NormalisableRange<float> (0.01f, 20.0f), 0.35f, "Hz"));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::delay::modDepth), "Mod Depth",
+                                                                  juce::NormalisableRange<float> (0.0f, 25.0f), 2.0f, "ms"));
+        g->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::fx::delay::pingpong), "PingPong", false));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::delay::duck), "Duck",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        layout.add (std::move (g));
+    }
+
+    // --- FX Reverb ---
+    {
+        auto g = std::make_unique<juce::AudioProcessorParameterGroup> ("fx.reverb", "FX Reverb", "|");
+        g->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::fx::reverb::enable), "Enable", false));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::reverb::mix), "Mix",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::reverb::size), "Size",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::reverb::decay), "Decay",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.4f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::reverb::damp), "Damp",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.4f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::reverb::preDelayMs), "PreDelay",
+                                                                  juce::NormalisableRange<float> (0.0f, 200.0f), 0.0f, "ms"));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::reverb::width), "Width",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 1.0f));
+        {
+            juce::NormalisableRange<float> r (20.0f, 2000.0f);
+            r.setSkewForCentre (120.0f);
+            g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::reverb::lowCutHz), "LowCut",
+                                                                      r, 40.0f, "Hz"));
+        }
+        {
+            juce::NormalisableRange<float> r (2000.0f, 20000.0f);
+            r.setSkewForCentre (9000.0f);
+            g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::reverb::highCutHz), "HighCut",
+                                                                      r, 16000.0f, "Hz"));
+        }
+        g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::reverb::quality), "Quality",
+                                                                   juce::StringArray { "Eco", "Hi" },
+                                                                   (int) params::fx::reverb::hi));
+        layout.add (std::move (g));
+    }
+
+    // --- FX Dist ---
+    {
+        auto g = std::make_unique<juce::AudioProcessorParameterGroup> ("fx.dist", "FX Dist", "|");
+        g->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::fx::dist::enable), "Enable", false));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::dist::mix), "Mix",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::dist::type), "Type",
+                                                                   juce::StringArray { "SoftClip", "HardClip", "Tanh", "Diode" },
+                                                                   (int) params::fx::dist::tanh));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::dist::driveDb), "Drive",
+                                                                  juce::NormalisableRange<float> (-24.0f, 36.0f), 0.0f, "dB"));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::dist::tone), "Tone",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f));
+        {
+            juce::NormalisableRange<float> r (800.0f, 20000.0f);
+            r.setSkewForCentre (4500.0f);
+            g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::dist::postLPHz), "Post LP",
+                                                                      r, 18000.0f, "Hz"));
+        }
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::dist::outputTrimDb), "Trim",
+                                                                  juce::NormalisableRange<float> (-24.0f, 24.0f), 0.0f, "dB"));
+        layout.add (std::move (g));
+    }
+
+    // --- FX Phaser ---
+    {
+        auto g = std::make_unique<juce::AudioProcessorParameterGroup> ("fx.phaser", "FX Phaser", "|");
+        g->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::fx::phaser::enable), "Enable", false));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::phaser::mix), "Mix",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::phaser::rateHz), "Rate",
+                                                                  juce::NormalisableRange<float> (0.01f, 20.0f), 0.35f, "Hz"));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::phaser::depth), "Depth",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.6f));
+        {
+            juce::NormalisableRange<float> r (20.0f, 18000.0f);
+            r.setSkewForCentre (1000.0f);
+            g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::phaser::centreHz), "Centre",
+                                                                      r, 1000.0f, "Hz"));
+        }
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::phaser::feedback), "Feedback",
+                                                                  juce::NormalisableRange<float> (-0.95f, 0.95f), 0.2f));
+        g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::phaser::stages), "Stages",
+                                                                   juce::StringArray { "4", "6", "8", "12" }, 1));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::phaser::stereo), "Stereo",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 1.0f));
+        layout.add (std::move (g));
+    }
+
+    // --- FX Octaver ---
+    {
+        auto g = std::make_unique<juce::AudioProcessorParameterGroup> ("fx.octaver", "FX Octaver", "|");
+        g->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::fx::octaver::enable), "Enable", false));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::octaver::mix), "Mix",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::octaver::subLevel), "Sub Level",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::octaver::blend), "Blend",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::octaver::sensitivity), "Sensitivity",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::octaver::tone), "Tone",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f));
+        layout.add (std::move (g));
+    }
 
     // --- Output ---
     auto outGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("out", "Output", "|");

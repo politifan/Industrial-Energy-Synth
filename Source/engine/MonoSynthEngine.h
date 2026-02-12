@@ -8,6 +8,7 @@
 #include "../Params.h"
 #include "../Util/Math.h"
 #include "../dsp/DestroyChain.h"
+#include "../dsp/FxChain.h"
 #include "../dsp/Lfo.h"
 #include "../dsp/PolyBlepOscillator.h"
 #include "../dsp/SvfFilter.h"
@@ -162,6 +163,74 @@ public:
         std::array<std::atomic<float>*, (size_t) params::mod::numSlots> modSlotDst {};
         std::array<std::atomic<float>*, (size_t) params::mod::numSlots> modSlotDepth {};
 
+        // FX global
+        std::atomic<float>* fxGlobalMix = nullptr;
+        std::atomic<float>* fxGlobalOrder = nullptr;
+        std::atomic<float>* fxGlobalOversample = nullptr;
+
+        // FX Chorus
+        std::atomic<float>* fxChorusEnable = nullptr;
+        std::atomic<float>* fxChorusMix = nullptr;
+        std::atomic<float>* fxChorusRateHz = nullptr;
+        std::atomic<float>* fxChorusDepthMs = nullptr;
+        std::atomic<float>* fxChorusDelayMs = nullptr;
+        std::atomic<float>* fxChorusFeedback = nullptr;
+        std::atomic<float>* fxChorusStereo = nullptr;
+        std::atomic<float>* fxChorusHpHz = nullptr;
+
+        // FX Delay
+        std::atomic<float>* fxDelayEnable = nullptr;
+        std::atomic<float>* fxDelayMix = nullptr;
+        std::atomic<float>* fxDelaySync = nullptr;
+        std::atomic<float>* fxDelayDivL = nullptr;
+        std::atomic<float>* fxDelayDivR = nullptr;
+        std::atomic<float>* fxDelayTimeMs = nullptr;
+        std::atomic<float>* fxDelayFeedback = nullptr;
+        std::atomic<float>* fxDelayFilterHz = nullptr;
+        std::atomic<float>* fxDelayModRate = nullptr;
+        std::atomic<float>* fxDelayModDepth = nullptr;
+        std::atomic<float>* fxDelayPingpong = nullptr;
+        std::atomic<float>* fxDelayDuck = nullptr;
+
+        // FX Reverb
+        std::atomic<float>* fxReverbEnable = nullptr;
+        std::atomic<float>* fxReverbMix = nullptr;
+        std::atomic<float>* fxReverbSize = nullptr;
+        std::atomic<float>* fxReverbDecay = nullptr;
+        std::atomic<float>* fxReverbDamp = nullptr;
+        std::atomic<float>* fxReverbPreDelayMs = nullptr;
+        std::atomic<float>* fxReverbWidth = nullptr;
+        std::atomic<float>* fxReverbLowCutHz = nullptr;
+        std::atomic<float>* fxReverbHighCutHz = nullptr;
+        std::atomic<float>* fxReverbQuality = nullptr;
+
+        // FX Dist
+        std::atomic<float>* fxDistEnable = nullptr;
+        std::atomic<float>* fxDistMix = nullptr;
+        std::atomic<float>* fxDistType = nullptr;
+        std::atomic<float>* fxDistDriveDb = nullptr;
+        std::atomic<float>* fxDistTone = nullptr;
+        std::atomic<float>* fxDistPostLPHz = nullptr;
+        std::atomic<float>* fxDistOutputTrimDb = nullptr;
+
+        // FX Phaser
+        std::atomic<float>* fxPhaserEnable = nullptr;
+        std::atomic<float>* fxPhaserMix = nullptr;
+        std::atomic<float>* fxPhaserRateHz = nullptr;
+        std::atomic<float>* fxPhaserDepth = nullptr;
+        std::atomic<float>* fxPhaserCentreHz = nullptr;
+        std::atomic<float>* fxPhaserFeedback = nullptr;
+        std::atomic<float>* fxPhaserStages = nullptr;
+        std::atomic<float>* fxPhaserStereo = nullptr;
+
+        // FX Octaver
+        std::atomic<float>* fxOctEnable = nullptr;
+        std::atomic<float>* fxOctMix = nullptr;
+        std::atomic<float>* fxOctSubLevel = nullptr;
+        std::atomic<float>* fxOctBlend = nullptr;
+        std::atomic<float>* fxOctSensitivity = nullptr;
+        std::atomic<float>* fxOctTone = nullptr;
+
         std::atomic<float>* outGainDb = nullptr;
     };
 
@@ -190,6 +259,7 @@ public:
     void setModWheel (int value0to127) noexcept;
     void setAftertouch (int value0to127) noexcept;
     void setPitchBend (int value0to16383) noexcept;
+    const ies::dsp::FxChain::Meters& getFxMeters() const noexcept { return fxChain.getMeters(); }
 
 private:
     struct LinearRamp final
@@ -353,6 +423,7 @@ private:
     dsp::DestroyChain destroyBase;
     dsp::DestroyChain destroyOs2;
     dsp::DestroyChain destroyOs4;
+    dsp::FxChain fxChain;
 
     juce::dsp::Oversampling<float> destroyOversampling2x { 1, 1, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, false };
     juce::dsp::Oversampling<float> destroyOversampling4x { 1, 2, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, false };

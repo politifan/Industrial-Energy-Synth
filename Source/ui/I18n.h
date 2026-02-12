@@ -21,6 +21,7 @@ enum class Key
     pageSynth,
     pageMod,
     pageLab,
+    pageFx,
     pageSeq,
     init,
     intentMode,
@@ -238,6 +239,7 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::pageSynth:    return u8 (u8"Синт");
             case Key::pageMod:      return u8 (u8"Мод");
             case Key::pageLab:      return u8 (u8"Лаб");
+            case Key::pageFx:       return u8 (u8"FX");
             case Key::pageSeq:      return u8 (u8"Сек");
             case Key::init:         return u8 (u8"Сброс");
             case Key::intentMode:   return u8 (u8"Цель");
@@ -450,6 +452,7 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::pageSynth:    return "Synth";
             case Key::pageMod:      return "Mod";
             case Key::pageLab:      return "Lab";
+            case Key::pageFx:       return "FX";
             case Key::pageSeq:      return "Seq";
             case Key::init:         return "Init";
             case Key::intentMode:   return "Intent";

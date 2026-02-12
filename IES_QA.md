@@ -70,6 +70,23 @@
 
 Ожидание: нет крашей, нет утечек UI, нет “зависших” нот (Panic помогает).
 
+## 8) FX Rack smoke (новый стек)
+1. Включи по очереди: `Chorus`, `Delay`, `Reverb`, `Dist`, `Phaser`, `Octaver`.
+2. Для каждого:
+   - покрути `Mix` от 0 до 100%;
+   - покрути ключевые параметры (`Rate/Depth/Drive/Feedback/Size` и т.д.);
+   - быстро автомейшни 2-3 параметра одновременно.
+3. Проверь `FX Global Mix`, `FX Order` (Fixed A/B), `FX Oversampling` (Off/2x/4x).
+4. Проверь Mod Matrix:
+   - назначь `LFO1 -> FX Delay Time`,
+   - `Macro1 -> FX Dist Drive`,
+   - `Aftertouch -> FX Reverb Mix`.
+
+Ожидание:
+- Нет щелчков/взрывов уровня.
+- Никаких крашей при переключении FX и Oversampling.
+- Модуляции ограничиваются корректно (не уходят в NaN/инфинити).
+
 ### 7.1 Stress matrix (SR / Buffer / Automation)
 | SR | Buffer | Что крутить/автоматизировать | Что проверить |
 |---:|---:|---|---|
