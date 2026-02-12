@@ -1,5 +1,7 @@
 #include "MonoSynthEngine.h"
 
+#include <cstdint>
+
 namespace ies::engine
 {
 static int msToSamples (double sampleRate, float ms) noexcept
@@ -22,6 +24,15 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     outGain.reset (sampleRateHz, 0.02); // 20ms click-avoidance
     outGain.setCurrentAndTargetValue (1.0f);
 
+    modWheelSm.reset (sampleRateHz, 0.01);
+    modWheelSm.setCurrentAndTargetValue (0.0f);
+    aftertouchSm.reset (sampleRateHz, 0.01);
+    aftertouchSm.setCurrentAndTargetValue (0.0f);
+    pitchBendSemisSm.reset (sampleRateHz, 0.002);
+    pitchBendSemisSm.setCurrentAndTargetValue (0.0f);
+    modRngState = 0x52414e44u;
+    randomNoteValue = 0.0f;
+
     osc1.prepare (sampleRateHz);
     osc2.prepare (sampleRateHz);
     osc3.prepare (sampleRateHz);
@@ -39,6 +50,8 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     // Oversampling/scratch buffers are allocated up-front (no audio-thread allocations).
     const auto maxN = juce::jmax (1, maxBlockSize);
     destroyBuffer.setSize (1, maxN, false, false, true);
+    ampEnvBuf.resize ((size_t) maxN);
+    filterEnvBuf.resize ((size_t) maxN);
     destroyNoteHz.resize ((size_t) maxN);
     destroyFoldDriveDb.resize ((size_t) maxN);
     destroyFoldAmount.resize ((size_t) maxN);
@@ -98,6 +111,13 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     shaperDriveDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->shaperDriveDb : nullptr, 0.0f));
     shaperMixSm.reset (sampleRateHz, smoothSeconds);
     shaperMixSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->shaperMix : nullptr, 1.0f));
+
+    noiseLevelSm.reset (sampleRateHz, smoothSeconds);
+    noiseLevelSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->noiseLevel : nullptr, 0.0f));
+    noiseColorSm.reset (sampleRateHz, smoothSeconds);
+    noiseColorSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->noiseColor : nullptr, 0.75f));
+    noiseRngState = 0x726f6e65u;
+    noiseLp = 0.0f;
 
     filterCutoffHzSm.reset (sampleRateHz, smoothSeconds);
     filterCutoffHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->filterCutoffHz : nullptr, 2000.0f));
@@ -274,7 +294,17 @@ void MonoSynthEngine::reset()
     tonePeak8GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak8GainDb : nullptr, 0.0f));
     tonePeak8QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak8Q : nullptr, 0.90f));
 
+    noiseLevelSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->noiseLevel : nullptr, 0.0f));
+    noiseColorSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->noiseColor : nullptr, 0.75f));
+    noiseRngState = 0x726f6e65u;
+    noiseLp = 0.0f;
+
     outGain.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (loadParam (params != nullptr ? params->outGainDb : nullptr, 0.0f), -100.0f));
+    modWheelSm.setCurrentAndTargetValue (0.0f);
+    aftertouchSm.setCurrentAndTargetValue (0.0f);
+    pitchBendSemisSm.setCurrentAndTargetValue (0.0f);
+    modRngState = 0x52414e44u;
+    randomNoteValue = 0.0f;
 
     // Keep drift running across notes, but reset to a neutral state on transport resets.
     driftState1 = 0.0f;
@@ -411,6 +441,13 @@ void MonoSynthEngine::noteOn (int midiNote, int velocity0to127)
 
     gateOn = true;
 
+    // Random mod source (Serum-like): new unipolar value per note-on.
+    // Fast deterministic xorshift32 (no allocations, no std::random).
+    modRngState ^= (modRngState << 13);
+    modRngState ^= (modRngState >> 17);
+    modRngState ^= (modRngState << 5);
+    randomNoteValue = (float) ((double) modRngState / 4294967296.0); // [0, 1)
+
     const auto envMode = (params != nullptr && params->monoEnvMode != nullptr)
         ? (int) std::lround (params->monoEnvMode->load())
         : (int) params::mono::retrigger;
@@ -456,6 +493,30 @@ void MonoSynthEngine::allNotesOff()
     filterEnv.noteOff();
 }
 
+void MonoSynthEngine::setModWheel (int value0to127) noexcept
+{
+    const auto v = (float) juce::jlimit (0, 127, value0to127) / 127.0f;
+    modWheelSm.setTargetValue (v);
+}
+
+void MonoSynthEngine::setAftertouch (int value0to127) noexcept
+{
+    const auto v = (float) juce::jlimit (0, 127, value0to127) / 127.0f;
+    aftertouchSm.setTargetValue (v);
+}
+
+void MonoSynthEngine::setPitchBend (int value0to16383) noexcept
+{
+    const int v = juce::jlimit (0, 16383, value0to16383);
+
+    // MIDI pitch wheel is 14-bit with 8192 = centre.
+    const float norm = ((float) v - 8192.0f) / 8192.0f; // roughly [-1..+1)
+
+    // Serum-like default: +/-2 semitones.
+    constexpr float rangeSemis = 2.0f;
+    pitchBendSemisSm.setTargetValue (juce::jlimit (-rangeSemis, rangeSemis, norm * rangeSemis));
+}
+
 void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample, int numSamples, float* preDestroyOut)
 {
     if (numSamples <= 0)
@@ -497,6 +558,9 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
 
     setTargetIfChanged (shaperDriveDbSm, params->shaperDriveDb != nullptr ? params->shaperDriveDb->load() : 0.0f);
     setTargetIfChanged (shaperMixSm, params->shaperMix != nullptr ? params->shaperMix->load() : 1.0f);
+
+    setTargetIfChanged (noiseLevelSm, params->noiseLevel != nullptr ? params->noiseLevel->load() : 0.0f);
+    setTargetIfChanged (noiseColorSm, params->noiseColor != nullptr ? params->noiseColor->load() : 0.75f);
 
     setTargetIfChanged (filterCutoffHzSm, params->filterCutoffHz != nullptr ? params->filterCutoffHz->load() : 2000.0f);
     setTargetIfChanged (filterResKnobSm,  params->filterResonance != nullptr ? params->filterResonance->load() : 0.25f);
@@ -706,16 +770,44 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         const auto dst = params->modSlotDst[(size_t) s] != nullptr ? (int) std::lround (params->modSlotDst[(size_t) s]->load()) : (int) params::mod::dstOff;
         const auto dep = params->modSlotDepth[(size_t) s] != nullptr ? params->modSlotDepth[(size_t) s]->load() : 0.0f;
 
-        slots[(size_t) s].src = juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, src);
+        slots[(size_t) s].src = juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, src);
         slots[(size_t) s].dst = juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, dst);
         slots[(size_t) s].depth = juce::jlimit (-1.0f, 1.0f, dep);
     }
 
+    const auto noiseEnabled = params->noiseEnable != nullptr && (params->noiseEnable->load() >= 0.5f);
+    auto nextNoise = [&]() noexcept -> float
+    {
+        // Fast, deterministic xorshift32 (no allocations, no std::random).
+        noiseRngState ^= (noiseRngState << 13);
+        noiseRngState ^= (noiseRngState >> 17);
+        noiseRngState ^= (noiseRngState << 5);
+
+        const auto r = (std::int32_t) noiseRngState;
+        return (float) r / 2147483648.0f; // [-1, 1)
+    };
+
     // 1) Generate oscillator mix + per-sample params for the Destroy chain.
     for (int i = 0; i < numSamples; ++i)
     {
+        const auto midiNote = noteGlide.getNext();
+        const auto noteSrc = juce::jlimit (0.0f, 1.0f, midiNote / 127.0f); // unipolar 0..1
+        const auto velSrc  = velocityGain; // unipolar 0..1 (captured per env-mode rules)
+        const auto bendSemis = pitchBendSemisSm.getNextValue();
+        const auto midiNoteBended = midiNote + bendSemis;
+
+        // Envelope sources: compute once and reuse (for Filter, Amp and Mod Matrix).
+        const auto aEnv = ampEnv.getNextSample();
+        const auto fEnv = filterEnv.getNextSample();
+        ampEnvBuf[(size_t) i] = aEnv;
+        filterEnvBuf[(size_t) i] = fEnv;
+
+        const auto randSrc = randomNoteValue; // unipolar 0..1, refreshed on note-on
+
         const auto l1 = lfo1.process(); // bipolar
         const auto l2 = lfo2.process(); // bipolar
+        const auto mw = modWheelSm.getNextValue(); // unipolar 0..1
+        const auto at = aftertouchSm.getNextValue(); // unipolar 0..1
 
         float modOsc1Level = 0.0f;
         float modOsc2Level = 0.0f;
@@ -744,6 +836,13 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
                 case params::mod::srcLfo2:   srcVal = l2; break;
                 case params::mod::srcMacro1: srcVal = macro1; break; // unipolar 0..1
                 case params::mod::srcMacro2: srcVal = macro2; break; // unipolar 0..1
+                case params::mod::srcModWheel: srcVal = mw; break;
+                case params::mod::srcAftertouch: srcVal = at; break;
+                case params::mod::srcVelocity: srcVal = velSrc; break;
+                case params::mod::srcNote: srcVal = noteSrc; break;
+                case params::mod::srcFilterEnv: srcVal = fEnv; break;
+                case params::mod::srcAmpEnv: srcVal = aEnv; break;
+                case params::mod::srcRandom: srcVal = randSrc; break;
             }
 
             const auto amt = srcVal * slot.depth;
@@ -768,8 +867,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         filterModCutoffSemis[(size_t) i] = juce::jlimit (-96.0f, 96.0f, modCutSemis);
         filterModResAdd[(size_t) i] = modResAdd;
 
-        const auto midiNote = noteGlide.getNext();
-        const auto noteHz = ies::math::midiNoteToHz (midiNote);
+        const auto noteHz = ies::math::midiNoteToHz (midiNoteBended);
         destroyNoteHz[(size_t) i] = noteHz;
 
         const auto w1 = params->osc1Wave != nullptr ? (int) std::lround (params->osc1Wave->load()) : (int) params::osc::saw;
@@ -799,9 +897,9 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         const auto driftCents2 = computeDriftCents (driftRng2, driftState2, alpha, juce::jlimit (0.0f, 1.0f, detune2));
         const auto driftCents3 = computeDriftCents (driftRng3, driftState3, alpha, juce::jlimit (0.0f, 1.0f, detune3));
 
-        const auto note1 = midiNote + (float) coarse1 + fine1 / 100.0f + driftCents1 / 100.0f;
-        const auto note2 = midiNote + (float) coarse2 + fine2 / 100.0f + driftCents2 / 100.0f;
-        const auto note3 = midiNote + (float) coarse3 + fine3 / 100.0f + driftCents3 / 100.0f;
+        const auto note1 = midiNoteBended + (float) coarse1 + fine1 / 100.0f + driftCents1 / 100.0f;
+        const auto note2 = midiNoteBended + (float) coarse2 + fine2 / 100.0f + driftCents2 / 100.0f;
+        const auto note3 = midiNoteBended + (float) coarse3 + fine3 / 100.0f + driftCents3 / 100.0f;
 
         osc1.setFrequency (ies::math::midiNoteToHz (note1));
         osc2.setFrequency (ies::math::midiNoteToHz (note2));
@@ -819,7 +917,22 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
             osc2.setPhase (p2);
         }
 
-        sigBuf[i] = s1 * lvl1 + s2 * lvl2 + s3 * lvl3;
+        // Noise (Serum-ish helper osc): level + color (brightness).
+        const auto noiseLevel = noiseLevelSm.getNextValue();
+        const auto noiseColor = noiseColorSm.getNextValue();
+        float noiseSample = 0.0f;
+        if (noiseEnabled && noiseLevel > 1.0e-6f)
+        {
+            const auto n = nextNoise();
+
+            // Map color to 1-pole lowpass alpha. Alpha mapping is cheap and reasonably SR-stable:
+            // alpha 0.02 ~ ~140 Hz @44.1k, alpha 0.95 ~ ~21 kHz @44.1k.
+            const auto a = juce::jlimit (0.02f, 0.95f, 0.02f + 0.93f * juce::jlimit (0.0f, 1.0f, noiseColor));
+            noiseLp += a * (n - noiseLp);
+            noiseSample = noiseLp * noiseLevel;
+        }
+
+        sigBuf[i] = s1 * lvl1 + s2 * lvl2 + s3 * lvl3 + noiseSample;
         if (preDestroyOut != nullptr)
             preDestroyOut[i] = sigBuf[i];
 
@@ -1013,7 +1126,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
             const auto baseCutoff = filterCutoffHzSm.getNextValue();
             auto resKnob          = filterResKnobSm.getNextValue();
             const auto envSemis   = filterEnvAmountSm.getNextValue();
-            const auto envVal = filterEnv.getNextSample();
+            const auto envVal = filterEnvBuf[(size_t) i];
 
             auto cutoff = baseCutoff;
             if (keyTrack)
@@ -1091,7 +1204,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
             }
         }
 
-        sig *= ampEnv.getNextSample();
+        sig *= ampEnvBuf[(size_t) i];
         sig *= velocityGain;
         sig *= outGain.getNextValue();
 

@@ -30,6 +30,9 @@ public:
     void enqueueUiNoteOn (int midiNoteNumber, int velocity) noexcept;
     void enqueueUiNoteOff (int midiNoteNumber) noexcept;
     void enqueueUiAllNotesOff() noexcept;
+    void enqueueUiPitchBend (int value0to16383) noexcept;
+    void enqueueUiModWheel (int value0to127) noexcept;
+    void enqueueUiAftertouch (int value0to127) noexcept;
     void applyStateFromUi (juce::ValueTree state, bool keepLanguage);
     void copyUiAudio (float* dest, int numSamples, UiAudioTap tap = UiAudioTap::postOutput) const noexcept;
 

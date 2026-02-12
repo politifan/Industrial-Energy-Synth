@@ -1152,6 +1152,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                             }
 
                                             safeThis->loadMacroNamesFromState();
+                                            safeThis->loadLabChordFromState();
                                             safeThis->refreshLabels();
                                             safeThis->refreshTooltips();
                                             safeThis->rebuildPresetMenu();
@@ -1169,7 +1170,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                       u8"• Double-click по ручке: сброс к дефолту.\n"
                                       u8"• Init/Сброс: сброс всех параметров (язык сохраняется).\n"
                                       u8"• Mod Matrix: выбери Source и Destination, Depth задаёт глубину (может быть отрицательной).\n"
-                                      u8"• Drag: перетащи M1/M2/LFO1/LFO2 на ручку чтобы назначить модуляцию.\n"
+                                      u8"• Drag: перетащи M1/M2/LFO1/LFO2/MW/AT/VEL/NOTE/RAND на ручку чтобы назначить модуляцию.\n"
                                       u8"• Mod Ring: тяни кольцо вокруг ручки чтобы менять Depth (Shift = точно). Alt-клик по кольцу: удалить модуляции для ручки.\n"
                                       u8"• LFO Sync: если ВКЛ, используется Div, а Rate (Гц) отключается.\n"
                                       u8"• Note Sync: Mod Freq отключается.\n"
@@ -1185,7 +1186,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                             "• Double-click knob: reset to default.\n"
                             "• Init: resets all params (keeps language).\n"
                             "• Mod Matrix: pick Source and Destination, Depth sets amount (can be negative).\n"
-                            "• Drag: drop M1/M2/LFO1/LFO2 on a knob to assign modulation.\n"
+                            "• Drag: drop M1/M2/LFO1/LFO2/MW/AT/VEL/NOTE/RAND on a knob to assign modulation.\n"
                             "• Mod Ring: drag the outer ring to adjust Depth (Shift = fine). Alt-click ring: clear modulation for this knob.\n"
                             "• LFO Sync: when ON, Div is used and Rate (Hz) is disabled.\n"
                             "• Note Sync: disables Mod Freq.\n"
@@ -1511,6 +1512,26 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     osc3Detune.getSlider().valueFromTextFunction = osc1Detune.getSlider().valueFromTextFunction;
     setupSliderDoubleClickDefault (osc3Detune.getSlider(), params::osc3::detune);
 
+    // --- Noise ---
+    noiseGroup.setText ("Noise");
+    addAndMakeVisible (noiseGroup);
+
+    noiseEnable.setButtonText ("Enable");
+    addAndMakeVisible (noiseEnable);
+    noiseEnableAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(), params::noise::enable, noiseEnable);
+
+    addAndMakeVisible (noiseLevel);
+    noiseLevelAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::noise::level, noiseLevel.getSlider());
+    noiseLevel.getSlider().textFromValueFunction = osc1Level.getSlider().textFromValueFunction;
+    noiseLevel.getSlider().valueFromTextFunction = osc1Level.getSlider().valueFromTextFunction;
+    setupSliderDoubleClickDefault (noiseLevel.getSlider(), params::noise::level);
+
+    addAndMakeVisible (noiseColor);
+    noiseColorAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::noise::color, noiseColor.getSlider());
+    noiseColor.getSlider().textFromValueFunction = osc1Level.getSlider().textFromValueFunction;
+    noiseColor.getSlider().valueFromTextFunction = osc1Level.getSlider().valueFromTextFunction;
+    setupSliderDoubleClickDefault (noiseColor.getSlider(), params::noise::color);
+
     // --- Destroy / Modulation ---
     destroyGroup.setText ("Destroy");
     addAndMakeVisible (destroyGroup);
@@ -1548,7 +1569,6 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     addAndMakeVisible (clipDrive);
     clipDriveAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::destroy::clipDriveDb, clipDrive.getSlider());
-    clipDrive.getSlider().setTextValueSuffix (" dB");
     setupSliderDoubleClickDefault (clipDrive.getSlider(), params::destroy::clipDriveDb);
     addAndMakeVisible (clipAmount);
     clipAmountAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::destroy::clipAmount, clipAmount.getSlider());
@@ -1584,7 +1604,6 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     addAndMakeVisible (modFreq);
     modFreqAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::destroy::modFreqHz, modFreq.getSlider());
-    modFreq.getSlider().setTextValueSuffix (" Hz");
     setupSliderDoubleClickDefault (modFreq.getSlider(), params::destroy::modFreqHz);
 
     addAndMakeVisible (crushBits);
@@ -1694,7 +1713,6 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     shaperDriveAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(),
                                                                        params::shaper::driveDb,
                                                                        shaperDrive.getSlider());
-    shaperDrive.getSlider().setTextValueSuffix (" dB");
     shaperDrive.getSlider().textFromValueFunction = fmtDb;
     shaperDrive.getSlider().valueFromTextFunction = parseNumber;
     setupSliderDoubleClickDefault (shaperDrive.getSlider(), params::shaper::driveDb);
@@ -1746,6 +1764,31 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     macro2.getSlider().textFromValueFunction = osc1Level.getSlider().textFromValueFunction;
     macro2.getSlider().valueFromTextFunction = osc1Level.getSlider().valueFromTextFunction;
     setupSliderDoubleClickDefault (macro2.getSlider(), params::macros::m2);
+
+    modWheelDrag.setSource (params::mod::srcModWheel);
+    modWheelDrag.setText ("MW");
+    modWheelDrag.setAccent (juce::Colour (0xff5dff7a));
+    addAndMakeVisible (modWheelDrag);
+
+    aftertouchDrag.setSource (params::mod::srcAftertouch);
+    aftertouchDrag.setText ("AT");
+    aftertouchDrag.setAccent (juce::Colour (0xffff6b7d));
+    addAndMakeVisible (aftertouchDrag);
+
+    velocityDrag.setSource (params::mod::srcVelocity);
+    velocityDrag.setText ("VEL");
+    velocityDrag.setAccent (juce::Colour (0xffffcf6a));
+    addAndMakeVisible (velocityDrag);
+
+    noteDrag.setSource (params::mod::srcNote);
+    noteDrag.setText ("NOTE");
+    noteDrag.setAccent (juce::Colour (0xff4f8cff));
+    addAndMakeVisible (noteDrag);
+
+    randomDrag.setSource (params::mod::srcRandom);
+    randomDrag.setText ("RAND");
+    randomDrag.setAccent (juce::Colour (0xff00e1ff));
+    addAndMakeVisible (randomDrag);
 
     lfo1Panel.setText ("LFO 1");
     addAndMakeVisible (lfo1Panel);
@@ -1894,6 +1937,13 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         src.addItem ("LFO 2", 3);
         src.addItem ("Macro 1", 4);
         src.addItem ("Macro 2", 5);
+        src.addItem ("Mod Wheel", 6);
+        src.addItem ("Aftertouch", 7);
+        src.addItem ("Velocity", 8);
+        src.addItem ("Note", 9);
+        src.addItem ("Filter Env", 10);
+        src.addItem ("Amp Env", 11);
+        src.addItem ("Random", 12);
         addAndMakeVisible (src);
         modSlotSrcAttachment[(size_t) i] = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), kModSlotSrcIds[i], src);
 
@@ -1944,7 +1994,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                                                                                                      (int) params::mod::dstShaperMix,
                                                                                                                      modSlotDst[(size_t) s].getSelectedItemIndex());
                                                                   const auto srcNow = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff,
-                                                                                                                          (int) params::mod::srcMacro2,
+                                                                                                                          (int) params::mod::srcRandom,
                                                                                                                           modSlotSrc[(size_t) s].getSelectedItemIndex());
                                                                   if (dNow == wantDst && srcNow != params::mod::srcOff)
                                                                       return s;
@@ -1958,7 +2008,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                                                                                                  (int) params::mod::dstShaperMix,
                                                                                                                  modSlotDst[(size_t) i].getSelectedItemIndex());
                                                               const auto srcNow = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff,
-                                                                                                                      (int) params::mod::srcMacro2,
+                                                                                                                      (int) params::mod::srcRandom,
                                                                                                                       modSlotSrc[(size_t) i].getSelectedItemIndex());
                                                               if (dNow == wantDst && srcNow != params::mod::srcOff)
                                                                   return i;
@@ -2122,6 +2172,156 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     labKeyWidth.getSlider().onValueChange = [this]
     {
         labKeyboard.setKeyWidth ((float) labKeyWidth.getSlider().getValue());
+        updateLabKeyboardRange();
+    };
+
+    addAndMakeVisible (labPitchBend);
+    labPitchBend.getSlider().setSliderStyle (juce::Slider::LinearHorizontal);
+    labPitchBend.getSlider().setTextBoxStyle (juce::Slider::TextBoxRight, false, 62, 18);
+    labPitchBend.getSlider().setRange (-1.0, 1.0, 0.001);
+    labPitchBend.getSlider().setValue (0.0, juce::dontSendNotification);
+    labPitchBend.getSlider().setNumDecimalPlacesToDisplay (2);
+    labPitchBend.getSlider().textFromValueFunction = [] (double v)
+    {
+        // +/-2 semitones range (matches engine default).
+        const auto st = v * 2.0;
+        const auto s = juce::String (st, 2).trimCharactersAtEnd ("0").trimCharactersAtEnd (".");
+        const auto sign = (st > 0.0) ? "+" : "";
+        return sign + s + " st";
+    };
+    labPitchBend.getSlider().valueFromTextFunction = [] (const juce::String& t)
+    {
+        auto s = t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-");
+        const auto st = s.getDoubleValue();
+        return juce::jlimit (-1.0, 1.0, st / 2.0);
+    };
+    labPitchBend.getSlider().onValueChange = [this]
+    {
+        // UI -> MIDI pitch wheel (14-bit). Centre is 8192.
+        const auto n = (float) juce::jlimit (-1.0, 1.0, labPitchBend.getSlider().getValue());
+        const int v14 = juce::jlimit (0, 16383, (int) std::lround (8192.0 + (double) n * 8191.0));
+        audioProcessor.enqueueUiPitchBend (v14);
+    };
+    labPitchBend.getSlider().onDragEnd = [this]
+    {
+        // Spring return (Serum-like).
+        labPitchBend.getSlider().setValue (0.0, juce::sendNotification);
+    };
+
+    addAndMakeVisible (labModWheel);
+    labModWheel.getSlider().setSliderStyle (juce::Slider::LinearHorizontal);
+    labModWheel.getSlider().setTextBoxStyle (juce::Slider::TextBoxRight, false, 54, 18);
+    labModWheel.getSlider().setRange (0.0, 127.0, 1.0);
+    labModWheel.getSlider().setValue (0.0, juce::dontSendNotification);
+    labModWheel.getSlider().setNumDecimalPlacesToDisplay (0);
+    labModWheel.getSlider().textFromValueFunction = [] (double v)
+    {
+        return juce::String ((int) std::lround (v));
+    };
+    labModWheel.getSlider().valueFromTextFunction = [] (const juce::String& t)
+    {
+        return t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
+    };
+    labModWheel.getSlider().setDoubleClickReturnValue (true, 0.0);
+    labModWheel.getSlider().onValueChange = [this]
+    {
+        audioProcessor.enqueueUiModWheel ((int) std::lround (labModWheel.getSlider().getValue()));
+    };
+
+    addAndMakeVisible (labAftertouch);
+    labAftertouch.getSlider().setSliderStyle (juce::Slider::LinearHorizontal);
+    labAftertouch.getSlider().setTextBoxStyle (juce::Slider::TextBoxRight, false, 54, 18);
+    labAftertouch.getSlider().setRange (0.0, 127.0, 1.0);
+    labAftertouch.getSlider().setValue (0.0, juce::dontSendNotification);
+    labAftertouch.getSlider().setNumDecimalPlacesToDisplay (0);
+    labAftertouch.getSlider().textFromValueFunction = labModWheel.getSlider().textFromValueFunction;
+    labAftertouch.getSlider().valueFromTextFunction = labModWheel.getSlider().valueFromTextFunction;
+    labAftertouch.getSlider().setDoubleClickReturnValue (true, 0.0);
+    labAftertouch.getSlider().onValueChange = [this]
+    {
+        audioProcessor.enqueueUiAftertouch ((int) std::lround (labAftertouch.getSlider().getValue()));
+    };
+    labAftertouch.getSlider().onDragEnd = [this]
+    {
+        // Momentary feel (press/release), like hardware aftertouch.
+        labAftertouch.getSlider().setValue (0.0, juce::sendNotification);
+    };
+
+    addAndMakeVisible (labKeyboardMode);
+    labKeyboardMode.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    labKeyboardMode.getCombo().addItem ("Poly", 1);
+    labKeyboardMode.getCombo().addItem ("Mono", 2);
+    labKeyboardModeAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(),
+                                                                             params::ui::labKeyboardMode,
+                                                                             labKeyboardMode.getCombo());
+    labKeyboardMode.getCombo().onChange = [this]
+    {
+        updateLabKeyboardInfo();
+    };
+
+    labScaleLock.setButtonText ("Scale Lock");
+    addAndMakeVisible (labScaleLock);
+    labScaleLockAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(),
+                                                                        params::ui::labScaleLock,
+                                                                        labScaleLock);
+    labScaleLock.onClick = [this]
+    {
+        updateEnabledStates();
+        updateLabKeyboardInfo();
+    };
+
+    addAndMakeVisible (labScaleRoot);
+    labScaleRoot.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    labScaleRoot.getCombo().addItem ("C", 1);
+    labScaleRoot.getCombo().addItem ("C#", 2);
+    labScaleRoot.getCombo().addItem ("D", 3);
+    labScaleRoot.getCombo().addItem ("D#", 4);
+    labScaleRoot.getCombo().addItem ("E", 5);
+    labScaleRoot.getCombo().addItem ("F", 6);
+    labScaleRoot.getCombo().addItem ("F#", 7);
+    labScaleRoot.getCombo().addItem ("G", 8);
+    labScaleRoot.getCombo().addItem ("G#", 9);
+    labScaleRoot.getCombo().addItem ("A", 10);
+    labScaleRoot.getCombo().addItem ("A#", 11);
+    labScaleRoot.getCombo().addItem ("B", 12);
+    labScaleRootAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(),
+                                                                          params::ui::labScaleRoot,
+                                                                          labScaleRoot.getCombo());
+    labScaleRoot.getCombo().onChange = [this]
+    {
+        updateLabKeyboardInfo();
+    };
+
+    addAndMakeVisible (labScaleType);
+    labScaleType.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    labScaleType.getCombo().addItem ("Major", 1);
+    labScaleType.getCombo().addItem ("Minor", 2);
+    labScaleType.getCombo().addItem ("Pent Maj", 3);
+    labScaleType.getCombo().addItem ("Pent Min", 4);
+    labScaleType.getCombo().addItem ("Chromatic", 5);
+    labScaleTypeAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(),
+                                                                          params::ui::labScaleType,
+                                                                          labScaleType.getCombo());
+    labScaleType.getCombo().onChange = [this]
+    {
+        updateLabKeyboardInfo();
+    };
+
+    labChordEnable.setButtonText ("Chord");
+    addAndMakeVisible (labChordEnable);
+    labChordEnableAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(),
+                                                                          params::ui::labChordEnable,
+                                                                          labChordEnable);
+    labChordEnable.onClick = [this]
+    {
+        updateLabKeyboardInfo();
+    };
+
+    labChordLearn.setButtonText ("Learn");
+    addAndMakeVisible (labChordLearn);
+    labChordLearn.onClick = [this]
+    {
+        learnLabChordFromActiveNotes();
     };
 
     addAndMakeVisible (labKeyboardRangeLabel);
@@ -2136,7 +2336,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     addAndMakeVisible (labKeyboard);
     labKeyboardState.addListener (this);
-    labKeyboard.setAvailableRange (24, 71);
+    labKeyboard.setAvailableRange (0, 127);
     labKeyboard.setOctaveForMiddleC (4);
     labKeyboard.setScrollButtonsVisible (false);
     labKeyboard.setWantsKeyboardFocus (true);
@@ -2370,6 +2570,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     const auto cOsc1   = juce::Colour (0xff00c7ff);
     const auto cOsc2   = juce::Colour (0xffb56cff);
     const auto cOsc3   = juce::Colour (0xff6be9ff);
+    const auto cNoise  = juce::Colour (0xffc7d5ea);
     const auto cDestroy= juce::Colour (0xffff5b2e);
     const auto cShaper = juce::Colour (0xff00e8c6);
     const auto cFilter = juce::Colour (0xff5dff7a);
@@ -2412,6 +2613,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (osc1Group, cOsc1);
     setGroupAccent (osc2Group, cOsc2);
     setGroupAccent (osc3Group, cOsc3);
+    setGroupAccent (noiseGroup, cNoise);
+    setGroupAccent (noiseEnable, cNoise);
     setGroupAccent (destroyGroup, cDestroy);
     setGroupAccent (shaperGroup, cShaper);
     setGroupAccent (filterGroup, cFilter);
@@ -2436,6 +2639,12 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (labPanic, cPanic);
     setGroupAccent (labVelocity, cTone);
     setGroupAccent (labKeyWidth, cTone);
+    setGroupAccent (labKeyboardMode, cTone);
+    setGroupAccent (labScaleLock, cTone);
+    setGroupAccent (labScaleRoot, cTone);
+    setGroupAccent (labScaleType, cTone);
+    setGroupAccent (labChordEnable, cTone);
+    setGroupAccent (labChordLearn, cTone);
     setGroupAccent (lfo1Sync, cMod);
     setGroupAccent (lfo2Sync, cMod);
     setGroupAccent (labKeyboard, cTone);
@@ -2465,6 +2674,9 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     for (auto* s : { &osc3Level.getSlider(), &osc3Coarse.getSlider(), &osc3Fine.getSlider(), &osc3Phase.getSlider(), &osc3Detune.getSlider() })
         setSliderAccent (*s, cOsc3);
 
+    for (auto* s : { &noiseLevel.getSlider(), &noiseColor.getSlider() })
+        setSliderAccent (*s, cNoise);
+
     for (auto* s : { &foldDrive.getSlider(), &foldAmount.getSlider(), &foldMix.getSlider(),
                      &clipDrive.getSlider(), &clipAmount.getSlider(), &clipMix.getSlider(),
                      &modAmount.getSlider(), &modMix.getSlider(), &modFreq.getSlider(),
@@ -2489,8 +2701,10 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                      &lfo2Rate.getSlider(), &lfo2Phase.getSlider() })
         setSliderAccent (*s, cMod);
 
-    for (auto* s : { &labVelocity.getSlider(), &labKeyWidth.getSlider() })
+    for (auto* s : { &labVelocity.getSlider(), &labKeyWidth.getSlider(), &labPitchBend.getSlider() })
         setSliderAccent (*s, cTone);
+    setSliderAccent (labModWheel.getSlider(), juce::Colour (0xff5dff7a));
+    setSliderAccent (labAftertouch.getSlider(), juce::Colour (0xffff6b7d));
 
     for (int i = 0; i < params::mod::numSlots; ++i)
         setSliderAccent (modSlotDepth[(size_t) i], cMod);
@@ -2524,6 +2738,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     rebuildPresetMenu();
 
     loadMacroNamesFromState();
+    loadLabChordFromState();
     refreshLabels();
     refreshTooltips();
 
@@ -2533,6 +2748,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                      &osc1Level.getSlider(), &osc1Coarse.getSlider(), &osc1Fine.getSlider(), &osc1Phase.getSlider(), &osc1Detune.getSlider(),
                      &osc2Level.getSlider(), &osc2Coarse.getSlider(), &osc2Fine.getSlider(), &osc2Phase.getSlider(), &osc2Detune.getSlider(),
                      &osc3Level.getSlider(), &osc3Coarse.getSlider(), &osc3Fine.getSlider(), &osc3Phase.getSlider(), &osc3Detune.getSlider(),
+                     &noiseLevel.getSlider(), &noiseColor.getSlider(),
                      &foldDrive.getSlider(), &foldAmount.getSlider(), &foldMix.getSlider(),
                      &clipDrive.getSlider(), &clipAmount.getSlider(), &clipMix.getSlider(),
                      &modAmount.getSlider(), &modMix.getSlider(), &modFreq.getSlider(),
@@ -2545,7 +2761,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                      &macro1.getSlider(), &macro2.getSlider(),
                      &lfo1Rate.getSlider(), &lfo1Phase.getSlider(),
                      &lfo2Rate.getSlider(), &lfo2Phase.getSlider(),
-                     &labVelocity.getSlider(), &labKeyWidth.getSlider() })
+                     &labVelocity.getSlider(), &labKeyWidth.getSlider(),
+                     &labPitchBend.getSlider(), &labModWheel.getSlider(), &labAftertouch.getSlider() })
         refreshSliderText (*s);
     for (int i = 0; i < params::mod::numSlots; ++i)
         refreshSliderText (modSlotDepth[(size_t) i]);
@@ -2794,6 +3011,7 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
         osc3Group.setBounds (splitRow (row2, 0));
         filterGroup.setBounds (splitRow (row2, 1));
+        noiseGroup.setBounds (splitRow (row2, 2));
     }
     else if (showSynth)
     {
@@ -2803,7 +3021,8 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         osc2Group.setBounds (splitRow (row2, 0));
         osc3Group.setBounds (splitRow (row2, 1));
 
-        filterGroup.setBounds (row3);
+        filterGroup.setBounds (splitRow (row3, 0));
+        noiseGroup.setBounds (splitRow (row3, 1));
     }
     else if (showMod)
     {
@@ -2908,6 +3127,14 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         gr.removeFromTop (4);
 
         layoutKnobGrid (gr, { &osc3Level, &osc3Coarse, &osc3Fine, &osc3Phase, &osc3Detune });
+    }
+
+    // Noise internal
+    {
+        auto gr = noiseGroup.getBounds().reduced (8, 22);
+        noiseEnable.setBounds (gr.removeFromTop (24).reduced (0, 4));
+        gr.removeFromTop (4);
+        layoutKnobGrid (gr, { &noiseLevel, &noiseColor });
     }
 
     // Destroy internal
@@ -3062,12 +3289,40 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
         {
             auto m = inside (macrosPanel);
-            auto badgeRow = m.removeFromTop (20);
-            const int badgeW = 54;
-            macro1Drag.setBounds (badgeRow.removeFromLeft (badgeW).withSizeKeepingCentre (badgeW, 22));
-            badgeRow.removeFromLeft (6);
-            macro2Drag.setBounds (badgeRow.removeFromLeft (badgeW).withSizeKeepingCentre (badgeW, 22));
+            const int badgeH = 22;
+            const int badgeGap = 6;
+
+            // Two-row badge layout: first row = performance sources, second row = per-note sources (Serum-like VELO/NOTE).
+            auto badgeRow1 = m.removeFromTop (badgeH);
             m.removeFromTop (4);
+            auto badgeRow2 = m.removeFromTop (badgeH);
+            m.removeFromTop (4);
+
+            const int badgeW1 = juce::jlimit (42, 54, (badgeRow1.getWidth() - badgeGap * 3) / 4);
+            auto placeRow1 = [&] (ies::ui::ModSourceBadge& b, bool addGap)
+            {
+                b.setBounds (badgeRow1.removeFromLeft (badgeW1).withSizeKeepingCentre (badgeW1, badgeH));
+                if (addGap)
+                    badgeRow1.removeFromLeft (badgeGap);
+            };
+
+            placeRow1 (macro1Drag, true);
+            placeRow1 (macro2Drag, true);
+            placeRow1 (modWheelDrag, true);
+            placeRow1 (aftertouchDrag, false);
+
+            const int badgeW2 = juce::jlimit (64, 120, (badgeRow2.getWidth() - badgeGap * 2) / 3);
+            auto placeRow2 = [&] (ies::ui::ModSourceBadge& b, bool addGap)
+            {
+                b.setBounds (badgeRow2.removeFromLeft (badgeW2).withSizeKeepingCentre (badgeW2, badgeH));
+                if (addGap)
+                    badgeRow2.removeFromLeft (badgeGap);
+            };
+
+            placeRow2 (velocityDrag, true);
+            placeRow2 (noteDrag, true);
+            placeRow2 (randomDrag, false);
+
             layoutKnobGrid (m, { &macro1, &macro2 });
         }
 
@@ -3161,7 +3416,8 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         const int kbH = juce::jlimit (62, 96, gr.getHeight() / 5);
         auto keyboardArea = gr.removeFromBottom (kbH);
         gr.removeFromBottom (3);
-        auto keyboardCtrl = gr.removeFromBottom (42);
+        const int keyboardCtrlH = juce::jlimit (88, 112, gr.getHeight() / 4);
+        auto keyboardCtrl = gr.removeFromBottom (keyboardCtrlH);
         gr.removeFromBottom (2);
         auto keyboardInfo = gr.removeFromBottom (18);
         gr.removeFromBottom (panelGap);
@@ -3177,21 +3433,64 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         }
 
         {
-            auto row = keyboardCtrl;
-            const int btnW = 62;
-            labOctaveDown.setBounds (row.removeFromLeft (btnW).reduced (2, 6));
-            labOctaveUp.setBounds (row.removeFromLeft (btnW).reduced (2, 6));
-            labHold.setBounds (row.removeFromLeft (76).reduced (2, 6));
-            labPanic.setBounds (row.removeFromLeft (70).reduced (2, 6));
-            row.removeFromLeft (6);
+            auto ctrl = keyboardCtrl;
+            auto rowA = ctrl.removeFromTop (30);
+            ctrl.removeFromTop (3);
+            auto rowB = ctrl.removeFromTop (34);
+            ctrl.removeFromTop (3);
+            auto rowC = ctrl;
 
-            const int half = juce::jmax (110, row.getWidth() / 2 - 3);
-            labVelocity.setBounds (row.removeFromLeft (half));
-            row.removeFromLeft (6);
-            labKeyWidth.setBounds (row);
+            {
+                auto row = rowA;
+                const int btnW = 58;
+                labOctaveDown.setBounds (row.removeFromLeft (btnW).reduced (2, 5));
+                labOctaveUp.setBounds (row.removeFromLeft (btnW).reduced (2, 5));
+                labHold.setBounds (row.removeFromLeft (76).reduced (2, 5));
+                labPanic.setBounds (row.removeFromLeft (70).reduced (2, 5));
+                row.removeFromLeft (6);
+                auto perf = row;
+                const int perfGap = 6;
+                const int perfW = juce::jmax (1, (perf.getWidth() - perfGap * 2) / 3);
+                labPitchBend.setBounds (perf.removeFromLeft (perfW));
+                perf.removeFromLeft (perfGap);
+                labModWheel.setBounds (perf.removeFromLeft (perfW));
+                perf.removeFromLeft (perfGap);
+                labAftertouch.setBounds (perf);
+            }
+
+            {
+                auto row = rowB;
+                const int half = juce::jmax (120, row.getWidth() / 2 - 3);
+                labVelocity.setBounds (row.removeFromLeft (half));
+                row.removeFromLeft (6);
+                labKeyWidth.setBounds (row);
+            }
+
+            {
+                auto row = rowC;
+                const int modeW = juce::jlimit (110, 160, row.getWidth() / 5);
+                labKeyboardMode.setBounds (row.removeFromLeft (modeW));
+                row.removeFromLeft (6);
+
+                labScaleLock.setBounds (row.removeFromLeft (juce::jmin (110, juce::jmax (84, row.getWidth() / 6))).reduced (0, 10));
+                row.removeFromLeft (6);
+
+                const int rootW = juce::jlimit (70, 94, row.getWidth() / 10);
+                labScaleRoot.setBounds (row.removeFromLeft (rootW));
+                row.removeFromLeft (6);
+
+                const int typeW = juce::jlimit (120, 180, row.getWidth() / 4);
+                labScaleType.setBounds (row.removeFromLeft (typeW));
+                row.removeFromLeft (6);
+
+                labChordEnable.setBounds (row.removeFromLeft (juce::jmin (110, juce::jmax (84, row.getWidth() / 6))).reduced (0, 10));
+                row.removeFromLeft (6);
+                labChordLearn.setBounds (row.removeFromLeft (72).reduced (2, 6));
+            }
         }
 
         labKeyboard.setKeyWidth ((float) labKeyWidth.getSlider().getValue());
+        updateLabKeyboardRange();
 
         const int trioH = juce::jlimit (120, 210, gr.getHeight() / 3);
         auto trioRow = gr.removeFromBottom (trioH);
@@ -3217,9 +3516,11 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     // Filter internal
     {
         auto gr = filterGroup.getBounds().reduced (8, 24);
-        filterType.setBounds (gr.removeFromTop (40));
-        gr.removeFromTop (4);
-        filterKeyTrack.setBounds (gr.removeFromTop (20));
+        auto head = gr.removeFromTop (40);
+        const int typeW = juce::jmax (160, head.getWidth() * 2 / 3);
+        filterType.setBounds (head.removeFromLeft (typeW));
+        head.removeFromLeft (6);
+        filterKeyTrack.setBounds (head.reduced (0, 10)); // avoid clipping on narrow heights
         gr.removeFromTop (4);
         auto knobArea = gr.removeFromTop (juce::jmin (96, juce::jmax (64, gr.getHeight())));
         layoutKnobGrid (knobArea, { &filterCutoff, &filterReso, &filterEnvAmount });
@@ -3373,6 +3674,11 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     osc3Phase.setVisible (showSynth);
     osc3Detune.setVisible (showSynth);
 
+    noiseGroup.setVisible (showSynth);
+    noiseEnable.setVisible (showSynth);
+    noiseLevel.setVisible (showSynth);
+    noiseColor.setVisible (showSynth);
+
     destroyGroup.setVisible (showLab);
     destroyOversample.setVisible (showLab);
     foldPanel.setVisible (showLab);
@@ -3441,6 +3747,11 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     macro1.setVisible (showMod);
     macro2Drag.setVisible (showMod);
     macro2.setVisible (showMod);
+    modWheelDrag.setVisible (showMod);
+    aftertouchDrag.setVisible (showMod);
+    velocityDrag.setVisible (showMod);
+    noteDrag.setVisible (showMod);
+    randomDrag.setVisible (showMod);
 
     lfo1Panel.setVisible (showMod);
     lfo1Drag.setVisible (showMod);
@@ -3484,6 +3795,15 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     labPanic.setVisible (showLab);
     labVelocity.setVisible (showLab);
     labKeyWidth.setVisible (showLab);
+    labPitchBend.setVisible (showLab);
+    labModWheel.setVisible (showLab);
+    labAftertouch.setVisible (showLab);
+    labKeyboardMode.setVisible (showLab);
+    labScaleLock.setVisible (showLab);
+    labScaleRoot.setVisible (showLab);
+    labScaleType.setVisible (showLab);
+    labChordEnable.setVisible (showLab);
+    labChordLearn.setVisible (showLab);
     labKeyboardRangeLabel.setVisible (showLab);
     labKeyboardInfoLabel.setVisible (showLab);
     labKeyboard.setVisible (showLab);
@@ -3679,6 +3999,11 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     osc3Phase.setLabelText (ies::ui::tr (ies::ui::Key::phase, langIdx));
     osc3Detune.setLabelText (ies::ui::tr (ies::ui::Key::detune, langIdx));
 
+    noiseGroup.setText (ies::ui::tr (ies::ui::Key::noise, langIdx));
+    noiseEnable.setButtonText (ies::ui::tr (ies::ui::Key::noiseEnable, langIdx));
+    noiseLevel.setLabelText (ies::ui::tr (ies::ui::Key::noiseLevel, langIdx));
+    noiseColor.setLabelText (ies::ui::tr (ies::ui::Key::noiseColor, langIdx));
+
     destroyGroup.setText (ies::ui::tr (ies::ui::Key::destroy, langIdx));
     destroyOversample.setLabelText (ies::ui::tr (ies::ui::Key::destroyOversample, langIdx));
     destroyOversample.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::oversampleOff, langIdx));
@@ -3760,12 +4085,31 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     labPanic.setButtonText (ies::ui::tr (ies::ui::Key::panic, langIdx));
     labVelocity.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Velocity") : juce::String ("Velocity"));
     labKeyWidth.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Ширина клавиш") : juce::String ("Key Width"));
+    labPitchBend.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Питч (bend)") : juce::String ("Pitch Bend"));
+    labModWheel.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Колесо мод.") : juce::String ("Mod Wheel"));
+    labAftertouch.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Афтертач") : juce::String ("Aftertouch"));
     labOctaveDown.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Октава вниз") : juce::String ("Octave down"));
     labOctaveUp.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Октава вверх") : juce::String ("Octave up"));
     labHold.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Удержание клавиш") : juce::String ("Keyboard hold"));
     labPanic.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Стоп клавиатуры") : juce::String ("Keyboard panic"));
     labVelocity.getSlider().setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Velocity клавиатуры") : juce::String ("Keyboard velocity"));
     labKeyWidth.getSlider().setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Ширина клавиш") : juce::String ("Keyboard key width"));
+    labPitchBend.getSlider().setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Питч-бенд") : juce::String ("Pitch bend"));
+    labModWheel.getSlider().setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Колесо модуляции") : juce::String ("Mod wheel"));
+    labAftertouch.getSlider().setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Афтертач") : juce::String ("Aftertouch"));
+    labKeyboardMode.setLabelText (ies::ui::tr (ies::ui::Key::labKeyboardMode, langIdx));
+    labKeyboardMode.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::labKeyboardModePoly, langIdx));
+    labKeyboardMode.getCombo().changeItemText (2, ies::ui::tr (ies::ui::Key::labKeyboardModeMono, langIdx));
+    labScaleLock.setButtonText (ies::ui::tr (ies::ui::Key::labScaleLock, langIdx));
+    labScaleRoot.setLabelText (ies::ui::tr (ies::ui::Key::labScaleRoot, langIdx));
+    labScaleType.setLabelText (ies::ui::tr (ies::ui::Key::labScaleType, langIdx));
+    labScaleType.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::labScaleMajor, langIdx));
+    labScaleType.getCombo().changeItemText (2, ies::ui::tr (ies::ui::Key::labScaleMinor, langIdx));
+    labScaleType.getCombo().changeItemText (3, ies::ui::tr (ies::ui::Key::labScalePentMaj, langIdx));
+    labScaleType.getCombo().changeItemText (4, ies::ui::tr (ies::ui::Key::labScalePentMin, langIdx));
+    labScaleType.getCombo().changeItemText (5, ies::ui::tr (ies::ui::Key::labScaleChromatic, langIdx));
+    labChordEnable.setButtonText (ies::ui::tr (ies::ui::Key::labChord, langIdx));
+    labChordLearn.setButtonText (ies::ui::tr (ies::ui::Key::labLearn, langIdx));
     labKeyboard.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Клавиатура") : juce::String ("Keyboard"));
     updateLabKeyboardRange();
     updateLabKeyboardInfo();
@@ -3787,6 +4131,13 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
         modSlotSrc[(size_t) i].changeItemText (3, ies::ui::tr (ies::ui::Key::modSrcLfo2, langIdx));
         modSlotSrc[(size_t) i].changeItemText (4, ies::ui::tr (ies::ui::Key::modSrcMacro1, langIdx));
         modSlotSrc[(size_t) i].changeItemText (5, ies::ui::tr (ies::ui::Key::modSrcMacro2, langIdx));
+        modSlotSrc[(size_t) i].changeItemText (6, ies::ui::tr (ies::ui::Key::modSrcModWheel, langIdx));
+        modSlotSrc[(size_t) i].changeItemText (7, ies::ui::tr (ies::ui::Key::modSrcAftertouch, langIdx));
+        modSlotSrc[(size_t) i].changeItemText (8, ies::ui::tr (ies::ui::Key::modSrcVelocity, langIdx));
+        modSlotSrc[(size_t) i].changeItemText (9, ies::ui::tr (ies::ui::Key::modSrcNote, langIdx));
+        modSlotSrc[(size_t) i].changeItemText (10, ies::ui::tr (ies::ui::Key::modSrcFilterEnv, langIdx));
+        modSlotSrc[(size_t) i].changeItemText (11, ies::ui::tr (ies::ui::Key::modSrcAmpEnv, langIdx));
+        modSlotSrc[(size_t) i].changeItemText (12, ies::ui::tr (ies::ui::Key::modSrcRandom, langIdx));
 
         // Destination menu
         modSlotDst[(size_t) i].changeItemText (1, ies::ui::tr (ies::ui::Key::modOff, langIdx));
@@ -3906,6 +4257,45 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
         labKeyWidth.getSlider().setTooltip (tip);
         labKeyWidth.getLabel().setTooltip (tip);
     }
+    {
+        const auto tip = T ("Pitch bend (spring). Range is +/-2 semitones.",
+                            u8"Питч-бенд (пружина). Диапазон +/-2 полутона.");
+        labPitchBend.getSlider().setTooltip (tip);
+        labPitchBend.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Mod Wheel (CC1) for the Lab keyboard. Use it as a modulation source in the Mod Matrix.",
+                            u8"Колесо модуляции (CC1) для клавиатуры Lab. Используй как источник модуляции в Mod Matrix.");
+        labModWheel.getSlider().setTooltip (tip);
+        labModWheel.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Aftertouch (channel pressure) for the Lab keyboard. Momentary control (springs back to 0).",
+                            u8"Афтертач (channel pressure) для клавиатуры Lab. Моментальный контроль (возврат в 0).");
+        labAftertouch.getSlider().setTooltip (tip);
+        labAftertouch.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Lab keyboard mode. Poly = overlapping notes allowed. Mono = only one note at a time (previous note is released).",
+                            u8"Режим клавиатуры Lab. Поли = можно удерживать несколько нот. Моно = только 1 нота (предыдущая отпускается).");
+        labKeyboardMode.getCombo().setTooltip (tip);
+        labKeyboardMode.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Scale Lock: quantize notes played on the Lab keyboard to a musical scale.",
+                            u8"Лад-лок: квантует ноты клавиатуры Lab в выбранный лад.");
+        labScaleLock.setTooltip (tip);
+        labScaleRoot.getCombo().setTooltip (tip);
+        labScaleRoot.getLabel().setTooltip (tip);
+        labScaleType.getCombo().setTooltip (tip);
+        labScaleType.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Chord memory: play a stored chord shape from one key. Learn captures intervals from currently held notes.",
+                            u8"Chord memory: проигрывает сохранённую форму аккорда одной клавишей. Learn запоминает интервалы из удерживаемых нот.");
+        labChordEnable.setTooltip (tip);
+        labChordLearn.setTooltip (tip);
+    }
 
     glideEnable.setTooltip (T ("Enable portamento (glide) between notes.", u8"Включить портаменто (глайд) между нотами."));
     {
@@ -3939,10 +4329,25 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
                               u8"Перетащи LFO 1 на ручку, чтобы назначить модуляцию.");
         const auto tipL2 = T ("Drag LFO 2 to a knob to assign modulation.",
                               u8"Перетащи LFO 2 на ручку, чтобы назначить модуляцию.");
+        const auto tipMW = T ("Drag Mod Wheel to a knob to assign modulation (source from your MIDI controller CC1).",
+                              u8"Перетащи Mod Wheel на ручку, чтобы назначить модуляцию (источник с MIDI контроллера CC1).");
+        const auto tipAT = T ("Drag Aftertouch to a knob to assign modulation (channel pressure).",
+                              u8"Перетащи Aftertouch на ручку, чтобы назначить модуляцию (channel pressure).");
+        const auto tipVel = T ("Drag Velocity to a knob to assign modulation (per-note velocity 0..127).",
+                               u8"Перетащи Velocity на ручку, чтобы назначить модуляцию (velocity ноты 0..127).");
+        const auto tipNote = T ("Drag Note to a knob to assign modulation (normalized MIDI note, follows glide).",
+                                u8"Перетащи Note на ручку, чтобы назначить модуляцию (нормализованная MIDI-нота, следует глайду).");
+        const auto tipRand = T ("Drag Random to a knob to assign modulation (random value on each note-on).",
+                                u8"Перетащи Random на ручку, чтобы назначить модуляцию (случайное значение на каждый note-on).");
         macro1Drag.setTooltipText (tipM1);
         macro2Drag.setTooltipText (tipM2);
         lfo1Drag.setTooltipText (tipL1);
         lfo2Drag.setTooltipText (tipL2);
+        modWheelDrag.setTooltipText (tipMW);
+        aftertouchDrag.setTooltipText (tipAT);
+        velocityDrag.setTooltipText (tipVel);
+        noteDrag.setTooltipText (tipNote);
+        randomDrag.setTooltipText (tipRand);
     }
 
     {
@@ -3974,8 +4379,8 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
     }
 
     {
-        const auto tipSrc = T ("Mod slot source (LFO/Macro).",
-                               u8"Источник модуляции (LFO/Макрос).");
+        const auto tipSrc = T ("Mod slot source (LFO/Macro/ModWheel/Aftertouch/Velocity/Note/Envs/Random).",
+                               u8"Источник модуляции (LFO/Макрос/ModWheel/Aftertouch/Velocity/Note/Env/Random).");
         const auto tipDst = T ("Mod slot destination (what to modulate).",
                                u8"Цель модуляции (что модулировать).");
         const auto tipDepth = T ("Mod depth (bipolar). Negative inverts the source. Double-click to reset.",
@@ -4129,13 +4534,30 @@ void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
     if (quickAssignClear.isEnabled() != hasTarget)
         quickAssignClear.setEnabled (hasTarget);
 
+    const auto scaleOn = labScaleLock.getToggleState();
+    labScaleRoot.setEnabled (scaleOn);
+    labScaleType.setEnabled (scaleOn);
+
     labOctaveDown.setEnabled (labBaseOctave > 0);
-    labOctaveUp.setEnabled (labBaseOctave < 7);
+    labOctaveUp.setEnabled (labBaseOctave < labMaxBaseOctave);
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::sendLabKeyboardAllNotesOff()
 {
     audioProcessor.enqueueUiAllNotesOff();
+    audioProcessor.enqueueUiPitchBend (8192);
+    labPitchBend.getSlider().setValue (0.0, juce::dontSendNotification);
+    audioProcessor.enqueueUiModWheel (0);
+    audioProcessor.enqueueUiAftertouch (0);
+    labModWheel.getSlider().setValue (0.0, juce::dontSendNotification);
+    labAftertouch.getSlider().setValue (0.0, juce::dontSendNotification);
+    for (auto& m : labMapByInput)
+    {
+        m.count = 0;
+        m.outNotes.fill (0);
+    }
+    labOutRefCount.fill (0);
+    labInputHeld.fill (false);
     labActiveNotes.fill (false);
 
     for (int ch = 1; ch <= 16; ++ch)
@@ -4146,7 +4568,7 @@ void IndustrialEnergySynthAudioProcessorEditor::sendLabKeyboardAllNotesOff()
 
 void IndustrialEnergySynthAudioProcessorEditor::setLabKeyboardBaseOctave (int octave)
 {
-    const auto clamped = juce::jlimit (0, 7, octave);
+    const auto clamped = juce::jlimit (0, juce::jmax (0, labMaxBaseOctave), octave);
     if (labBaseOctave == clamped)
         return;
 
@@ -4156,12 +4578,63 @@ void IndustrialEnergySynthAudioProcessorEditor::setLabKeyboardBaseOctave (int oc
 
 void IndustrialEnergySynthAudioProcessorEditor::updateLabKeyboardRange()
 {
-    // Keep a fixed 4-octave window and slide it by base octave.
-    constexpr int spanSemitones = 48;
-    const auto start = juce::jlimit (0, 127 - spanSemitones, labBaseOctave * 12);
-    const auto end = juce::jlimit (0, 127, start + spanSemitones);
+    // Full-width keyboard: as the window gets wider, show more keys (instead of only scaling key sizes).
+    // We keep a fixed key width (controlled by labKeyWidth) and slide the lowest visible key by octave.
+    auto isWhite = [] (int midiNote) noexcept
+    {
+        const int m = midiNote % 12;
+        const int s = (m < 0) ? (m + 12) : m;
+        return s == 0 || s == 2 || s == 4 || s == 5 || s == 7 || s == 9 || s == 11;
+    };
 
-    labKeyboard.setAvailableRange (start, end);
+    const int kbW = labKeyboard.getWidth();
+    const float keyW = (float) labKeyWidth.getSlider().getValue();
+
+    auto computeEndForStart = [&] (int startNote) noexcept
+    {
+        // Fallback for initial layout phases.
+        if (kbW <= 0 || keyW <= 0.1f)
+            return juce::jmin (127, startNote + 48);
+
+        // Approx: number of white keys that fit at the current key width.
+        const int whiteKeys = juce::jlimit (7, 72, (int) std::floor ((float) kbW / keyW) + 1);
+
+        int count = 0;
+        int lastWhite = startNote;
+        for (int n = startNote; n <= 127 && count < whiteKeys; ++n)
+        {
+            if (isWhite (n))
+            {
+                lastWhite = n;
+                ++count;
+            }
+        }
+
+        // Include the last black key after the final white key (if any).
+        return juce::jmin (127, lastWhite + 1);
+    };
+
+    // Make sure the keyboard can display the full MIDI range; we control the view via setLowestVisibleKey().
+    labKeyboard.setAvailableRange (0, 127);
+
+    // First-pass: compute span for the current base octave.
+    int start = juce::jlimit (0, 127, labBaseOctave * 12);
+    int end = computeEndForStart (start);
+    int span = juce::jlimit (12, 127, end - start);
+
+    // Clamp start so [start..start+span] stays within MIDI range. Keep it on C boundaries.
+    const int maxStart = juce::jmax (0, 127 - span);
+    start = juce::jlimit (0, maxStart, start);
+    start = (start / 12) * 12;
+
+    // Recompute end for the clamped start.
+    end = computeEndForStart (start);
+    span = juce::jlimit (12, 127, end - start);
+
+    labMaxBaseOctave = juce::jlimit (0, 10, maxStart / 12);
+    labBaseOctave = juce::jlimit (0, labMaxBaseOctave, start / 12);
+
+    labKeyboard.setLowestVisibleKey (start);
     labKeyboard.setKeyPressBaseOctave (labBaseOctave);
 
     const auto isRu = isRussian();
@@ -4173,6 +4646,15 @@ void IndustrialEnergySynthAudioProcessorEditor::updateLabKeyboardRange()
 
 void IndustrialEnergySynthAudioProcessorEditor::updateLabKeyboardInfo()
 {
+    // Update keyboard scale highlighting (visual aid).
+    {
+        const auto root = juce::jlimit (0, 11, labScaleRoot.getCombo().getSelectedItemIndex());
+        const auto type = (params::ui::LabScaleType) juce::jlimit ((int) params::ui::labScaleMajor,
+                                                                   (int) params::ui::labScaleChromatic,
+                                                                   labScaleType.getCombo().getSelectedItemIndex());
+        labKeyboard.setScaleHighlight (labScaleLock.getToggleState(), root, type);
+    }
+
     int activeCount = 0;
     int topNote = -1;
     for (int n = 0; n < (int) labActiveNotes.size(); ++n)
@@ -4186,6 +4668,25 @@ void IndustrialEnergySynthAudioProcessorEditor::updateLabKeyboardInfo()
 
     const auto vel = (int) std::lround (labVelocity.getSlider().getValue());
     const auto isRu = isRussian();
+
+    const auto modeText = labKeyboardMode.getCombo().getText();
+
+    juce::String scaleText;
+    if (labScaleLock.getToggleState())
+        scaleText = labScaleRoot.getCombo().getText() + " " + labScaleType.getCombo().getText();
+    else
+        scaleText = isRu ? juce::String::fromUTF8 (u8"Выкл") : juce::String ("Off");
+
+    juce::String chordIntervalsText;
+    for (int i = 0; i < labChordCount; ++i)
+    {
+        if (i > 0)
+            chordIntervalsText << ",";
+        chordIntervalsText << juce::String (labChordIntervals[(size_t) i]);
+    }
+    const auto chordText = labChordEnable.getToggleState()
+        ? chordIntervalsText
+        : (isRu ? juce::String::fromUTF8 (u8"Выкл") : juce::String ("Off"));
 
     juce::String txt;
     if (activeCount <= 0)
@@ -4205,7 +4706,264 @@ void IndustrialEnergySynthAudioProcessorEditor::updateLabKeyboardInfo()
                + " | Top note: " + midiNoteName (topNote));
     }
 
+    if (isRu)
+        txt << juce::String::fromUTF8 (u8" | Режим: ") << modeText
+            << juce::String::fromUTF8 (u8" | Лад: ") << scaleText
+            << juce::String::fromUTF8 (u8" | Аккорд: ") << chordText;
+    else
+        txt << " | Mode: " << modeText
+            << " | Scale: " << scaleText
+            << " | Chord: " << chordText;
+
     labKeyboardInfoLabel.setText (txt, juce::dontSendNotification);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::loadLabChordFromState()
+{
+    labChordIntervals.fill (0);
+    labChordCount = 1;
+
+    auto& s = audioProcessor.getAPVTS().state;
+    auto raw = s.getProperty (params::ui::labChordIntervals, {}).toString();
+    raw = raw.trim().removeCharacters ("\r\n\t");
+    if (raw.isEmpty())
+        return;
+
+    // Accept a few common separators: comma/space/semicolon.
+    juce::StringArray tokens;
+    tokens.addTokens (raw, ",; ", "");
+
+    juce::Array<int> intervals;
+    for (const auto& tok : tokens)
+    {
+        if (! tok.containsAnyOf ("0123456789-+"))
+            continue;
+
+        const int v = juce::jlimit (-24, 24, tok.getIntValue());
+        if (! intervals.contains (v))
+            intervals.add (v);
+    }
+
+    if (intervals.isEmpty())
+        return;
+
+    intervals.sort();
+    if (! intervals.contains (0))
+        intervals.insert (0, 0);
+
+    labChordCount = juce::jlimit (1, labMaxChordNotes, intervals.size());
+    for (int i = 0; i < labChordCount; ++i)
+        labChordIntervals[(size_t) i] = intervals[i];
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::learnLabChordFromActiveNotes()
+{
+    juce::Array<int> notes;
+    notes.ensureStorageAllocated (labMaxChordNotes);
+
+    for (int n = 0; n < 128; ++n)
+        if (labOutRefCount[(size_t) n] > 0)
+            notes.add (n);
+
+    const auto isRu = isRussian();
+    if (notes.size() < 2)
+    {
+        statusLabel.setText (isRu ? juce::String::fromUTF8 (u8"Chord Learn: удержи 2+ ноты и нажми Learn.")
+                                  : juce::String ("Chord Learn: hold 2+ notes, then click Learn."),
+                             juce::dontSendNotification);
+        return;
+    }
+
+    // Use the lowest held note as chord root.
+    const int root = notes[0];
+
+    juce::StringArray parts;
+    parts.ensureStorageAllocated (juce::jmin (notes.size(), labMaxChordNotes));
+
+    int count = 0;
+    for (int i = 0; i < notes.size() && count < labMaxChordNotes; ++i)
+    {
+        const int iv = juce::jlimit (-24, 24, notes[i] - root);
+        parts.add (juce::String (iv));
+        ++count;
+    }
+
+    const auto intervalsStr = parts.joinIntoString (",");
+    audioProcessor.getAPVTS().state.setProperty (params::ui::labChordIntervals, intervalsStr, nullptr);
+    loadLabChordFromState();
+
+    statusLabel.setText ((isRu ? juce::String::fromUTF8 (u8"Chord learned: ") : juce::String ("Chord learned: ")) + intervalsStr,
+                         juce::dontSendNotification);
+
+    // Clear currently held audition notes to avoid confusion/stuck sounds.
+    sendLabKeyboardAllNotesOff();
+}
+
+int IndustrialEnergySynthAudioProcessorEditor::quantizeLabNote (int midiNote) const
+{
+    const int note = juce::jlimit (0, 127, midiNote);
+    if (! labScaleLock.getToggleState())
+        return note;
+
+    const int root = juce::jlimit (0, 11, labScaleRoot.getCombo().getSelectedItemIndex());
+    const auto type = (params::ui::LabScaleType) juce::jlimit (0, 4, labScaleType.getCombo().getSelectedItemIndex());
+
+    if (type == params::ui::labScaleChromatic)
+        return note;
+
+    bool allowed[12] = { false };
+    auto setAllowed = [&] (std::initializer_list<int> ints)
+    {
+        for (int i : ints)
+            allowed[(size_t) ((i % 12 + 12) % 12)] = true;
+    };
+
+    switch (type)
+    {
+        case params::ui::labScaleMajor:   setAllowed ({ 0, 2, 4, 5, 7, 9, 11 }); break;
+        case params::ui::labScaleMinor:   setAllowed ({ 0, 2, 3, 5, 7, 8, 10 }); break;
+        case params::ui::labScalePentMaj: setAllowed ({ 0, 2, 4, 7, 9 }); break;
+        case params::ui::labScalePentMin: setAllowed ({ 0, 3, 5, 7, 10 }); break;
+        case params::ui::labScaleChromatic: break;
+    }
+
+    auto inScale = [&] (int n)
+    {
+        const int rel = (n - root + 1200) % 12;
+        return allowed[(size_t) rel];
+    };
+
+    if (inScale (note))
+        return note;
+
+    // Snap to the nearest in-scale note (prefer upwards on ties).
+    for (int d = 1; d <= 12; ++d)
+    {
+        const int up = note + d;
+        if (up <= 127 && inScale (up))
+            return up;
+
+        const int down = note - d;
+        if (down >= 0 && inScale (down))
+            return down;
+    }
+
+    return note;
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::labPressInputNote (int inputNote, int velocity0to127)
+{
+    const int in = juce::jlimit (0, 127, inputNote);
+    const int vel = juce::jlimit (1, 127, velocity0to127);
+
+    const bool latch = labHold.getToggleState();
+    const bool monoKb = (labKeyboardMode.getCombo().getSelectedItemIndex() == (int) params::ui::labKbMono);
+
+    if (latch && labInputHeld[(size_t) in])
+    {
+        labReleaseInputNote (in);
+        return;
+    }
+
+    // Defensive: if we somehow get a duplicate NoteOn, re-map cleanly.
+    if (labInputHeld[(size_t) in])
+        labReleaseInputNote (in);
+
+    if (monoKb)
+    {
+        for (int n = 0; n < 128; ++n)
+            if (n != in && labInputHeld[(size_t) n])
+                labReleaseInputNote (n);
+    }
+
+    const int root = quantizeLabNote (in);
+    const bool chordOn = labChordEnable.getToggleState();
+
+    auto& map = labMapByInput[(size_t) in];
+    map.count = 0;
+    map.outNotes.fill (0);
+
+    auto addOut = [&] (int outNote)
+    {
+        if (outNote < 0 || outNote > 127)
+            return;
+
+        for (int i = 0; i < map.count; ++i)
+            if (map.outNotes[(size_t) i] == outNote)
+                return;
+
+        if (map.count >= labMaxChordNotes)
+            return;
+
+        map.outNotes[(size_t) map.count++] = outNote;
+    };
+
+    if (chordOn)
+    {
+        for (int i = 0; i < labChordCount; ++i)
+            addOut (root + labChordIntervals[(size_t) i]);
+    }
+    else
+    {
+        addOut (root);
+    }
+
+    labInputHeld[(size_t) in] = true;
+
+    auto sendOut = [&] (int out)
+    {
+        if (++labOutRefCount[(size_t) out] == 1)
+            audioProcessor.enqueueUiNoteOn (out, vel);
+        labActiveNotes[(size_t) out] = true;
+    };
+
+    // Important for a mono synth: send the chord root last so the audible pitch lands on the root.
+    if (chordOn && map.count > 1)
+    {
+        for (int i = 0; i < map.count; ++i)
+        {
+            const int out = map.outNotes[(size_t) i];
+            if (out != root)
+                sendOut (out);
+        }
+        sendOut (root);
+    }
+    else
+    {
+        for (int i = 0; i < map.count; ++i)
+            sendOut (map.outNotes[(size_t) i]);
+    }
+
+    updateLabKeyboardInfo();
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::labReleaseInputNote (int inputNote)
+{
+    const int in = juce::jlimit (0, 127, inputNote);
+    if (! labInputHeld[(size_t) in])
+        return;
+
+    auto& map = labMapByInput[(size_t) in];
+    for (int i = 0; i < map.count; ++i)
+    {
+        const int out = juce::jlimit (0, 127, map.outNotes[(size_t) i]);
+        auto& rc = labOutRefCount[(size_t) out];
+        if (rc > 0)
+            --rc;
+
+        if (rc <= 0)
+        {
+            rc = 0;
+            audioProcessor.enqueueUiNoteOff (out);
+            labActiveNotes[(size_t) out] = false;
+        }
+    }
+
+    map.count = 0;
+    map.outNotes.fill (0);
+    labInputHeld[(size_t) in] = false;
+
+    updateLabKeyboardInfo();
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::handleNoteOn (juce::MidiKeyboardState* source,
@@ -4217,27 +4975,7 @@ void IndustrialEnergySynthAudioProcessorEditor::handleNoteOn (juce::MidiKeyboard
 
     const auto note = juce::jlimit (0, 127, midiNoteNumber);
     const auto fixedVelocity = juce::jlimit (1, 127, (int) std::lround (labVelocity.getSlider().getValue()));
-
-    if (labHold.getToggleState())
-    {
-        if (labActiveNotes[(size_t) note])
-        {
-            audioProcessor.enqueueUiNoteOff (note);
-            labActiveNotes[(size_t) note] = false;
-        }
-        else
-        {
-            audioProcessor.enqueueUiNoteOn (note, fixedVelocity);
-            labActiveNotes[(size_t) note] = true;
-        }
-    }
-    else
-    {
-        audioProcessor.enqueueUiNoteOn (note, fixedVelocity);
-        labActiveNotes[(size_t) note] = true;
-    }
-
-    updateLabKeyboardInfo();
+    labPressInputNote (note, fixedVelocity);
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::handleNoteOff (juce::MidiKeyboardState* source,
@@ -4251,9 +4989,7 @@ void IndustrialEnergySynthAudioProcessorEditor::handleNoteOff (juce::MidiKeyboar
     if (labHold.getToggleState())
         return;
 
-    audioProcessor.enqueueUiNoteOff (note);
-    labActiveNotes[(size_t) note] = false;
-    updateLabKeyboardInfo();
+    labReleaseInputNote (note);
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
@@ -4666,6 +5402,13 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
         const juce::Colour colLfo2  (0xff7d5fff);
         const juce::Colour colMacro1(0xffffb000);
         const juce::Colour colMacro2(0xfff06bff);
+        const juce::Colour colMw    (0xff00e676);
+        const juce::Colour colAt    (0xffff6b7d);
+        const juce::Colour colVel   (0xffffcf6a);
+        const juce::Colour colNote  (0xff4f8cff);
+        const juce::Colour colFEnv  (0xff35ff9a);
+        const juce::Colour colAEnv  (0xff00c7ff);
+        const juce::Colour colRand  (0xff00e1ff);
 
         auto updateFor = [&] (ies::ui::KnobWithLabel& knob)
         {
@@ -4678,6 +5421,13 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
             float sumLfo2 = 0.0f;
             float sumM1 = 0.0f;
             float sumM2 = 0.0f;
+            float sumMw = 0.0f;
+            float sumAt = 0.0f;
+            float sumVel = 0.0f;
+            float sumNote = 0.0f;
+            float sumFEnv = 0.0f;
+            float sumAEnv = 0.0f;
+            float sumRand = 0.0f;
 
             for (int i = 0; i < params::mod::numSlots; ++i)
             {
@@ -4685,7 +5435,7 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
                 if (d != dst)
                     continue;
 
-                const auto src = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, modSlotSrc[(size_t) i].getSelectedItemIndex());
+                const auto src = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
                 const auto dep = (float) modSlotDepth[(size_t) i].getValue();
 
                 switch (src)
@@ -4695,12 +5445,19 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
                     case params::mod::srcLfo2:   sumLfo2 += dep; break;
                     case params::mod::srcMacro1: sumM1   += dep; break;
                     case params::mod::srcMacro2: sumM2   += dep; break;
+                    case params::mod::srcModWheel: sumMw += dep; break;
+                    case params::mod::srcAftertouch: sumAt += dep; break;
+                    case params::mod::srcVelocity: sumVel += dep; break;
+                    case params::mod::srcNote: sumNote += dep; break;
+                    case params::mod::srcFilterEnv: sumFEnv += dep; break;
+                    case params::mod::srcAmpEnv: sumAEnv += dep; break;
+                    case params::mod::srcRandom: sumRand += dep; break;
                     default: break;
                 }
             }
 
             struct Arc final { float depth; juce::Colour col; };
-            std::array<Arc, 4> arcs {};
+            std::array<Arc, 11> arcs {};
             int count = 0;
 
             auto addArc = [&] (float d, juce::Colour c)
@@ -4714,6 +5471,13 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
             addArc (sumLfo2, colLfo2);
             addArc (sumM1, colMacro1);
             addArc (sumM2, colMacro2);
+            addArc (sumMw, colMw);
+            addArc (sumAt, colAt);
+            addArc (sumVel, colVel);
+            addArc (sumNote, colNote);
+            addArc (sumFEnv, colFEnv);
+            addArc (sumAEnv, colAEnv);
+            addArc (sumRand, colRand);
 
             bool changed = false;
             changed |= setIfChanged (s, "modArcCount", count);
@@ -4851,6 +5615,7 @@ void IndustrialEnergySynthAudioProcessorEditor::loadPresetByComboSelection()
     }
 
     loadMacroNamesFromState();
+    loadLabChordFromState();
     refreshLabels();
     refreshTooltips();
 }
@@ -4887,7 +5652,7 @@ void IndustrialEnergySynthAudioProcessorEditor::clearAllModForDest (params::mod:
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
         const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
-        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, modSlotSrc[(size_t) i].getSelectedItemIndex());
+        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
         if (d == dst && s != params::mod::srcOff)
             clearModSlot (i);
     }
@@ -4911,7 +5676,7 @@ void IndustrialEnergySynthAudioProcessorEditor::assignModulation (params::mod::S
 
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
-        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, modSlotSrc[(size_t) i].getSelectedItemIndex());
+        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
         const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
 
         if (s == src && d == dst)
@@ -4929,7 +5694,19 @@ void IndustrialEnergySynthAudioProcessorEditor::assignModulation (params::mod::S
     if (existing < 0)
     {
         const bool isMacro = (src == params::mod::srcMacro1 || src == params::mod::srcMacro2);
-        const float defDepth = isMacro ? 1.0f : 0.25f;
+        float defDepth = 0.25f;
+        if (isMacro)
+            defDepth = 1.0f;
+        else if (src == params::mod::srcModWheel || src == params::mod::srcAftertouch)
+            defDepth = 0.5f;
+        else if (src == params::mod::srcVelocity)
+            defDepth = 0.5f;
+        else if (src == params::mod::srcNote)
+            defDepth = 0.35f;
+        else if (src == params::mod::srcFilterEnv || src == params::mod::srcAmpEnv)
+            defDepth = 0.8f;
+        else if (src == params::mod::srcRandom)
+            defDepth = 0.5f;
         setParamValue (kModSlotDepthIds[slot], defDepth);
     }
 
@@ -4951,6 +5728,13 @@ void IndustrialEnergySynthAudioProcessorEditor::assignModulation (params::mod::S
                 case params::mod::srcLfo2:   return isRu ? juce::String::fromUTF8 (u8"LFO 2") : "LFO 2";
                 case params::mod::srcMacro1: return isRu ? juce::String::fromUTF8 (u8"Макро 1") : "Macro 1";
                 case params::mod::srcMacro2: return isRu ? juce::String::fromUTF8 (u8"Макро 2") : "Macro 2";
+                case params::mod::srcModWheel: return isRu ? juce::String::fromUTF8 (u8"ModWheel") : "Mod Wheel";
+                case params::mod::srcAftertouch: return isRu ? juce::String::fromUTF8 (u8"Aftertouch") : "Aftertouch";
+                case params::mod::srcVelocity: return isRu ? juce::String::fromUTF8 (u8"Velocity") : "Velocity";
+                case params::mod::srcNote: return isRu ? juce::String::fromUTF8 (u8"Note") : "Note";
+                case params::mod::srcFilterEnv: return isRu ? juce::String::fromUTF8 (u8"Огиб. фильтра") : "Filter Env";
+                case params::mod::srcAmpEnv: return isRu ? juce::String::fromUTF8 (u8"Огиб. амплитуды") : "Amp Env";
+                case params::mod::srcRandom: return isRu ? juce::String::fromUTF8 (u8"Случайно") : "Random";
                 default: break;
             }
             return "Off";
@@ -4996,7 +5780,7 @@ void IndustrialEnergySynthAudioProcessorEditor::showModulationMenu (params::mod:
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
         const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
-        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, modSlotSrc[(size_t) i].getSelectedItemIndex());
+        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
         if (d == dst && s != params::mod::srcOff)
             matchingSlots.add (i);
     }
@@ -5135,14 +5919,15 @@ void IndustrialEnergySynthAudioProcessorEditor::setLastTouchedModDest (params::m
         return "-";
     }();
 
-    float sumL1 = 0.0f, sumL2 = 0.0f, sumM1 = 0.0f, sumM2 = 0.0f;
+    float sumL1 = 0.0f, sumL2 = 0.0f, sumM1 = 0.0f, sumM2 = 0.0f, sumMW = 0.0f, sumAT = 0.0f, sumV = 0.0f, sumN = 0.0f;
+    float sumFE = 0.0f, sumAE = 0.0f, sumR = 0.0f;
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
         const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
         if (d != dst)
             continue;
 
-        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, modSlotSrc[(size_t) i].getSelectedItemIndex());
+        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
         const auto dep = (float) modSlotDepth[(size_t) i].getValue();
 
         switch (s)
@@ -5151,6 +5936,13 @@ void IndustrialEnergySynthAudioProcessorEditor::setLastTouchedModDest (params::m
             case params::mod::srcLfo2:   sumL2 += dep; break;
             case params::mod::srcMacro1: sumM1 += dep; break;
             case params::mod::srcMacro2: sumM2 += dep; break;
+            case params::mod::srcModWheel: sumMW += dep; break;
+            case params::mod::srcAftertouch: sumAT += dep; break;
+            case params::mod::srcVelocity: sumV += dep; break;
+            case params::mod::srcNote: sumN += dep; break;
+            case params::mod::srcFilterEnv: sumFE += dep; break;
+            case params::mod::srcAmpEnv: sumAE += dep; break;
+            case params::mod::srcRandom: sumR += dep; break;
             case params::mod::srcOff:    break;
         }
     }
@@ -5170,6 +5962,13 @@ void IndustrialEnergySynthAudioProcessorEditor::setLastTouchedModDest (params::m
     addPart (modInfo, "L2", sumL2);
     addPart (modInfo, "M1", sumM1);
     addPart (modInfo, "M2", sumM2);
+    addPart (modInfo, "MW", sumMW);
+    addPart (modInfo, "AT", sumAT);
+    addPart (modInfo, "V", sumV);
+    addPart (modInfo, "N", sumN);
+    addPart (modInfo, "FE", sumFE);
+    addPart (modInfo, "AE", sumAE);
+    addPart (modInfo, "R", sumR);
 
     auto targetText = (isRu ? juce::String::fromUTF8 (u8"Цель: ") : juce::String ("Target: ")) + dstName;
     if (modInfo.isNotEmpty())

@@ -11,6 +11,7 @@
 #include "ui/ShaperEditor.h"
 #include "ui/WavePreview.h"
 #include "ui/ModSourceBadge.h"
+#include "ui/LabKeyboardComponent.h"
 #include "presets/PresetManager.h"
 
 #include <array>
@@ -74,6 +75,11 @@ private:
     void setLabKeyboardBaseOctave (int octave);
     void updateLabKeyboardRange();
     void updateLabKeyboardInfo();
+    void loadLabChordFromState();
+    void learnLabChordFromActiveNotes();
+    int quantizeLabNote (int midiNote) const;
+    void labPressInputNote (int inputNote, int velocity0to127);
+    void labReleaseInputNote (int inputNote);
 
     // Top bar
     juce::TextButton initButton;
@@ -173,6 +179,15 @@ private:
     std::unique_ptr<APVTS::SliderAttachment> osc3PhaseAttachment;
     ies::ui::KnobWithLabel osc3Detune;
     std::unique_ptr<APVTS::SliderAttachment> osc3DetuneAttachment;
+
+    // Noise (Serum-ish helper oscillator)
+    juce::GroupComponent noiseGroup;
+    juce::ToggleButton noiseEnable;
+    std::unique_ptr<APVTS::ButtonAttachment> noiseEnableAttachment;
+    ies::ui::KnobWithLabel noiseLevel;
+    std::unique_ptr<APVTS::SliderAttachment> noiseLevelAttachment;
+    ies::ui::KnobWithLabel noiseColor;
+    std::unique_ptr<APVTS::SliderAttachment> noiseColorAttachment;
 
     // Destroy / Modulation
     juce::GroupComponent destroyGroup;
@@ -292,6 +307,11 @@ private:
     ies::ui::ModSourceBadge macro2Drag;
     ies::ui::KnobWithLabel macro2;
     std::unique_ptr<APVTS::SliderAttachment> macro2Attachment;
+    ies::ui::ModSourceBadge modWheelDrag;
+    ies::ui::ModSourceBadge aftertouchDrag;
+    ies::ui::ModSourceBadge velocityDrag;
+    ies::ui::ModSourceBadge noteDrag;
+    ies::ui::ModSourceBadge randomDrag;
 
     juce::GroupComponent lfo1Panel;
     ies::ui::ModSourceBadge lfo1Drag;
@@ -357,12 +377,38 @@ private:
     juce::TextButton labPanic;
     ies::ui::KnobWithLabel labVelocity;
     ies::ui::KnobWithLabel labKeyWidth;
+    ies::ui::KnobWithLabel labPitchBend;
+    ies::ui::KnobWithLabel labModWheel;
+    ies::ui::KnobWithLabel labAftertouch;
+    ies::ui::ComboWithLabel labKeyboardMode;
+    std::unique_ptr<APVTS::ComboBoxAttachment> labKeyboardModeAttachment;
+    juce::ToggleButton labScaleLock;
+    std::unique_ptr<APVTS::ButtonAttachment> labScaleLockAttachment;
+    ies::ui::ComboWithLabel labScaleRoot;
+    std::unique_ptr<APVTS::ComboBoxAttachment> labScaleRootAttachment;
+    ies::ui::ComboWithLabel labScaleType;
+    std::unique_ptr<APVTS::ComboBoxAttachment> labScaleTypeAttachment;
+    juce::ToggleButton labChordEnable;
+    std::unique_ptr<APVTS::ButtonAttachment> labChordEnableAttachment;
+    juce::TextButton labChordLearn;
     juce::Label labKeyboardRangeLabel;
     juce::Label labKeyboardInfoLabel;
     juce::MidiKeyboardState labKeyboardState;
-    juce::MidiKeyboardComponent labKeyboard { labKeyboardState, juce::MidiKeyboardComponent::horizontalKeyboard };
+    ies::ui::LabKeyboardComponent labKeyboard { labKeyboardState };
     int labBaseOctave = 2;
+    int labMaxBaseOctave = 7;
+    static constexpr int labMaxChordNotes = 8;
+    struct LabInputMap final
+    {
+        int count = 0;
+        std::array<int, labMaxChordNotes> outNotes {};
+    };
+    std::array<LabInputMap, 128> labMapByInput {};
+    std::array<int, 128> labOutRefCount {};
+    std::array<bool, 128> labInputHeld {};
     std::array<bool, 128> labActiveNotes {};
+    std::array<int, labMaxChordNotes> labChordIntervals { { 0 } };
+    int labChordCount = 1;
 
     juce::ComponentBoundsConstrainer boundsConstrainer;
     juce::ResizableBorderComponent resizeBorder { this, &boundsConstrainer };

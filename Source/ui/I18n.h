@@ -48,6 +48,11 @@ enum class Key
     detune,
     sync,
 
+    noise,
+    noiseEnable,
+    noiseLevel,
+    noiseColor,
+
     destroy,
     destroyFold,
     destroyClip,
@@ -140,6 +145,13 @@ enum class Key
     modSrcLfo2,
     modSrcMacro1,
     modSrcMacro2,
+    modSrcModWheel,
+    modSrcAftertouch,
+    modSrcVelocity,
+    modSrcNote,
+    modSrcFilterEnv,
+    modSrcAmpEnv,
+    modSrcRandom,
     modDstOsc1Level,
     modDstOsc2Level,
     modDstOsc3Level,
@@ -151,6 +163,20 @@ enum class Key
     modDstCrushMix,
     modDstShaperDrive,
     modDstShaperMix,
+
+    labKeyboardMode,
+    labKeyboardModePoly,
+    labKeyboardModeMono,
+    labScaleLock,
+    labScaleRoot,
+    labScaleType,
+    labScaleMajor,
+    labScaleMinor,
+    labScalePentMaj,
+    labScalePentMin,
+    labScaleChromatic,
+    labChord,
+    labLearn,
 
     clipStatusPre,
     clipStatusOut,
@@ -210,6 +236,11 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::phase:        return u8 (u8"Фаза");
             case Key::detune:       return u8 (u8"Детюн (нестаб.)");
             case Key::sync:         return u8 (u8"Синхр. с Осц1");
+
+            case Key::noise:        return u8 (u8"Шум");
+            case Key::noiseEnable:  return u8 (u8"Вкл");
+            case Key::noiseLevel:   return u8 (u8"Уровень");
+            case Key::noiseColor:   return u8 (u8"Яркость");
 
             case Key::destroy:      return u8 (u8"Разрушение");
             case Key::destroyFold:  return u8 (u8"Фолд");
@@ -303,6 +334,13 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::modSrcLfo2:   return u8 (u8"LFO 2");
             case Key::modSrcMacro1: return u8 (u8"Макро 1");
             case Key::modSrcMacro2: return u8 (u8"Макро 2");
+            case Key::modSrcModWheel: return u8 (u8"ModWheel");
+            case Key::modSrcAftertouch: return u8 (u8"Aftertouch");
+            case Key::modSrcVelocity: return u8 (u8"Velocity");
+            case Key::modSrcNote: return u8 (u8"Note");
+            case Key::modSrcFilterEnv: return u8 (u8"Filter Env");
+            case Key::modSrcAmpEnv: return u8 (u8"Amp Env");
+            case Key::modSrcRandom: return u8 (u8"Random");
             case Key::modDstOsc1Level:     return u8 (u8"Осц1 уровень");
             case Key::modDstOsc2Level:     return u8 (u8"Осц2 уровень");
             case Key::modDstOsc3Level:     return u8 (u8"Осц3 уровень");
@@ -314,6 +352,20 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::modDstCrushMix:      return u8 (u8"Mix (crush)");
             case Key::modDstShaperDrive:   return u8 (u8"Драйв (shaper)");
             case Key::modDstShaperMix:     return u8 (u8"Mix (shaper)");
+
+            case Key::labKeyboardMode:     return u8 (u8"Режим");
+            case Key::labKeyboardModePoly: return u8 (u8"Поли");
+            case Key::labKeyboardModeMono: return u8 (u8"Моно");
+            case Key::labScaleLock:        return u8 (u8"Лад-лок");
+            case Key::labScaleRoot:        return u8 (u8"Тоника");
+            case Key::labScaleType:        return u8 (u8"Лад");
+            case Key::labScaleMajor:       return u8 (u8"Мажор");
+            case Key::labScaleMinor:       return u8 (u8"Минор");
+            case Key::labScalePentMaj:     return u8 (u8"Пент. маж");
+            case Key::labScalePentMin:     return u8 (u8"Пент. мин");
+            case Key::labScaleChromatic:   return u8 (u8"Хром.");
+            case Key::labChord:            return u8 (u8"Аккорд");
+            case Key::labLearn:            return u8 (u8"Учить");
 
             case Key::clipStatusPre:  return u8 (u8"PRE");
             case Key::clipStatusOut:  return u8 (u8"OUT");
@@ -368,6 +420,11 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::phase:        return "Phase";
             case Key::detune:       return "Detune (unstable)";
             case Key::sync:         return "Sync to Osc1";
+
+            case Key::noise:        return "Noise";
+            case Key::noiseEnable:  return "Enable";
+            case Key::noiseLevel:   return "Level";
+            case Key::noiseColor:   return "Color";
 
             case Key::destroy:      return "Destroy";
             case Key::destroyFold:  return "Fold";
@@ -461,6 +518,13 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::modSrcLfo2:   return "LFO 2";
             case Key::modSrcMacro1: return "Macro 1";
             case Key::modSrcMacro2: return "Macro 2";
+            case Key::modSrcModWheel: return "Mod Wheel";
+            case Key::modSrcAftertouch: return "Aftertouch";
+            case Key::modSrcVelocity: return "Velocity";
+            case Key::modSrcNote: return "Note";
+            case Key::modSrcFilterEnv: return "Filter Env";
+            case Key::modSrcAmpEnv: return "Amp Env";
+            case Key::modSrcRandom: return "Random";
             case Key::modDstOsc1Level:     return "Osc1 Level";
             case Key::modDstOsc2Level:     return "Osc2 Level";
             case Key::modDstOsc3Level:     return "Osc3 Level";
@@ -472,6 +536,20 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::modDstCrushMix:      return "Crush Mix";
             case Key::modDstShaperDrive:   return "Shaper Drive";
             case Key::modDstShaperMix:     return "Shaper Mix";
+
+            case Key::labKeyboardMode:     return "Mode";
+            case Key::labKeyboardModePoly: return "Poly";
+            case Key::labKeyboardModeMono: return "Mono";
+            case Key::labScaleLock:        return "Scale Lock";
+            case Key::labScaleRoot:        return "Root";
+            case Key::labScaleType:        return "Scale";
+            case Key::labScaleMajor:       return "Major";
+            case Key::labScaleMinor:       return "Minor";
+            case Key::labScalePentMaj:     return "Pent Maj";
+            case Key::labScalePentMin:     return "Pent Min";
+            case Key::labScaleChromatic:   return "Chromatic";
+            case Key::labChord:            return "Chord";
+            case Key::labLearn:            return "Learn";
 
             case Key::clipStatusPre:  return "PRE";
             case Key::clipStatusOut:  return "OUT";

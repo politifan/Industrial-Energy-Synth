@@ -67,6 +67,13 @@ inline constexpr const char* phase  = "osc3.phase";
 inline constexpr const char* detune = "osc3.detune";
 }
 
+namespace noise
+{
+inline constexpr const char* enable = "noise.enable"; // bool
+inline constexpr const char* level  = "noise.level";  // float 0..1
+inline constexpr const char* color  = "noise.color";  // float 0..1 (brightness)
+}
+
 namespace lfo
 {
 inline constexpr const char* wave    = "wave";    // choice
@@ -255,7 +262,14 @@ enum Source
     srcLfo1 = 1,
     srcLfo2 = 2,
     srcMacro1 = 3,
-    srcMacro2 = 4
+    srcMacro2 = 4,
+    srcModWheel = 5,
+    srcAftertouch = 6,
+    srcVelocity = 7,
+    srcNote = 8,
+    srcFilterEnv = 9,
+    srcAmpEnv = 10,
+    srcRandom = 11
 };
 
 enum Dest
@@ -367,6 +381,16 @@ inline constexpr const char* analyzerSource = "ui.analyzerSource"; // choice: Po
 inline constexpr const char* analyzerFreeze = "ui.analyzerFreeze"; // bool
 inline constexpr const char* analyzerAveraging = "ui.analyzerAveraging"; // choice: Fast, Medium, Smooth
 
+// Lab keyboard helpers (UI-only workflow; they affect only the on-screen Lab keyboard preview).
+inline constexpr const char* labKeyboardMode = "ui.labKeyboardMode"; // choice: Poly, Mono
+inline constexpr const char* labScaleLock    = "ui.labScaleLock";    // bool
+inline constexpr const char* labScaleRoot    = "ui.labScaleRoot";    // choice: C..B
+inline constexpr const char* labScaleType    = "ui.labScaleType";    // choice
+inline constexpr const char* labChordEnable  = "ui.labChordEnable";  // bool
+
+// Non-parameter state keys (stored as ValueTree properties inside APVTS state).
+inline constexpr const char* labChordIntervals = "ui.labChordIntervals"; // string like "0,4,7"
+
 enum AnalyzerSource
 {
     analyzerPost = 0,
@@ -378,6 +402,21 @@ enum AnalyzerAveraging
     analyzerFast = 0,
     analyzerMedium = 1,
     analyzerSmooth = 2
+};
+
+enum LabKeyboardMode
+{
+    labKbPoly = 0,
+    labKbMono = 1
+};
+
+enum LabScaleType
+{
+    labScaleMajor = 0,
+    labScaleMinor = 1,
+    labScalePentMaj = 2,
+    labScalePentMin = 3,
+    labScaleChromatic = 4
 };
 
 enum Language

@@ -73,6 +73,10 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
     paramPointers.osc3Phase     = apvts.getRawParameterValue (params::osc3::phase);
     paramPointers.osc3Detune    = apvts.getRawParameterValue (params::osc3::detune);
 
+    paramPointers.noiseEnable   = apvts.getRawParameterValue (params::noise::enable);
+    paramPointers.noiseLevel    = apvts.getRawParameterValue (params::noise::level);
+    paramPointers.noiseColor    = apvts.getRawParameterValue (params::noise::color);
+
     paramPointers.ampAttackMs   = apvts.getRawParameterValue (params::amp::attackMs);
     paramPointers.ampDecayMs    = apvts.getRawParameterValue (params::amp::decayMs);
     paramPointers.ampSustain    = apvts.getRawParameterValue (params::amp::sustain);
@@ -262,6 +266,28 @@ void IndustrialEnergySynthAudioProcessor::enqueueUiAllNotesOff() noexcept
     // CC123 All Notes Off + CC120 All Sound Off.
     pushUiMidiEvent ((juce::uint8) 0xB0, (juce::uint8) 123, (juce::uint8) 0);
     pushUiMidiEvent ((juce::uint8) 0xB0, (juce::uint8) 120, (juce::uint8) 0);
+}
+
+void IndustrialEnergySynthAudioProcessor::enqueueUiPitchBend (int value0to16383) noexcept
+{
+    const int v = juce::jlimit (0, 16383, value0to16383);
+    const auto lsb = (juce::uint8) (v & 0x7f);
+    const auto msb = (juce::uint8) ((v >> 7) & 0x7f);
+    pushUiMidiEvent ((juce::uint8) 0xE0, lsb, msb);
+}
+
+void IndustrialEnergySynthAudioProcessor::enqueueUiModWheel (int value0to127) noexcept
+{
+    const auto v = (juce::uint8) juce::jlimit (0, 127, value0to127);
+    // CC1 Mod Wheel.
+    pushUiMidiEvent ((juce::uint8) 0xB0, (juce::uint8) 1, v);
+}
+
+void IndustrialEnergySynthAudioProcessor::enqueueUiAftertouch (int value0to127) noexcept
+{
+    const auto v = (juce::uint8) juce::jlimit (0, 127, value0to127);
+    // Channel Pressure (Aftertouch).
+    pushUiMidiEvent ((juce::uint8) 0xD0, v, (juce::uint8) 0);
 }
 
 void IndustrialEnergySynthAudioProcessor::applyStateFromUi (juce::ValueTree state, bool keepLanguage)
@@ -478,6 +504,23 @@ void IndustrialEnergySynthAudioProcessor::processBlock (juce::AudioBuffer<float>
         {
             engine.allNotesOff();
         }
+        else if (msg.isController())
+        {
+            if (msg.getControllerNumber() == 1) // CC1 Mod Wheel
+                engine.setModWheel (msg.getControllerValue());
+        }
+        else if (msg.isChannelPressure())
+        {
+            engine.setAftertouch (msg.getChannelPressureValue());
+        }
+        else if (msg.isAftertouch())
+        {
+            engine.setAftertouch (msg.getAfterTouchValue());
+        }
+        else if (msg.isPitchWheel())
+        {
+            engine.setPitchBend (msg.getPitchWheelValue());
+        }
     }
 
     if (cursor < totalSamples)
@@ -614,6 +657,26 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
                                                                      "Analyzer Averaging",
                                                                      juce::StringArray { "Fast", "Medium", "Smooth" },
                                                                      (int) params::ui::analyzerMedium));
+
+    // Lab keyboard workflow (preview-only).
+    uiGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::ui::labKeyboardMode),
+                                                                     "Lab Keyboard Mode",
+                                                                     juce::StringArray { "Poly", "Mono" },
+                                                                     (int) params::ui::labKbPoly));
+    uiGroup->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::ui::labScaleLock),
+                                                                   "Lab Scale Lock",
+                                                                   false));
+    uiGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::ui::labScaleRoot),
+                                                                     "Lab Scale Root",
+                                                                     juce::StringArray { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" },
+                                                                     0));
+    uiGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::ui::labScaleType),
+                                                                     "Lab Scale Type",
+                                                                     juce::StringArray { "Major", "Minor", "Pent Maj", "Pent Min", "Chromatic" },
+                                                                     (int) params::ui::labScaleMajor));
+    uiGroup->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::ui::labChordEnable),
+                                                                   "Lab Chord Memory",
+                                                                   false));
     layout.add (std::move (uiGroup));
 
     // --- Mono ---
@@ -675,7 +738,9 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
 
     // --- Mod Matrix (fixed slots; no drag/drop yet) ---
     auto modGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("mod", "Mod Matrix", "|");
-    const auto modSrcChoices = juce::StringArray { "Off", "LFO 1", "LFO 2", "Macro 1", "Macro 2" };
+    const auto modSrcChoices = juce::StringArray { "Off", "LFO 1", "LFO 2", "Macro 1", "Macro 2",
+                                                   "Mod Wheel", "Aftertouch", "Velocity", "Note",
+                                                   "Filter Env", "Amp Env", "Random" };
     const auto modDstChoices = juce::StringArray { "Off", "Osc1 Level", "Osc2 Level", "Osc3 Level", "Filter Cutoff", "Filter Reso",
                                                    "Fold Amount", "Clip Amount", "Mod Amount", "Crush Mix",
                                                    "Shaper Drive", "Shaper Mix" };
@@ -750,6 +815,15 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
     osc3Group->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::osc3::detune), "Detune (Unstable)",
                                                                       juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
     layout.add (std::move (osc3Group));
+
+    // --- Noise (Serum-ish helper oscillator) ---
+    auto noiseGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("noise", "Noise", "|");
+    noiseGroup->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::noise::enable), "Enable", false));
+    noiseGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::noise::level), "Level",
+                                                                       juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+    noiseGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::noise::color), "Color",
+                                                                       juce::NormalisableRange<float> (0.0f, 1.0f), 0.75f));
+    layout.add (std::move (noiseGroup));
 
     // --- Destroy / Modulation ---
     auto destroyGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("destroy", "Destroy", "|");

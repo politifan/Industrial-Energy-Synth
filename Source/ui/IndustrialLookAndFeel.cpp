@@ -81,8 +81,14 @@ void IndustrialLookAndFeel::drawButtonBackground (juce::Graphics& g,
     else if (isHighlighted)
         base = base.brighter (0.10f);
 
-    g.setColour (base);
-    g.fillRoundedRectangle (b, 5.0f);
+    {
+        const auto topCol = base.brighter (0.08f);
+        const auto botCol = base.darker (0.06f);
+        juce::ColourGradient cg (topCol, b.getX(), b.getY(),
+                                 botCol, b.getX(), b.getBottom(), false);
+        g.setGradientFill (cg);
+        g.fillRoundedRectangle (b, 5.0f);
+    }
 
     g.setColour (brd.withAlpha (0.95f));
     g.drawRoundedRectangle (b, 5.0f, 1.0f);
@@ -154,13 +160,20 @@ void IndustrialLookAndFeel::drawRotarySlider (juce::Graphics& g,
             const int src = srcVar.isInt() ? (int) srcVar : (int) params::mod::srcOff;
 
             auto c = accentCol;
-            switch ((params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMacro2, src))
+            switch ((params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, src))
             {
                 case params::mod::srcOff:    break;
                 case params::mod::srcLfo1:   c = juce::Colour (0xff00c7ff); break;
                 case params::mod::srcLfo2:   c = juce::Colour (0xff7d5fff); break;
                 case params::mod::srcMacro1: c = juce::Colour (0xffffb000); break;
                 case params::mod::srcMacro2: c = juce::Colour (0xfff06bff); break;
+                case params::mod::srcModWheel: c = juce::Colour (0xff00e676); break;
+                case params::mod::srcAftertouch: c = juce::Colour (0xffff6b7d); break;
+                case params::mod::srcVelocity: c = juce::Colour (0xffffcf6a); break;
+                case params::mod::srcNote: c = juce::Colour (0xff4f8cff); break;
+                case params::mod::srcFilterEnv: c = juce::Colour (0xff35ff9a); break;
+                case params::mod::srcAmpEnv: c = juce::Colour (0xff00c7ff); break;
+                case params::mod::srcRandom: c = juce::Colour (0xff00e1ff); break;
             }
 
             auto halo = knob.expanded (5.0f);
@@ -223,7 +236,8 @@ void IndustrialLookAndFeel::drawRotarySlider (juce::Graphics& g,
     // Modulation rings (outer arcs, one per source) - Serum-like visual feedback.
     {
         const auto countVar = slider.getProperties().getWithDefault ("modArcCount", 0);
-        const int count = countVar.isInt() ? juce::jlimit (0, 8, (int) countVar) : 0;
+        // Up to 11 sources currently (LFO1/LFO2/M1/M2/MW/AT/VEL/NOTE/FENV/AENV/RAND).
+        const int count = countVar.isInt() ? juce::jlimit (0, 12, (int) countVar) : 0;
         if (count > 0)
         {
             const auto range = (rotaryEndAngle - rotaryStartAngle);
@@ -368,11 +382,25 @@ void IndustrialLookAndFeel::drawGroupComponentOutline (juce::Graphics& g,
     const auto a = colourFromProperty (group, "accentColour", accent);
     const auto activity = juce::jlimit (0.0f, 1.0f, floatFromProperty (group, "activity", 0.0f));
 
-    const auto fill = enabled ? panel.withAlpha (0.72f) : panel.withAlpha (0.25f);
+    const auto fillAlpha = enabled ? 0.78f : 0.25f;
     const auto brd  = enabled ? border.withAlpha (0.95f) : border.withAlpha (0.25f);
 
-    g.setColour (fill);
-    g.fillRoundedRectangle (bounds, 8.0f);
+    // Main panel fill: subtle gradient + tiny per-block tint so the UI feels less flat.
+    {
+        const auto topCol = panel.brighter (enabled ? 0.12f : 0.05f).withAlpha (fillAlpha);
+        const auto botCol = panel2.withAlpha (fillAlpha);
+        juce::ColourGradient cg (topCol, bounds.getX(), bounds.getY(),
+                                 botCol, bounds.getX(), bounds.getBottom(), false);
+        g.setGradientFill (cg);
+        g.fillRoundedRectangle (bounds, 8.0f);
+
+        if (enabled)
+        {
+            const auto tint = a.withAlpha (0.030f + 0.050f * activity);
+            g.setColour (tint);
+            g.fillRoundedRectangle (bounds.reduced (2.0f), 7.0f);
+        }
+    }
 
     g.setColour (brd);
     g.drawRoundedRectangle (bounds, 8.0f, 1.0f);
@@ -380,8 +408,14 @@ void IndustrialLookAndFeel::drawGroupComponentOutline (juce::Graphics& g,
     // Header bar
     auto header = bounds.withHeight (24.0f).reduced (1.0f, 1.0f);
     const auto headerBoost = enabled ? (0.85f + 0.10f * activity) : 0.22f;
-    g.setColour (panel2.withAlpha (headerBoost));
-    g.fillRoundedRectangle (header, 7.0f);
+    {
+        const auto ht = panel2.brighter (0.08f).withAlpha (headerBoost);
+        const auto hb = panel2.darker (0.04f).withAlpha (headerBoost);
+        juce::ColourGradient hg (ht, header.getX(), header.getY(),
+                                 hb, header.getX(), header.getBottom(), false);
+        g.setGradientFill (hg);
+        g.fillRoundedRectangle (header, 7.0f);
+    }
 
     // Accent stripe
     auto stripe = header.removeFromLeft (6.0f).reduced (0.0f, 5.0f);

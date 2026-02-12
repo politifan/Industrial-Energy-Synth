@@ -32,7 +32,7 @@ public:
             return false;
 
         const auto n = s.fromFirstOccurrenceOf (":", false, false).getIntValue();
-        if (n < (int) params::mod::srcOff || n > (int) params::mod::srcMacro2)
+        if (n < (int) params::mod::srcOff || n > (int) params::mod::srcRandom)
             return false;
 
         out = (params::mod::Source) n;

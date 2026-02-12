@@ -48,6 +48,10 @@ public:
         std::atomic<float>* osc3Phase = nullptr;
         std::atomic<float>* osc3Detune = nullptr;
 
+        std::atomic<float>* noiseEnable = nullptr;
+        std::atomic<float>* noiseLevel = nullptr;
+        std::atomic<float>* noiseColor = nullptr;
+
         std::atomic<float>* ampAttackMs = nullptr;
         std::atomic<float>* ampDecayMs = nullptr;
         std::atomic<float>* ampSustain = nullptr;
@@ -175,6 +179,9 @@ public:
     void noteOn (int midiNote, int velocity0to127);
     void noteOff (int midiNote);
     void allNotesOff();
+    void setModWheel (int value0to127) noexcept;
+    void setAftertouch (int value0to127) noexcept;
+    void setPitchBend (int value0to16383) noexcept;
 
 private:
     struct LinearRamp final
@@ -311,7 +318,19 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> tonePeak8QSm;
     bool tonePeak8On = false;
 
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> noiseLevelSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> noiseColorSm;
+    juce::uint32 noiseRngState = 0x726f6e65u; // "rone" - arbitrary non-zero seed
+    float noiseLp = 0.0f;
+
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> outGain;
+
+    // MIDI performance sources (for Mod Matrix).
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> modWheelSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> aftertouchSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> pitchBendSemisSm;
+    juce::uint32 modRngState = 0x52414e44u; // "RAND" (seed for Random mod source)
+    float randomNoteValue = 0.0f; // unipolar 0..1, refreshed on note-on
 
     dsp::PolyBlepOscillator osc1;
     dsp::PolyBlepOscillator osc2;
@@ -330,6 +349,8 @@ private:
 
     // Scratch buffers (allocated in prepare; no allocations in render).
     juce::AudioBuffer<float> destroyBuffer;
+    std::vector<float> ampEnvBuf;
+    std::vector<float> filterEnvBuf;
     std::vector<float> destroyNoteHz;
     std::vector<float> destroyFoldDriveDb;
     std::vector<float> destroyFoldAmount;
