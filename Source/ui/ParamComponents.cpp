@@ -105,7 +105,10 @@ void ComboWithLabel::resized()
     {
         const auto labelH = 16;
         label.setBounds (r.removeFromTop (labelH));
-        combo.setBounds (r.reduced (0, 1));
+        // Keep combo compact even when parent cell is tall (prevents giant dropdown rows).
+        const int comboH = juce::jlimit (20, 30, r.getHeight());
+        auto comboArea = r.removeFromTop (comboH);
+        combo.setBounds (comboArea.reduced (0, 1));
         label.setJustificationType (juce::Justification::centredLeft);
         return;
     }

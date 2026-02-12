@@ -1017,7 +1017,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     // Resizable + minimum constraints.
     // Keep a sane minimum: the UI is dense (Serum-like panels) and includes a spectrum editor.
     // Allow very wide/tall layouts (users often dock/undock and resize in one dimension).
-    boundsConstrainer.setSizeLimits (680, 460, 2600, 1600);
+    boundsConstrainer.setSizeLimits (980, 620, 2600, 1600);
     setConstrainer (&boundsConstrainer);
     setResizable (true, true);
 
@@ -3165,13 +3165,13 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (noiseEnable, cNoise);
     setGroupAccent (destroyGroup, cDestroy);
     // Destroy block needs higher contrast: it is dense and users rely on it even when amounts are low.
-    destroyGroup.getProperties().set ("fillAlpha", 0.92);
-    destroyGroup.getProperties().set ("tintBase", 0.06);
-    destroyGroup.getProperties().set ("tintAct", 0.10);
+    destroyGroup.getProperties().set ("fillAlpha", 0.86);
+    destroyGroup.getProperties().set ("tintBase", 0.03);
+    destroyGroup.getProperties().set ("tintAct", 0.06);
     setGroupAccent (shaperGroup, cShaper);
-    shaperGroup.getProperties().set ("fillAlpha", 0.93);
-    shaperGroup.getProperties().set ("tintBase", 0.08);
-    shaperGroup.getProperties().set ("tintAct", 0.12);
+    shaperGroup.getProperties().set ("fillAlpha", 0.84);
+    shaperGroup.getProperties().set ("tintBase", 0.02);
+    shaperGroup.getProperties().set ("tintAct", 0.04);
     setGroupAccent (filterGroup, cFilter);
     setGroupAccent (filterEnvGroup, cFilter);
     setGroupAccent (ampGroup, cEnv);
@@ -3188,7 +3188,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (modInsightsPanel, cMod);
     setGroupAccent (modQuickPanel, cMod);
     setGroupAccent (labGroup, cMod);
-    labGroup.getProperties().set ("fillAlpha", 0.16);
+    labGroup.getProperties().set ("fillAlpha", 0.12);
     labGroup.getProperties().set ("tintBase", 0.01);
     labGroup.getProperties().set ("tintAct", 0.02);
     setGroupAccent (fxGroup, cOut);
@@ -3407,7 +3407,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
             c->addMouseListener (this, deep);
 
     // Default size, can be overridden by persisted UI state.
-    setSize (1060, 620);
+    setSize (1360, 820);
     restoreEditorSizeFromState();
 }
 
@@ -4433,7 +4433,7 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         fxOutMeter.setBounds (rk.removeFromTop (16).reduced (0, 1));
 
         auto dt = detail.reduced (8, 22);
-        auto globalRow = dt.removeFromTop (84);
+        auto globalRow = dt.removeFromTop (72);
         const int gw = juce::jmax (100, (globalRow.getWidth() - gap2 * 2) / 3);
         fxGlobalMix.setBounds (globalRow.removeFromLeft (gw));
         globalRow.removeFromLeft (gap2);
@@ -4442,13 +4442,51 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         fxGlobalOversample.setBounds (globalRow);
         dt.removeFromTop (6);
 
+        auto layoutFxControls = [&] (juce::Rectangle<int> area, std::initializer_list<juce::Component*> comps)
+        {
+            const int count = (int) comps.size();
+            if (count <= 0)
+                return;
+
+            const int gapC = 8;
+            const int gapR = 8;
+            int cols = juce::jlimit (2, 5, area.getWidth() / 190);
+            cols = juce::jmin (cols, count);
+            int rows = (count + cols - 1) / cols;
+
+            // Keep controls readable: if cells get too short, reduce columns.
+            for (;;)
+            {
+                const int cellH = juce::jmax (1, (area.getHeight() - gapR * (rows - 1)) / rows);
+                if (cellH >= 74 || cols <= 1)
+                    break;
+                --cols;
+                rows = (count + cols - 1) / cols;
+            }
+
+            const int cellW = juce::jmax (1, (area.getWidth() - gapC * (cols - 1)) / cols);
+            const int cellH = juce::jmax (1, (area.getHeight() - gapR * (rows - 1)) / rows);
+
+            int idx = 0;
+            for (auto* c : comps)
+            {
+                const int col = idx % cols;
+                const int row = idx / cols;
+                c->setBounds (area.getX() + col * (cellW + gapC),
+                              area.getY() + row * (cellH + gapR),
+                              cellW,
+                              cellH);
+                ++idx;
+            }
+        };
+
         auto setVisibleForBlock = [&] (FxBlockIndex idx, std::initializer_list<juce::Component*> comps)
         {
             const bool on = (selectedFxBlock == idx);
             for (auto* c : comps)
                 c->setVisible (on && showFx);
             if (on && showFx)
-                layoutKnobGrid (dt, comps);
+                layoutFxControls (dt, comps);
         };
 
         // Common controls are always visible on FX page.
@@ -4457,8 +4495,40 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         fxGlobalOversample.setVisible (showFx);
 
         setVisibleForBlock (fxChorus, { &fxChorusMix, &fxChorusRate, &fxChorusDepth, &fxChorusDelay, &fxChorusFeedback, &fxChorusStereo, &fxChorusHp });
-        setVisibleForBlock (fxDelay, { &fxDelayMix, &fxDelayTime, &fxDelayFeedback, &fxDelaySync, &fxDelayPingPong, &fxDelayDivL, &fxDelayDivR,
-                                       &fxDelayFilter, &fxDelayModRate, &fxDelayModDepth, &fxDelayDuck });
+        {
+            const bool on = (selectedFxBlock == fxDelay) && showFx;
+            for (auto* c : { (juce::Component*) &fxDelayMix, (juce::Component*) &fxDelayTime, (juce::Component*) &fxDelayFeedback,
+                             (juce::Component*) &fxDelaySync, (juce::Component*) &fxDelayPingPong,
+                             (juce::Component*) &fxDelayDivL, (juce::Component*) &fxDelayDivR,
+                             (juce::Component*) &fxDelayFilter, (juce::Component*) &fxDelayModRate,
+                             (juce::Component*) &fxDelayModDepth, (juce::Component*) &fxDelayDuck })
+                c->setVisible (on);
+
+            if (on)
+            {
+                auto dd = dt;
+                const int gap = 8;
+
+                const int row1H = juce::jlimit (96, 146, dd.getHeight() / 2);
+                auto row1 = dd.removeFromTop (row1H);
+                dd.removeFromTop (gap);
+                auto row2 = dd;
+
+                {
+                    const int toggleW = juce::jlimit (88, 108, row1.getWidth() / 7);
+                    const int toggleH = 26;
+                    auto toggles = row1.removeFromRight (toggleW * 2 + gap);
+                    fxDelaySync.setBounds (toggles.removeFromLeft (toggleW).withHeight (toggleH).withY (row1.getY() + 8));
+                    toggles.removeFromLeft (gap);
+                    fxDelayPingPong.setBounds (toggles.removeFromLeft (toggleW).withHeight (toggleH).withY (row1.getY() + 8));
+                    row1.removeFromRight (gap);
+
+                    layoutFxControls (row1, { &fxDelayMix, &fxDelayTime, &fxDelayFeedback });
+                }
+
+                layoutFxControls (row2, { &fxDelayDivL, &fxDelayDivR, &fxDelayFilter, &fxDelayModRate, &fxDelayModDepth, &fxDelayDuck });
+            }
+        }
         setVisibleForBlock (fxReverb, { &fxReverbMix, &fxReverbSize, &fxReverbDecay, &fxReverbDamp, &fxReverbPreDelay, &fxReverbWidth,
                                         &fxReverbLowCut, &fxReverbHighCut, &fxReverbQuality });
         setVisibleForBlock (fxDist, { &fxDistMix, &fxDistDrive, &fxDistTone, &fxDistType, &fxDistPostLp, &fxDistTrim });
@@ -4529,8 +4599,8 @@ void IndustrialEnergySynthAudioProcessorEditor::restoreEditorSizeFromState()
     const int h = (int) state.getProperty (params::ui::editorH, defH);
 
     // Must match boundsConstrainer limits set in ctor.
-    const int clampedW = juce::jlimit (680, 2600, w);
-    const int clampedH = juce::jlimit (460, 1600, h);
+    const int clampedW = juce::jlimit (980, 2600, w);
+    const int clampedH = juce::jlimit (620, 1600, h);
 
     lastStoredEditorW = clampedW;
     lastStoredEditorH = clampedH;
