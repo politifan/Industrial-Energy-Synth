@@ -2,6 +2,8 @@
 #include "PluginProcessor.h"
 #include "Params.h"
 
+#include <cctype>
+
 namespace
 {
 struct FactoryPreset final
@@ -1006,6 +1008,11 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setLookAndFeel (&lnf);
     toneEqWindowContent.setLookAndFeel (&lnf);
     modLastSlotByDest.fill (-1);
+    labKeyToSemitone.fill (-1);
+    labComputerKeyHeld.fill (false);
+    labComputerKeyInputNote.fill (-1);
+    setWantsKeyboardFocus (true);
+    setMouseClickGrabsKeyboardFocus (true);
 
     // Resizable + minimum constraints.
     // Keep a sane minimum: the UI is dense (Serum-like panels) and includes a spectrum editor.
@@ -1026,7 +1033,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     addAndMakeVisible (panicButton);
     panicButton.onClick = [this]
     {
-        sendLabKeyboardAllNotesOff();
+        sendLabKeyboardAllNotesOff (true);
         audioProcessor.requestPanic();
     };
 
@@ -2407,11 +2414,39 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         updateLabKeyboardInfo();
     };
 
+    addAndMakeVisible (labBindMode);
+    labBindMode.setButtonText ("Bind");
+    labBindMode.onClick = [this]
+    {
+        if (! labBindMode.getToggleState())
+        {
+            labPendingBindKeyCode = -1;
+            statusLabel.setText ({}, juce::dontSendNotification);
+            return;
+        }
+
+        const auto msg = isRussian()
+            ? juce::String::fromUTF8 (u8"Bind Keys: нажми клавишу на компьютере, затем кликни ноту на Lab-клавиатуре.")
+            : juce::String ("Bind Keys: press a computer key, then click a note on the Lab keyboard.");
+        statusLabel.setText (msg, juce::dontSendNotification);
+    };
+
+    addAndMakeVisible (labBindReset);
+    labBindReset.setButtonText ("Reset Bind");
+    labBindReset.onClick = [this]
+    {
+        resetLabKeyBindsToDefault();
+        const auto msg = isRussian()
+            ? juce::String::fromUTF8 (u8"Бинды клавиш: сброшены к умолчанию.")
+            : juce::String ("Key bindings reset to default.");
+        statusLabel.setText (msg, juce::dontSendNotification);
+    };
+
     addAndMakeVisible (labPanic);
     labPanic.setButtonText ("Panic");
     labPanic.onClick = [this]
     {
-        sendLabKeyboardAllNotesOff();
+        sendLabKeyboardAllNotesOff (true);
         audioProcessor.requestPanic();
     };
 
@@ -2669,6 +2704,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     fxGlobalOrder.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
     fxGlobalOrder.getCombo().addItem ("Order A", 1);
     fxGlobalOrder.getCombo().addItem ("Order B", 2);
+    fxGlobalOrder.getCombo().addItem ("Custom", 3);
     fxGlobalOrderAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::global::order, fxGlobalOrder.getCombo());
 
     addAndMakeVisible (fxGlobalOversample);
@@ -2685,19 +2721,79 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         a = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), paramId, k.getSlider());
         setupSliderDoubleClickDefault (k.getSlider(), paramId);
     };
+    auto setCompactText = [] (juce::Slider& s, int decimals = 2)
+    {
+        s.setNumDecimalPlacesToDisplay (decimals);
+        s.textFromValueFunction = [decimals] (double v)
+        {
+            return juce::String (v, decimals).trimCharactersAtEnd ("0").trimCharactersAtEnd (".");
+        };
+        s.valueFromTextFunction = [] (const juce::String& t)
+        {
+            return t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
+        };
+    };
 
     initFxKnob (fxChorusMix, "Mix", params::fx::chorus::mix, fxChorusMixAttachment);
+    setCompactText (fxChorusMix.getSlider(), 2);
     initFxKnob (fxChorusRate, "Rate", params::fx::chorus::rateHz, fxChorusRateAttachment);
     fxChorusRate.getSlider().setTextValueSuffix (" Hz");
+    setCompactText (fxChorusRate.getSlider(), 2);
     initFxKnob (fxChorusDepth, "Depth", params::fx::chorus::depthMs, fxChorusDepthAttachment);
     fxChorusDepth.getSlider().setTextValueSuffix (" ms");
+    setCompactText (fxChorusDepth.getSlider(), 2);
     initFxKnob (fxChorusDelay, "Delay", params::fx::chorus::delayMs, fxChorusDelayAttachment);
     fxChorusDelay.getSlider().setTextValueSuffix (" ms");
+    setCompactText (fxChorusDelay.getSlider(), 2);
+    initFxKnob (fxChorusFeedback, "Feedback", params::fx::chorus::feedback, fxChorusFeedbackAttachment);
+    setCompactText (fxChorusFeedback.getSlider(), 2);
+    initFxKnob (fxChorusStereo, "Stereo", params::fx::chorus::stereo, fxChorusStereoAttachment);
+    setCompactText (fxChorusStereo.getSlider(), 2);
+    initFxKnob (fxChorusHp, "HP", params::fx::chorus::hpHz, fxChorusHpAttachment);
+    fxChorusHp.getSlider().setTextValueSuffix (" Hz");
+    setCompactText (fxChorusHp.getSlider(), 0);
 
     initFxKnob (fxDelayMix, "Mix", params::fx::delay::mix, fxDelayMixAttachment);
+    setCompactText (fxDelayMix.getSlider(), 2);
     initFxKnob (fxDelayTime, "Time", params::fx::delay::timeMs, fxDelayTimeAttachment);
     fxDelayTime.getSlider().setTextValueSuffix (" ms");
+    setCompactText (fxDelayTime.getSlider(), 1);
     initFxKnob (fxDelayFeedback, "Feedback", params::fx::delay::feedback, fxDelayFeedbackAttachment);
+    setCompactText (fxDelayFeedback.getSlider(), 2);
+    addAndMakeVisible (fxDelayDivL);
+    fxDelayDivL.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    fxDelayDivL.setLabelText ("Div L");
+    addAndMakeVisible (fxDelayDivR);
+    fxDelayDivR.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    fxDelayDivR.setLabelText ("Div R");
+    for (auto* c : { &fxDelayDivL.getCombo(), &fxDelayDivR.getCombo() })
+    {
+        c->addItem ("1/1", 1);
+        c->addItem ("1/2", 2);
+        c->addItem ("1/4", 3);
+        c->addItem ("1/8", 4);
+        c->addItem ("1/16", 5);
+        c->addItem ("1/32", 6);
+        c->addItem ("1/4T", 7);
+        c->addItem ("1/8T", 8);
+        c->addItem ("1/16T", 9);
+        c->addItem ("1/4D", 10);
+        c->addItem ("1/8D", 11);
+        c->addItem ("1/16D", 12);
+    }
+    fxDelayDivLAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::delay::divL, fxDelayDivL.getCombo());
+    fxDelayDivRAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::delay::divR, fxDelayDivR.getCombo());
+    initFxKnob (fxDelayFilter, "Filter", params::fx::delay::filterHz, fxDelayFilterAttachment);
+    fxDelayFilter.getSlider().setTextValueSuffix (" Hz");
+    setCompactText (fxDelayFilter.getSlider(), 0);
+    initFxKnob (fxDelayModRate, "Mod Rate", params::fx::delay::modRate, fxDelayModRateAttachment);
+    fxDelayModRate.getSlider().setTextValueSuffix (" Hz");
+    setCompactText (fxDelayModRate.getSlider(), 2);
+    initFxKnob (fxDelayModDepth, "Mod Depth", params::fx::delay::modDepth, fxDelayModDepthAttachment);
+    fxDelayModDepth.getSlider().setTextValueSuffix (" ms");
+    setCompactText (fxDelayModDepth.getSlider(), 2);
+    initFxKnob (fxDelayDuck, "Duck", params::fx::delay::duck, fxDelayDuckAttachment);
+    setCompactText (fxDelayDuck.getSlider(), 2);
     addAndMakeVisible (fxDelaySync);
     fxDelaySync.setButtonText ("Sync");
     fxDelaySyncAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(), params::fx::delay::sync, fxDelaySync);
@@ -2706,14 +2802,44 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     fxDelayPingPongAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(), params::fx::delay::pingpong, fxDelayPingPong);
 
     initFxKnob (fxReverbMix, "Mix", params::fx::reverb::mix, fxReverbMixAttachment);
+    setCompactText (fxReverbMix.getSlider(), 2);
     initFxKnob (fxReverbSize, "Size", params::fx::reverb::size, fxReverbSizeAttachment);
+    setCompactText (fxReverbSize.getSlider(), 2);
     initFxKnob (fxReverbDecay, "Decay", params::fx::reverb::decay, fxReverbDecayAttachment);
+    setCompactText (fxReverbDecay.getSlider(), 2);
     initFxKnob (fxReverbDamp, "Damp", params::fx::reverb::damp, fxReverbDampAttachment);
+    setCompactText (fxReverbDamp.getSlider(), 2);
+    initFxKnob (fxReverbPreDelay, "PreDelay", params::fx::reverb::preDelayMs, fxReverbPreDelayAttachment);
+    fxReverbPreDelay.getSlider().setTextValueSuffix (" ms");
+    setCompactText (fxReverbPreDelay.getSlider(), 1);
+    initFxKnob (fxReverbWidth, "Width", params::fx::reverb::width, fxReverbWidthAttachment);
+    setCompactText (fxReverbWidth.getSlider(), 2);
+    initFxKnob (fxReverbLowCut, "LowCut", params::fx::reverb::lowCutHz, fxReverbLowCutAttachment);
+    fxReverbLowCut.getSlider().setTextValueSuffix (" Hz");
+    setCompactText (fxReverbLowCut.getSlider(), 0);
+    initFxKnob (fxReverbHighCut, "HighCut", params::fx::reverb::highCutHz, fxReverbHighCutAttachment);
+    fxReverbHighCut.getSlider().setTextValueSuffix (" Hz");
+    setCompactText (fxReverbHighCut.getSlider(), 0);
+    addAndMakeVisible (fxReverbQuality);
+    fxReverbQuality.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    fxReverbQuality.setLabelText ("Quality");
+    fxReverbQuality.getCombo().addItem ("Eco", 1);
+    fxReverbQuality.getCombo().addItem ("Hi", 2);
+    fxReverbQualityAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::reverb::quality, fxReverbQuality.getCombo());
 
     initFxKnob (fxDistMix, "Mix", params::fx::dist::mix, fxDistMixAttachment);
+    setCompactText (fxDistMix.getSlider(), 2);
     initFxKnob (fxDistDrive, "Drive", params::fx::dist::driveDb, fxDistDriveAttachment);
     fxDistDrive.getSlider().setTextValueSuffix (" dB");
+    setCompactText (fxDistDrive.getSlider(), 1);
     initFxKnob (fxDistTone, "Tone", params::fx::dist::tone, fxDistToneAttachment);
+    setCompactText (fxDistTone.getSlider(), 2);
+    initFxKnob (fxDistPostLp, "Post LP", params::fx::dist::postLPHz, fxDistPostLpAttachment);
+    fxDistPostLp.getSlider().setTextValueSuffix (" Hz");
+    setCompactText (fxDistPostLp.getSlider(), 0);
+    initFxKnob (fxDistTrim, "Trim", params::fx::dist::outputTrimDb, fxDistTrimAttachment);
+    fxDistTrim.getSlider().setTextValueSuffix (" dB");
+    setCompactText (fxDistTrim.getSlider(), 1);
     addAndMakeVisible (fxDistType);
     fxDistType.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
     fxDistType.setLabelText ("Type");
@@ -2724,15 +2850,39 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     fxDistTypeAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::dist::type, fxDistType.getCombo());
 
     initFxKnob (fxPhaserMix, "Mix", params::fx::phaser::mix, fxPhaserMixAttachment);
+    setCompactText (fxPhaserMix.getSlider(), 2);
     initFxKnob (fxPhaserRate, "Rate", params::fx::phaser::rateHz, fxPhaserRateAttachment);
     fxPhaserRate.getSlider().setTextValueSuffix (" Hz");
+    setCompactText (fxPhaserRate.getSlider(), 2);
     initFxKnob (fxPhaserDepth, "Depth", params::fx::phaser::depth, fxPhaserDepthAttachment);
+    setCompactText (fxPhaserDepth.getSlider(), 2);
     initFxKnob (fxPhaserFeedback, "Feedback", params::fx::phaser::feedback, fxPhaserFeedbackAttachment);
+    setCompactText (fxPhaserFeedback.getSlider(), 2);
+    initFxKnob (fxPhaserCentre, "Centre", params::fx::phaser::centreHz, fxPhaserCentreAttachment);
+    fxPhaserCentre.getSlider().setTextValueSuffix (" Hz");
+    setCompactText (fxPhaserCentre.getSlider(), 0);
+    addAndMakeVisible (fxPhaserStages);
+    fxPhaserStages.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    fxPhaserStages.setLabelText ("Stages");
+    fxPhaserStages.getCombo().addItem ("4", 1);
+    fxPhaserStages.getCombo().addItem ("6", 2);
+    fxPhaserStages.getCombo().addItem ("8", 3);
+    fxPhaserStages.getCombo().addItem ("10", 4);
+    fxPhaserStages.getCombo().addItem ("12", 5);
+    fxPhaserStagesAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::phaser::stages, fxPhaserStages.getCombo());
+    initFxKnob (fxPhaserStereo, "Stereo", params::fx::phaser::stereo, fxPhaserStereoAttachment);
+    setCompactText (fxPhaserStereo.getSlider(), 2);
 
     initFxKnob (fxOctMix, "Mix", params::fx::octaver::mix, fxOctMixAttachment);
+    setCompactText (fxOctMix.getSlider(), 2);
     initFxKnob (fxOctSub, "Sub", params::fx::octaver::subLevel, fxOctSubAttachment);
+    setCompactText (fxOctSub.getSlider(), 2);
     initFxKnob (fxOctBlend, "Blend", params::fx::octaver::blend, fxOctBlendAttachment);
+    setCompactText (fxOctBlend.getSlider(), 2);
     initFxKnob (fxOctTone, "Tone", params::fx::octaver::tone, fxOctToneAttachment);
+    setCompactText (fxOctTone.getSlider(), 2);
+    initFxKnob (fxOctSensitivity, "Sensitivity", params::fx::octaver::sensitivity, fxOctSensitivityAttachment);
+    setCompactText (fxOctSensitivity.getSlider(), 2);
 
     for (int i = 0; i < (int) fxPreMeters.size(); ++i)
     {
@@ -3015,9 +3165,13 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (noiseEnable, cNoise);
     setGroupAccent (destroyGroup, cDestroy);
     // Destroy block needs higher contrast: it is dense and users rely on it even when amounts are low.
+    destroyGroup.getProperties().set ("fillAlpha", 0.92);
     destroyGroup.getProperties().set ("tintBase", 0.06);
     destroyGroup.getProperties().set ("tintAct", 0.10);
     setGroupAccent (shaperGroup, cShaper);
+    shaperGroup.getProperties().set ("fillAlpha", 0.93);
+    shaperGroup.getProperties().set ("tintBase", 0.08);
+    shaperGroup.getProperties().set ("tintAct", 0.12);
     setGroupAccent (filterGroup, cFilter);
     setGroupAccent (filterEnvGroup, cFilter);
     setGroupAccent (ampGroup, cEnv);
@@ -3034,6 +3188,9 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (modInsightsPanel, cMod);
     setGroupAccent (modQuickPanel, cMod);
     setGroupAccent (labGroup, cMod);
+    labGroup.getProperties().set ("fillAlpha", 0.16);
+    labGroup.getProperties().set ("tintBase", 0.01);
+    labGroup.getProperties().set ("tintAct", 0.02);
     setGroupAccent (fxGroup, cOut);
     setGroupAccent (fxRackPanel, cOut);
     setGroupAccent (fxDetailPanel, cOut);
@@ -3049,6 +3206,15 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (fxDistEnable, cOut);
     setGroupAccent (fxPhaserEnable, cOut);
     setGroupAccent (fxOctaverEnable, cOut);
+    setGroupAccent (fxDelaySync, cOut);
+    setGroupAccent (fxDelayPingPong, cOut);
+    setGroupAccent (fxGlobalOrder, cOut);
+    setGroupAccent (fxGlobalOversample, cOut);
+    setGroupAccent (fxDelayDivL, cOut);
+    setGroupAccent (fxDelayDivR, cOut);
+    setGroupAccent (fxDistType, cOut);
+    setGroupAccent (fxReverbQuality, cOut);
+    setGroupAccent (fxPhaserStages, cOut);
     setGroupAccent (seqGroup, cOut);
     setGroupAccent (arpEnable, cOut);
     setGroupAccent (arpLatch, cOut);
@@ -3062,6 +3228,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (labOctaveDown, cTone);
     setGroupAccent (labOctaveUp, cTone);
     setGroupAccent (labHold, cTone);
+    setGroupAccent (labBindMode, cTone);
+    setGroupAccent (labBindReset, cTone);
     setGroupAccent (labPanic, cPanic);
     setGroupAccent (labVelocity, cTone);
     setGroupAccent (labKeyWidth, cTone);
@@ -3129,12 +3297,17 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     for (auto* s : { &arpRate.getSlider(), &arpGate.getSlider(), &arpOctaves.getSlider(), &arpSwing.getSlider() })
         setSliderAccent (*s, cOut);
-    for (auto* s : { &fxGlobalMix.getSlider(), &fxChorusMix.getSlider(), &fxChorusRate.getSlider(), &fxChorusDepth.getSlider(), &fxChorusDelay.getSlider(),
+    for (auto* s : { &fxGlobalMix.getSlider(),
+                     &fxChorusMix.getSlider(), &fxChorusRate.getSlider(), &fxChorusDepth.getSlider(), &fxChorusDelay.getSlider(),
+                     &fxChorusFeedback.getSlider(), &fxChorusStereo.getSlider(), &fxChorusHp.getSlider(),
                      &fxDelayMix.getSlider(), &fxDelayTime.getSlider(), &fxDelayFeedback.getSlider(),
+                     &fxDelayFilter.getSlider(), &fxDelayModRate.getSlider(), &fxDelayModDepth.getSlider(), &fxDelayDuck.getSlider(),
                      &fxReverbMix.getSlider(), &fxReverbSize.getSlider(), &fxReverbDecay.getSlider(), &fxReverbDamp.getSlider(),
-                     &fxDistMix.getSlider(), &fxDistDrive.getSlider(), &fxDistTone.getSlider(),
+                     &fxReverbPreDelay.getSlider(), &fxReverbWidth.getSlider(), &fxReverbLowCut.getSlider(), &fxReverbHighCut.getSlider(),
+                     &fxDistMix.getSlider(), &fxDistDrive.getSlider(), &fxDistTone.getSlider(), &fxDistPostLp.getSlider(), &fxDistTrim.getSlider(),
                      &fxPhaserMix.getSlider(), &fxPhaserRate.getSlider(), &fxPhaserDepth.getSlider(), &fxPhaserFeedback.getSlider(),
-                     &fxOctMix.getSlider(), &fxOctSub.getSlider(), &fxOctBlend.getSlider(), &fxOctTone.getSlider() })
+                     &fxPhaserCentre.getSlider(), &fxPhaserStereo.getSlider(),
+                     &fxOctMix.getSlider(), &fxOctSub.getSlider(), &fxOctBlend.getSlider(), &fxOctTone.getSlider(), &fxOctSensitivity.getSlider() })
         setSliderAccent (*s, cOut);
 
     for (auto* s : { &labVelocity.getSlider(), &labKeyWidth.getSlider(), &labPitchBend.getSlider() })
@@ -3181,6 +3354,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     loadMacroNamesFromState();
     loadLabChordFromState();
+    loadLabKeyBindsFromState();
     refreshLabels();
     refreshTooltips();
 
@@ -3206,12 +3380,17 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                      &labVelocity.getSlider(), &labKeyWidth.getSlider(),
                      &labPitchBend.getSlider(), &labModWheel.getSlider(), &labAftertouch.getSlider() })
         refreshSliderText (*s);
-    for (auto* s : { &fxGlobalMix.getSlider(), &fxChorusMix.getSlider(), &fxChorusRate.getSlider(), &fxChorusDepth.getSlider(), &fxChorusDelay.getSlider(),
+    for (auto* s : { &fxGlobalMix.getSlider(),
+                     &fxChorusMix.getSlider(), &fxChorusRate.getSlider(), &fxChorusDepth.getSlider(), &fxChorusDelay.getSlider(),
+                     &fxChorusFeedback.getSlider(), &fxChorusStereo.getSlider(), &fxChorusHp.getSlider(),
                      &fxDelayMix.getSlider(), &fxDelayTime.getSlider(), &fxDelayFeedback.getSlider(),
+                     &fxDelayFilter.getSlider(), &fxDelayModRate.getSlider(), &fxDelayModDepth.getSlider(), &fxDelayDuck.getSlider(),
                      &fxReverbMix.getSlider(), &fxReverbSize.getSlider(), &fxReverbDecay.getSlider(), &fxReverbDamp.getSlider(),
-                     &fxDistMix.getSlider(), &fxDistDrive.getSlider(), &fxDistTone.getSlider(),
+                     &fxReverbPreDelay.getSlider(), &fxReverbWidth.getSlider(), &fxReverbLowCut.getSlider(), &fxReverbHighCut.getSlider(),
+                     &fxDistMix.getSlider(), &fxDistDrive.getSlider(), &fxDistTone.getSlider(), &fxDistPostLp.getSlider(), &fxDistTrim.getSlider(),
                      &fxPhaserMix.getSlider(), &fxPhaserRate.getSlider(), &fxPhaserDepth.getSlider(), &fxPhaserFeedback.getSlider(),
-                     &fxOctMix.getSlider(), &fxOctSub.getSlider(), &fxOctBlend.getSlider(), &fxOctTone.getSlider() })
+                     &fxPhaserCentre.getSlider(), &fxPhaserStereo.getSlider(),
+                     &fxOctMix.getSlider(), &fxOctSub.getSlider(), &fxOctBlend.getSlider(), &fxOctTone.getSlider(), &fxOctSensitivity.getSlider() })
         refreshSliderText (*s);
     for (int i = 0; i < params::mod::numSlots; ++i)
         refreshSliderText (modSlotDepth[(size_t) i]);
@@ -4149,7 +4328,9 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
                 labOctaveDown.setBounds (row.removeFromLeft (btnW).reduced (2, 5));
                 labOctaveUp.setBounds (row.removeFromLeft (btnW).reduced (2, 5));
                 labHold.setBounds (row.removeFromLeft (76).reduced (2, 5));
-                labPanic.setBounds (row.removeFromLeft (70).reduced (2, 5));
+                labBindMode.setBounds (row.removeFromLeft (72).reduced (2, 5));
+                labBindReset.setBounds (row.removeFromLeft (88).reduced (2, 5));
+                labPanic.setBounds (row.removeFromLeft (68).reduced (2, 5));
                 row.removeFromLeft (6);
                 auto perf = row;
                 const int perfGap = 6;
@@ -4275,12 +4456,14 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         fxGlobalOrder.setVisible (showFx);
         fxGlobalOversample.setVisible (showFx);
 
-        setVisibleForBlock (fxChorus, { &fxChorusMix, &fxChorusRate, &fxChorusDepth, &fxChorusDelay });
-        setVisibleForBlock (fxDelay, { &fxDelayMix, &fxDelayTime, &fxDelayFeedback, &fxDelaySync, &fxDelayPingPong });
-        setVisibleForBlock (fxReverb, { &fxReverbMix, &fxReverbSize, &fxReverbDecay, &fxReverbDamp });
-        setVisibleForBlock (fxDist, { &fxDistMix, &fxDistDrive, &fxDistTone, &fxDistType });
-        setVisibleForBlock (fxPhaser, { &fxPhaserMix, &fxPhaserRate, &fxPhaserDepth, &fxPhaserFeedback });
-        setVisibleForBlock (fxOctaver, { &fxOctMix, &fxOctSub, &fxOctBlend, &fxOctTone });
+        setVisibleForBlock (fxChorus, { &fxChorusMix, &fxChorusRate, &fxChorusDepth, &fxChorusDelay, &fxChorusFeedback, &fxChorusStereo, &fxChorusHp });
+        setVisibleForBlock (fxDelay, { &fxDelayMix, &fxDelayTime, &fxDelayFeedback, &fxDelaySync, &fxDelayPingPong, &fxDelayDivL, &fxDelayDivR,
+                                       &fxDelayFilter, &fxDelayModRate, &fxDelayModDepth, &fxDelayDuck });
+        setVisibleForBlock (fxReverb, { &fxReverbMix, &fxReverbSize, &fxReverbDecay, &fxReverbDamp, &fxReverbPreDelay, &fxReverbWidth,
+                                        &fxReverbLowCut, &fxReverbHighCut, &fxReverbQuality });
+        setVisibleForBlock (fxDist, { &fxDistMix, &fxDistDrive, &fxDistTone, &fxDistType, &fxDistPostLp, &fxDistTrim });
+        setVisibleForBlock (fxPhaser, { &fxPhaserMix, &fxPhaserRate, &fxPhaserDepth, &fxPhaserFeedback, &fxPhaserCentre, &fxPhaserStages, &fxPhaserStereo });
+        setVisibleForBlock (fxOctaver, { &fxOctMix, &fxOctSub, &fxOctBlend, &fxOctTone, &fxOctSensitivity });
 
         auto setTabVisual = [] (juce::TextButton& b, bool active)
         {
@@ -4443,8 +4626,15 @@ int IndustrialEnergySynthAudioProcessorEditor::getLanguageIndex() const
 
 void IndustrialEnergySynthAudioProcessorEditor::setUiPage (int newPageIndex)
 {
+    const auto prevPage = uiPage;
     const auto clamped = juce::jlimit ((int) pageSynth, (int) pageSeq, newPageIndex);
     uiPage = (UiPage) clamped;
+    if (prevPage == pageLab && uiPage != pageLab)
+    {
+        sendLabKeyboardAllNotesOff();
+        labBindMode.setToggleState (false, juce::dontSendNotification);
+        labPendingBindKeyCode = -1;
+    }
 
     applyUiPageVisibility();
 
@@ -4475,9 +4665,23 @@ void IndustrialEnergySynthAudioProcessorEditor::setUiPage (int newPageIndex)
     setTabVisual (pageSeqButton, uiPage == pageSeq);
 
     if (uiPage == pageLab)
+    {
         labKeyboard.grabKeyboardFocus();
+        grabKeyboardFocus();
+    }
 
     resized();
+    if (uiPage == pageLab)
+    {
+        juce::Component::SafePointer<IndustrialEnergySynthAudioProcessorEditor> safeThis (this);
+        juce::MessageManager::callAsync ([safeThis]
+        {
+            if (safeThis == nullptr)
+                return;
+            safeThis->resized();
+            safeThis->repaint();
+        });
+    }
     repaint();
 }
 
@@ -4678,6 +4882,8 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     labOctaveDown.setVisible (showLab);
     labOctaveUp.setVisible (showLab);
     labHold.setVisible (showLab);
+    labBindMode.setVisible (showLab);
+    labBindReset.setVisible (showLab);
     labPanic.setVisible (showLab);
     labVelocity.setVisible (showLab);
     labKeyWidth.setVisible (showLab);
@@ -4693,6 +4899,15 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     labKeyboardRangeLabel.setVisible (showLab);
     labKeyboardInfoLabel.setVisible (showLab);
     labKeyboard.setVisible (showLab);
+    if (showLab)
+    {
+        // Keep Lab shell in the back so it doesn't visually wash out Shaper/Env content.
+        labGroup.toBack();
+        shaperGroup.toFront (false);
+        filterEnvGroup.toFront (false);
+        ampGroup.toFront (false);
+        labKeyboard.toFront (false);
+    }
 
     fxGroup.setVisible (showFx);
     fxRackPanel.setVisible (showFx);
@@ -4716,27 +4931,47 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     fxChorusRate.setVisible (showFx && selectedFxBlock == fxChorus);
     fxChorusDepth.setVisible (showFx && selectedFxBlock == fxChorus);
     fxChorusDelay.setVisible (showFx && selectedFxBlock == fxChorus);
+    fxChorusFeedback.setVisible (showFx && selectedFxBlock == fxChorus);
+    fxChorusStereo.setVisible (showFx && selectedFxBlock == fxChorus);
+    fxChorusHp.setVisible (showFx && selectedFxBlock == fxChorus);
     fxDelayMix.setVisible (showFx && selectedFxBlock == fxDelay);
     fxDelayTime.setVisible (showFx && selectedFxBlock == fxDelay);
     fxDelayFeedback.setVisible (showFx && selectedFxBlock == fxDelay);
+    fxDelayDivL.setVisible (showFx && selectedFxBlock == fxDelay);
+    fxDelayDivR.setVisible (showFx && selectedFxBlock == fxDelay);
+    fxDelayFilter.setVisible (showFx && selectedFxBlock == fxDelay);
+    fxDelayModRate.setVisible (showFx && selectedFxBlock == fxDelay);
+    fxDelayModDepth.setVisible (showFx && selectedFxBlock == fxDelay);
+    fxDelayDuck.setVisible (showFx && selectedFxBlock == fxDelay);
     fxDelaySync.setVisible (showFx && selectedFxBlock == fxDelay);
     fxDelayPingPong.setVisible (showFx && selectedFxBlock == fxDelay);
     fxReverbMix.setVisible (showFx && selectedFxBlock == fxReverb);
     fxReverbSize.setVisible (showFx && selectedFxBlock == fxReverb);
     fxReverbDecay.setVisible (showFx && selectedFxBlock == fxReverb);
     fxReverbDamp.setVisible (showFx && selectedFxBlock == fxReverb);
+    fxReverbPreDelay.setVisible (showFx && selectedFxBlock == fxReverb);
+    fxReverbWidth.setVisible (showFx && selectedFxBlock == fxReverb);
+    fxReverbLowCut.setVisible (showFx && selectedFxBlock == fxReverb);
+    fxReverbHighCut.setVisible (showFx && selectedFxBlock == fxReverb);
+    fxReverbQuality.setVisible (showFx && selectedFxBlock == fxReverb);
     fxDistMix.setVisible (showFx && selectedFxBlock == fxDist);
     fxDistDrive.setVisible (showFx && selectedFxBlock == fxDist);
     fxDistTone.setVisible (showFx && selectedFxBlock == fxDist);
+    fxDistPostLp.setVisible (showFx && selectedFxBlock == fxDist);
+    fxDistTrim.setVisible (showFx && selectedFxBlock == fxDist);
     fxDistType.setVisible (showFx && selectedFxBlock == fxDist);
     fxPhaserMix.setVisible (showFx && selectedFxBlock == fxPhaser);
     fxPhaserRate.setVisible (showFx && selectedFxBlock == fxPhaser);
     fxPhaserDepth.setVisible (showFx && selectedFxBlock == fxPhaser);
     fxPhaserFeedback.setVisible (showFx && selectedFxBlock == fxPhaser);
+    fxPhaserCentre.setVisible (showFx && selectedFxBlock == fxPhaser);
+    fxPhaserStages.setVisible (showFx && selectedFxBlock == fxPhaser);
+    fxPhaserStereo.setVisible (showFx && selectedFxBlock == fxPhaser);
     fxOctMix.setVisible (showFx && selectedFxBlock == fxOctaver);
     fxOctSub.setVisible (showFx && selectedFxBlock == fxOctaver);
     fxOctBlend.setVisible (showFx && selectedFxBlock == fxOctaver);
     fxOctTone.setVisible (showFx && selectedFxBlock == fxOctaver);
+    fxOctSensitivity.setVisible (showFx && selectedFxBlock == fxOctaver);
     for (auto& m : fxPreMeters)
         m.setVisible (showFx);
     for (auto& m : fxPostMeters)
@@ -5070,6 +5305,8 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     labOctaveDown.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Окт -") : juce::String ("Oct -"));
     labOctaveUp.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Окт +") : juce::String ("Oct +"));
     labHold.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Удерж.") : juce::String ("Hold"));
+    labBindMode.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Бинд") : juce::String ("Bind"));
+    labBindReset.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Сброс биндов") : juce::String ("Reset Bind"));
     labPanic.setButtonText (ies::ui::tr (ies::ui::Key::panic, langIdx));
     labVelocity.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Velocity") : juce::String ("Velocity"));
     labKeyWidth.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Ширина клавиш") : juce::String ("Key Width"));
@@ -5079,6 +5316,8 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     labOctaveDown.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Октава вниз") : juce::String ("Octave down"));
     labOctaveUp.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Октава вверх") : juce::String ("Octave up"));
     labHold.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Удержание клавиш") : juce::String ("Keyboard hold"));
+    labBindMode.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Режим бинда клавиш") : juce::String ("Keyboard bind mode"));
+    labBindReset.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Сброс биндов клавиш") : juce::String ("Keyboard bind reset"));
     labPanic.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Стоп клавиатуры") : juce::String ("Keyboard panic"));
     labVelocity.getSlider().setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Velocity клавиатуры") : juce::String ("Keyboard velocity"));
     labKeyWidth.getSlider().setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Ширина клавиш") : juce::String ("Keyboard key width"));
@@ -5105,9 +5344,58 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     fxGroup.setText ("FX");
     fxRackPanel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Цепь") : juce::String ("Rack"));
     fxDetailPanel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Параметры") : juce::String ("Block"));
+    fxBlockChorus.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Хорус") : juce::String ("Chorus"));
+    fxBlockDelay.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Дилей") : juce::String ("Delay"));
+    fxBlockReverb.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Реверб") : juce::String ("Reverb"));
+    fxBlockDist.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Дист") : juce::String ("Dist"));
+    fxBlockPhaser.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Фэйзер") : juce::String ("Phaser"));
+    fxBlockOctaver.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Октавер") : juce::String ("Octaver"));
     fxGlobalMix.setLabelText ("FX Mix");
     fxGlobalOrder.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Порядок") : juce::String ("Order"));
     fxGlobalOversample.setLabelText ("OS");
+    fxChorusMix.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Микс") : juce::String ("Mix"));
+    fxChorusRate.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Скорость") : juce::String ("Rate"));
+    fxChorusDepth.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Глубина") : juce::String ("Depth"));
+    fxChorusDelay.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Задержка") : juce::String ("Delay"));
+    fxChorusFeedback.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Фидбек") : juce::String ("Feedback"));
+    fxChorusStereo.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Стерео") : juce::String ("Stereo"));
+    fxChorusHp.setLabelText ("HP");
+    fxDelayMix.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Микс") : juce::String ("Mix"));
+    fxDelayTime.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Время") : juce::String ("Time"));
+    fxDelayFeedback.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Фидбек") : juce::String ("Feedback"));
+    fxDelayDivL.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Доля L") : juce::String ("Div L"));
+    fxDelayDivR.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Доля R") : juce::String ("Div R"));
+    fxDelayFilter.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Фильтр") : juce::String ("Filter"));
+    fxDelayModRate.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Мод. скорость") : juce::String ("Mod Rate"));
+    fxDelayModDepth.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Мод. глубина") : juce::String ("Mod Depth"));
+    fxDelayDuck.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Duck") : juce::String ("Duck"));
+    fxReverbMix.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Микс") : juce::String ("Mix"));
+    fxReverbSize.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Размер") : juce::String ("Size"));
+    fxReverbDecay.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Decay") : juce::String ("Decay"));
+    fxReverbDamp.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Демпф.") : juce::String ("Damp"));
+    fxReverbPreDelay.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"PreDelay") : juce::String ("PreDelay"));
+    fxReverbWidth.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Ширина") : juce::String ("Width"));
+    fxReverbLowCut.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"НЧ срез") : juce::String ("LowCut"));
+    fxReverbHighCut.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"ВЧ срез") : juce::String ("HighCut"));
+    fxReverbQuality.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Качество") : juce::String ("Quality"));
+    fxDistMix.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Микс") : juce::String ("Mix"));
+    fxDistDrive.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Драйв") : juce::String ("Drive"));
+    fxDistTone.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Тон") : juce::String ("Tone"));
+    fxDistPostLp.setLabelText ("Post LP");
+    fxDistTrim.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Trim") : juce::String ("Trim"));
+    fxDistType.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Тип") : juce::String ("Type"));
+    fxPhaserMix.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Микс") : juce::String ("Mix"));
+    fxPhaserRate.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Скорость") : juce::String ("Rate"));
+    fxPhaserDepth.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Глубина") : juce::String ("Depth"));
+    fxPhaserFeedback.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Фидбек") : juce::String ("Feedback"));
+    fxPhaserCentre.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Центр") : juce::String ("Centre"));
+    fxPhaserStages.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Стадии") : juce::String ("Stages"));
+    fxPhaserStereo.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Стерео") : juce::String ("Stereo"));
+    fxOctMix.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Микс") : juce::String ("Mix"));
+    fxOctSub.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Саб") : juce::String ("Sub"));
+    fxOctBlend.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Blend") : juce::String ("Blend"));
+    fxOctTone.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Тон") : juce::String ("Tone"));
+    fxOctSensitivity.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Трекинг") : juce::String ("Sensitivity"));
     fxOutLabel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"FX Выход") : juce::String ("FX Out"),
                         juce::dontSendNotification);
     fxDelaySync.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Синхр.") : juce::String ("Sync"));
@@ -5298,6 +5586,10 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
                            u8"Режим удержания: нажатые ноты остаются включенными до повторного нажатия или Stop."));
     labPanic.setTooltip (T ("Force all notes off for the Lab keyboard.",
                             u8"Принудительно выключить все ноты клавиатуры Lab."));
+    labBindMode.setTooltip (T ("Enable key-bind learn mode: press a computer key, then click a Lab keyboard note to assign.",
+                               u8"Включить режим обучения биндов: нажми клавишу компьютера, затем кликни ноту на клавиатуре Lab для назначения."));
+    labBindReset.setTooltip (T ("Reset computer keyboard bindings to defaults (Z-M / Q-U layout).",
+                                u8"Сбросить бинды клавиатуры к умолчанию (раскладка Z-M / Q-U)."));
     {
         const auto tip = T ("Fixed velocity for notes played on the Lab keyboard.",
                             u8"Фиксированная velocity для нот с клавиатуры Lab.");
@@ -5576,6 +5868,17 @@ void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
             arpDiv.setEnabled (syncOn);
     }
 
+    // FX Delay: when sync is ON, use Div L/R; when OFF, use Time (ms).
+    {
+        const auto syncOn = fxDelaySync.getToggleState();
+        if (fxDelayTime.isEnabled() == syncOn)
+            fxDelayTime.setEnabled (! syncOn);
+        if (fxDelayDivL.isEnabled() != syncOn)
+            fxDelayDivL.setEnabled (syncOn);
+        if (fxDelayDivR.isEnabled() != syncOn)
+            fxDelayDivR.setEnabled (syncOn);
+    }
+
     const auto hasTarget = (lastTouchedModDest != params::mod::dstOff);
     if (quickAssignMacro1.isEnabled() != hasTarget)
         quickAssignMacro1.setEnabled (hasTarget);
@@ -5596,15 +5899,18 @@ void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
     labOctaveUp.setEnabled (labBaseOctave < labMaxBaseOctave);
 }
 
-void IndustrialEnergySynthAudioProcessorEditor::sendLabKeyboardAllNotesOff()
+void IndustrialEnergySynthAudioProcessorEditor::sendLabKeyboardAllNotesOff (bool resetControllers)
 {
     audioProcessor.enqueueUiAllNotesOff();
-    audioProcessor.enqueueUiPitchBend (8192);
-    labPitchBend.getSlider().setValue (0.0, juce::dontSendNotification);
-    audioProcessor.enqueueUiModWheel (0);
-    audioProcessor.enqueueUiAftertouch (0);
-    labModWheel.getSlider().setValue (0.0, juce::dontSendNotification);
-    labAftertouch.getSlider().setValue (0.0, juce::dontSendNotification);
+    if (resetControllers)
+    {
+        audioProcessor.enqueueUiPitchBend (8192);
+        labPitchBend.getSlider().setValue (0.0, juce::dontSendNotification);
+        audioProcessor.enqueueUiModWheel (0);
+        audioProcessor.enqueueUiAftertouch (0);
+        labModWheel.getSlider().setValue (0.0, juce::dontSendNotification);
+        labAftertouch.getSlider().setValue (0.0, juce::dontSendNotification);
+    }
     for (auto& m : labMapByInput)
     {
         m.count = 0;
@@ -5613,6 +5919,8 @@ void IndustrialEnergySynthAudioProcessorEditor::sendLabKeyboardAllNotesOff()
     labOutRefCount.fill (0);
     labInputHeld.fill (false);
     labActiveNotes.fill (false);
+    labComputerKeyHeld.fill (false);
+    labComputerKeyInputNote.fill (-1);
 
     for (int ch = 1; ch <= 16; ++ch)
         labKeyboardState.allNotesOff (ch);
@@ -5850,6 +6158,126 @@ void IndustrialEnergySynthAudioProcessorEditor::learnLabChordFromActiveNotes()
     sendLabKeyboardAllNotesOff();
 }
 
+void IndustrialEnergySynthAudioProcessorEditor::resetLabKeyBindsToDefault()
+{
+    labKeyToSemitone.fill (-1);
+
+    auto bind = [this] (char c, int semitone)
+    {
+        const auto u = (unsigned char) std::toupper ((unsigned char) c);
+        if (u < labKeyToSemitone.size())
+            labKeyToSemitone[u] = semitone;
+    };
+
+    // Serum-like two-row computer keyboard layout.
+    bind ('Z', 0);  bind ('S', 1);  bind ('X', 2);  bind ('D', 3);  bind ('C', 4);  bind ('V', 5);
+    bind ('G', 6);  bind ('B', 7);  bind ('H', 8);  bind ('N', 9);  bind ('J', 10); bind ('M', 11);
+    bind (',', 12); bind ('L', 13); bind ('.', 14); bind (';', 15); bind ('/', 16);
+
+    bind ('Q', 12); bind ('2', 13); bind ('W', 14); bind ('3', 15); bind ('E', 16); bind ('R', 17);
+    bind ('5', 18); bind ('T', 19); bind ('6', 20); bind ('Y', 21); bind ('7', 22); bind ('U', 23);
+    bind ('I', 24);
+
+    storeLabKeyBindsToState();
+    updateLabKeyboardInfo();
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::loadLabKeyBindsFromState()
+{
+    const auto raw = audioProcessor.getAPVTS().state.getProperty (params::ui::labKeyBinds, {}).toString().trim();
+    if (raw.isEmpty())
+    {
+        resetLabKeyBindsToDefault();
+        return;
+    }
+
+    labKeyToSemitone.fill (-1);
+    bool any = false;
+    juce::StringArray pairs;
+    pairs.addTokens (raw, ",", "");
+    for (const auto& p : pairs)
+    {
+        const auto s = p.trim();
+        const int colon = s.indexOfChar (':');
+        if (colon <= 0 || colon >= s.length() - 1)
+            continue;
+
+        const auto keyPart = s.substring (0, colon).trim();
+        const auto valPart = s.substring (colon + 1).trim();
+        const int keyCode = keyPart.getIntValue();
+        const int semi = juce::jlimit (-60, 96, valPart.getIntValue());
+        if (keyCode < 0 || keyCode >= (int) labKeyToSemitone.size())
+            continue;
+
+        labKeyToSemitone[(size_t) keyCode] = semi;
+        any = true;
+    }
+
+    if (! any)
+        resetLabKeyBindsToDefault();
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::storeLabKeyBindsToState()
+{
+    juce::StringArray parts;
+    for (int k = 0; k < (int) labKeyToSemitone.size(); ++k)
+    {
+        const int semi = labKeyToSemitone[(size_t) k];
+        if (semi < -60 || semi > 96)
+            continue;
+        parts.add (juce::String (k) + ":" + juce::String (semi));
+    }
+    audioProcessor.getAPVTS().state.setProperty (params::ui::labKeyBinds, parts.joinIntoString (","), nullptr);
+}
+
+int IndustrialEnergySynthAudioProcessorEditor::normaliseLabKeyCode (const juce::KeyPress& key) const
+{
+    if (key.getModifiers().isCtrlDown() || key.getModifiers().isAltDown() || key.getModifiers().isCommandDown())
+        return -1;
+
+    int code = key.getKeyCode();
+    const auto tc = key.getTextCharacter();
+    if (tc >= 32 && tc < 127)
+        code = (int) std::toupper ((unsigned char) tc);
+
+    if (code < 0 || code >= (int) labKeyToSemitone.size())
+        return -1;
+    return code;
+}
+
+juce::String IndustrialEnergySynthAudioProcessorEditor::keyCodeToLabel (int keyCode) const
+{
+    if (keyCode >= 32 && keyCode < 127)
+        return juce::String::charToString ((juce::juce_wchar) keyCode);
+
+    switch (keyCode)
+    {
+        case juce::KeyPress::spaceKey: return "Space";
+        case juce::KeyPress::returnKey: return "Enter";
+        case juce::KeyPress::tabKey: return "Tab";
+        default: break;
+    }
+
+    return juce::String (keyCode);
+}
+
+bool IndustrialEnergySynthAudioProcessorEditor::shouldCaptureComputerKeyboard() const
+{
+    if (uiPage != pageLab)
+        return false;
+
+    auto* focused = juce::Component::getCurrentlyFocusedComponent();
+    if (focused == nullptr)
+        return true;
+    if (dynamic_cast<juce::TextEditor*> (focused) != nullptr)
+        return false;
+    if (dynamic_cast<juce::Label*> (focused) != nullptr)
+        return false;
+    if (dynamic_cast<juce::ComboBox*> (focused) != nullptr)
+        return false;
+    return true;
+}
+
 int IndustrialEnergySynthAudioProcessorEditor::quantizeLabNote (int midiNote) const
 {
     const int note = juce::jlimit (0, 127, midiNote);
@@ -6025,6 +6453,25 @@ void IndustrialEnergySynthAudioProcessorEditor::handleNoteOn (juce::MidiKeyboard
     juce::ignoreUnused (source, midiChannel, velocity);
 
     const auto note = juce::jlimit (0, 127, midiNoteNumber);
+    if (labBindMode.getToggleState() && labPendingBindKeyCode >= 0)
+    {
+        const int base = labBaseOctave * 12;
+        const int semitone = juce::jlimit (-60, 96, note - base);
+        labKeyToSemitone[(size_t) juce::jlimit (0, (int) labKeyToSemitone.size() - 1, labPendingBindKeyCode)] = semitone;
+        storeLabKeyBindsToState();
+
+        const auto msg = isRussian()
+            ? (juce::String::fromUTF8 (u8"Бинд: ") + keyCodeToLabel (labPendingBindKeyCode)
+               + juce::String::fromUTF8 (u8" -> ") + midiNoteName (note))
+            : ("Bind: " + keyCodeToLabel (labPendingBindKeyCode) + " -> " + midiNoteName (note));
+        statusLabel.setText (msg, juce::dontSendNotification);
+
+        labPendingBindKeyCode = -1;
+        labBindMode.setToggleState (false, juce::dontSendNotification);
+        updateLabKeyboardInfo();
+        return;
+    }
+
     const auto fixedVelocity = juce::jlimit (1, 127, (int) std::lround (labVelocity.getSlider().getValue()));
     labPressInputNote (note, fixedVelocity);
 }
@@ -7312,6 +7759,68 @@ void IndustrialEnergySynthAudioProcessorEditor::mouseExit (const juce::MouseEven
 
     if (hovered == nullptr)
         statusLabel.setText ({}, juce::dontSendNotification);
+}
+
+bool IndustrialEnergySynthAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
+{
+    if (! shouldCaptureComputerKeyboard())
+        return false;
+
+    const int keyCode = normaliseLabKeyCode (key);
+    if (keyCode < 0)
+        return false;
+
+    if (labBindMode.getToggleState())
+    {
+        labPendingBindKeyCode = keyCode;
+        const auto msg = isRussian()
+            ? (juce::String::fromUTF8 (u8"Bind Keys: выбрана клавиша ") + keyCodeToLabel (keyCode)
+               + juce::String::fromUTF8 (u8". Теперь кликни ноту на клавиатуре Lab."))
+            : ("Bind Keys: selected key " + keyCodeToLabel (keyCode) + ". Now click a note on the Lab keyboard.");
+        statusLabel.setText (msg, juce::dontSendNotification);
+        return true;
+    }
+
+    const int semitone = labKeyToSemitone[(size_t) keyCode];
+    if (semitone < -60 || semitone > 96)
+        return false;
+
+    if (labComputerKeyHeld[(size_t) keyCode])
+        return true;
+
+    const int baseNote = labBaseOctave * 12;
+    const int note = juce::jlimit (0, 127, baseNote + semitone);
+    const int fixedVelocity = juce::jlimit (1, 127, (int) std::lround (labVelocity.getSlider().getValue()));
+    labComputerKeyHeld[(size_t) keyCode] = true;
+    labComputerKeyInputNote[(size_t) keyCode] = note;
+    labPressInputNote (note, fixedVelocity);
+    return true;
+}
+
+bool IndustrialEnergySynthAudioProcessorEditor::keyStateChanged (bool isKeyDown)
+{
+    if (isKeyDown)
+        return false;
+    if (! shouldCaptureComputerKeyboard())
+        return false;
+
+    bool consumed = false;
+    for (int keyCode = 0; keyCode < (int) labComputerKeyHeld.size(); ++keyCode)
+    {
+        if (! labComputerKeyHeld[(size_t) keyCode])
+            continue;
+        if (juce::KeyPress::isKeyCurrentlyDown (keyCode))
+            continue;
+
+        const int note = labComputerKeyInputNote[(size_t) keyCode];
+        if (note >= 0)
+            labReleaseInputNote (note);
+
+        labComputerKeyHeld[(size_t) keyCode] = false;
+        labComputerKeyInputNote[(size_t) keyCode] = -1;
+        consumed = true;
+    }
+    return consumed;
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::updateStatusFromComponent (juce::Component* c)

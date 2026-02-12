@@ -1322,6 +1322,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
 
         ies::dsp::FxChain::RuntimeParams fxp;
         fxp.globalMix01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxGlobalMix, 0.0f));
+        const float fxMorph = juce::jlimit (0.0f, 1.0f, loadf (params->fxGlobalMorph, 0.0f));
 
         fxp.chorusEnable = loadb (params->fxChorusEnable, false);
         fxp.chorusMix01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxChorusMix, 0.0f) + avg (fxModChorusMixSum));
@@ -1379,6 +1380,33 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         fxp.octaverBlend01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxOctBlend, 0.5f));
         fxp.octaverSensitivity01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxOctSensitivity, 0.5f));
         fxp.octaverTone01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxOctTone, 0.5f));
+
+        // FX Morph (global one-knob): broad macro for movement/space/aggression.
+        if (fxMorph > 0.0f)
+        {
+            fxp.globalMix01 = juce::jlimit (0.0f, 1.0f, fxp.globalMix01 + 0.18f * fxMorph);
+
+            fxp.chorusDepthMs = juce::jlimit (0.0f, 25.0f, fxp.chorusDepthMs + 7.0f * fxMorph);
+            fxp.chorusMix01 = juce::jlimit (0.0f, 1.0f, fxp.chorusMix01 + 0.12f * fxMorph);
+
+            fxp.delayFeedback01 = juce::jlimit (0.0f, 0.98f, fxp.delayFeedback01 + 0.25f * fxMorph);
+            fxp.delayModDepthMs = juce::jlimit (0.0f, 25.0f, fxp.delayModDepthMs + 6.0f * fxMorph);
+            fxp.delayMix01 = juce::jlimit (0.0f, 1.0f, fxp.delayMix01 + 0.15f * fxMorph);
+
+            fxp.reverbSize01 = juce::jlimit (0.0f, 1.0f, fxp.reverbSize01 + 0.25f * fxMorph);
+            fxp.reverbDecay01 = juce::jlimit (0.0f, 1.0f, fxp.reverbDecay01 + 0.22f * fxMorph);
+            fxp.reverbMix01 = juce::jlimit (0.0f, 1.0f, fxp.reverbMix01 + 0.14f * fxMorph);
+
+            fxp.distDriveDb = juce::jlimit (-24.0f, 36.0f, fxp.distDriveDb + 10.0f * fxMorph);
+            fxp.distMix01 = juce::jlimit (0.0f, 1.0f, fxp.distMix01 + 0.16f * fxMorph);
+
+            fxp.phaserDepth01 = juce::jlimit (0.0f, 1.0f, fxp.phaserDepth01 + 0.28f * fxMorph);
+            fxp.phaserFeedback = juce::jlimit (-0.95f, 0.95f, fxp.phaserFeedback + 0.22f * fxMorph);
+            fxp.phaserMix01 = juce::jlimit (0.0f, 1.0f, fxp.phaserMix01 + 0.12f * fxMorph);
+
+            fxp.octaverSubLevel01 = juce::jlimit (0.0f, 1.0f, fxp.octaverSubLevel01 + 0.22f * fxMorph);
+            fxp.octaverMix01 = juce::jlimit (0.0f, 1.0f, fxp.octaverMix01 + 0.12f * fxMorph);
+        }
 
         const auto fxOrder = loadi (params->fxGlobalOrder, (int) params::fx::global::orderFixedA);
         const auto fxOs = loadi (params->fxGlobalOversample, (int) params::fx::global::osOff);

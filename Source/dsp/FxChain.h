@@ -49,6 +49,27 @@ public:
     // Audio processing. Uses and updates meters.
     Meters& getMeters() noexcept { return meters; }
     const Meters& getMeters() const noexcept { return meters; }
+    void setCustomOrder (const std::array<int, (size_t) numBlocks>& order) noexcept
+    {
+        std::array<bool, (size_t) numBlocks> used {};
+        std::array<int, (size_t) numBlocks> norm { { 0, 1, 2, 3, 4, 5 } };
+        int w = 0;
+        for (int v : order)
+        {
+            const int b = juce::jlimit (0, (int) numBlocks - 1, v);
+            if (! used[(size_t) b] && w < (int) norm.size())
+            {
+                norm[(size_t) w++] = b;
+                used[(size_t) b] = true;
+            }
+        }
+        for (int b = 0; b < (int) numBlocks && w < (int) norm.size(); ++b)
+        {
+            if (! used[(size_t) b])
+                norm[(size_t) w++] = b;
+        }
+        customOrder = norm;
+    }
 
     struct RuntimeParams final
     {
@@ -620,6 +641,7 @@ private:
 
     Meters meters;
     std::atomic<float> hostBpm { 120.0f };
+    std::array<int, (size_t) numBlocks> customOrder { { 0, 1, 2, 3, 4, 5 } };
 };
 } // namespace ies::dsp
 
@@ -1006,6 +1028,7 @@ inline void FxChain::process (juce::AudioBuffer<float>& buffer, int startSample,
                 if (p.octaverEnable) processEffectOctaver (l, r, numSamples, p);
                 mixWetDry (l, r, dryL, dryR, numSamples, octMixSm.getNextValue());
                 break;
+            case numBlocks:
             default: break;
         }
 
@@ -1014,7 +1037,7 @@ inline void FxChain::process (juce::AudioBuffer<float>& buffer, int startSample,
                                             std::memory_order_relaxed);
     };
 
-    const int ord = juce::jlimit ((int) params::fx::global::orderFixedA, (int) params::fx::global::orderFixedB, orderChoice);
+    const int ord = juce::jlimit ((int) params::fx::global::orderFixedA, (int) params::fx::global::orderCustom, orderChoice);
     if (ord == (int) params::fx::global::orderFixedB)
     {
         run (chorus);
@@ -1023,6 +1046,11 @@ inline void FxChain::process (juce::AudioBuffer<float>& buffer, int startSample,
         run (delay);
         run (reverb);
         run (octaver);
+    }
+    else if (ord == (int) params::fx::global::orderCustom)
+    {
+        for (int i = 0; i < (int) numBlocks; ++i)
+            run ((Block) juce::jlimit (0, (int) numBlocks - 1, customOrder[(size_t) i]));
     }
     else
     {

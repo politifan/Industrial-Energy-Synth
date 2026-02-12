@@ -69,18 +69,26 @@ private:
     void mouseDoubleClick (const juce::MouseEvent&) override;
     void mouseEnter (const juce::MouseEvent&) override;
     void mouseExit (const juce::MouseEvent&) override;
+    bool keyPressed (const juce::KeyPress& key) override;
+    bool keyStateChanged (bool isKeyDown) override;
 
     void setupSliderDoubleClickDefault (juce::Slider&, const char* paramId);
     void loadMacroNamesFromState();
     void storeMacroNameToState (int macroIndex, const juce::String& name);
     void refreshMacroNames();
     void promptMacroRename (int macroIndex);
-    void sendLabKeyboardAllNotesOff();
+    void sendLabKeyboardAllNotesOff (bool resetControllers = false);
     void setLabKeyboardBaseOctave (int octave);
     void updateLabKeyboardRange();
     void updateLabKeyboardInfo();
     void loadLabChordFromState();
     void learnLabChordFromActiveNotes();
+    void loadLabKeyBindsFromState();
+    void storeLabKeyBindsToState();
+    void resetLabKeyBindsToDefault();
+    int normaliseLabKeyCode (const juce::KeyPress& key) const;
+    juce::String keyCodeToLabel (int keyCode) const;
+    bool shouldCaptureComputerKeyboard() const;
     int quantizeLabNote (int midiNote) const;
     void labPressInputNote (int inputNote, int velocity0to127);
     void labReleaseInputNote (int inputNote);
@@ -420,21 +428,39 @@ private:
     ies::ui::KnobWithLabel fxChorusRate;
     ies::ui::KnobWithLabel fxChorusDepth;
     ies::ui::KnobWithLabel fxChorusDelay;
+    ies::ui::KnobWithLabel fxChorusFeedback;
+    ies::ui::KnobWithLabel fxChorusStereo;
+    ies::ui::KnobWithLabel fxChorusHp;
     std::unique_ptr<APVTS::ButtonAttachment> fxChorusEnableAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxChorusMixAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxChorusRateAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxChorusDepthAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxChorusDelayAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxChorusFeedbackAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxChorusStereoAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxChorusHpAttachment;
 
     ies::ui::KnobWithLabel fxDelayMix;
     ies::ui::KnobWithLabel fxDelayTime;
     ies::ui::KnobWithLabel fxDelayFeedback;
+    ies::ui::ComboWithLabel fxDelayDivL;
+    ies::ui::ComboWithLabel fxDelayDivR;
+    ies::ui::KnobWithLabel fxDelayFilter;
+    ies::ui::KnobWithLabel fxDelayModRate;
+    ies::ui::KnobWithLabel fxDelayModDepth;
+    ies::ui::KnobWithLabel fxDelayDuck;
     juce::ToggleButton fxDelaySync;
     juce::ToggleButton fxDelayPingPong;
     std::unique_ptr<APVTS::ButtonAttachment> fxDelayEnableAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxDelayMixAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxDelayTimeAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxDelayFeedbackAttachment;
+    std::unique_ptr<APVTS::ComboBoxAttachment> fxDelayDivLAttachment;
+    std::unique_ptr<APVTS::ComboBoxAttachment> fxDelayDivRAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxDelayFilterAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxDelayModRateAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxDelayModDepthAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxDelayDuckAttachment;
     std::unique_ptr<APVTS::ButtonAttachment> fxDelaySyncAttachment;
     std::unique_ptr<APVTS::ButtonAttachment> fxDelayPingPongAttachment;
 
@@ -442,41 +468,63 @@ private:
     ies::ui::KnobWithLabel fxReverbSize;
     ies::ui::KnobWithLabel fxReverbDecay;
     ies::ui::KnobWithLabel fxReverbDamp;
+    ies::ui::KnobWithLabel fxReverbPreDelay;
+    ies::ui::KnobWithLabel fxReverbWidth;
+    ies::ui::KnobWithLabel fxReverbLowCut;
+    ies::ui::KnobWithLabel fxReverbHighCut;
+    ies::ui::ComboWithLabel fxReverbQuality;
     std::unique_ptr<APVTS::ButtonAttachment> fxReverbEnableAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxReverbMixAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxReverbSizeAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxReverbDecayAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxReverbDampAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxReverbPreDelayAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxReverbWidthAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxReverbLowCutAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxReverbHighCutAttachment;
+    std::unique_ptr<APVTS::ComboBoxAttachment> fxReverbQualityAttachment;
 
     ies::ui::KnobWithLabel fxDistMix;
     ies::ui::KnobWithLabel fxDistDrive;
     ies::ui::KnobWithLabel fxDistTone;
+    ies::ui::KnobWithLabel fxDistPostLp;
+    ies::ui::KnobWithLabel fxDistTrim;
     ies::ui::ComboWithLabel fxDistType;
     std::unique_ptr<APVTS::ButtonAttachment> fxDistEnableAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxDistMixAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxDistDriveAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxDistToneAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxDistPostLpAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxDistTrimAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> fxDistTypeAttachment;
 
     ies::ui::KnobWithLabel fxPhaserMix;
     ies::ui::KnobWithLabel fxPhaserRate;
     ies::ui::KnobWithLabel fxPhaserDepth;
     ies::ui::KnobWithLabel fxPhaserFeedback;
+    ies::ui::KnobWithLabel fxPhaserCentre;
+    ies::ui::ComboWithLabel fxPhaserStages;
+    ies::ui::KnobWithLabel fxPhaserStereo;
     std::unique_ptr<APVTS::ButtonAttachment> fxPhaserEnableAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxPhaserMixAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxPhaserRateAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxPhaserDepthAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxPhaserFeedbackAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxPhaserCentreAttachment;
+    std::unique_ptr<APVTS::ComboBoxAttachment> fxPhaserStagesAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxPhaserStereoAttachment;
 
     ies::ui::KnobWithLabel fxOctMix;
     ies::ui::KnobWithLabel fxOctSub;
     ies::ui::KnobWithLabel fxOctBlend;
     ies::ui::KnobWithLabel fxOctTone;
+    ies::ui::KnobWithLabel fxOctSensitivity;
     std::unique_ptr<APVTS::ButtonAttachment> fxOctEnableAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxOctMixAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxOctSubAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxOctBlendAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxOctToneAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxOctSensitivityAttachment;
 
     enum FxBlockIndex
     {
@@ -515,6 +563,8 @@ private:
     juce::TextButton labOctaveDown;
     juce::TextButton labOctaveUp;
     juce::ToggleButton labHold;
+    juce::ToggleButton labBindMode;
+    juce::TextButton labBindReset;
     juce::TextButton labPanic;
     ies::ui::KnobWithLabel labVelocity;
     ies::ui::KnobWithLabel labKeyWidth;
@@ -550,6 +600,10 @@ private:
     std::array<bool, 128> labActiveNotes {};
     std::array<int, labMaxChordNotes> labChordIntervals { { 0 } };
     int labChordCount = 1;
+    std::array<int, 256> labKeyToSemitone {};
+    std::array<bool, 256> labComputerKeyHeld {};
+    std::array<int, 256> labComputerKeyInputNote {};
+    int labPendingBindKeyCode = -1;
 
     juce::ComponentBoundsConstrainer boundsConstrainer;
     juce::ResizableBorderComponent resizeBorder { this, &boundsConstrainer };

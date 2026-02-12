@@ -167,6 +167,7 @@ public:
         std::atomic<float>* fxGlobalMix = nullptr;
         std::atomic<float>* fxGlobalOrder = nullptr;
         std::atomic<float>* fxGlobalOversample = nullptr;
+        std::atomic<float>* fxGlobalMorph = nullptr;
 
         // FX Chorus
         std::atomic<float>* fxChorusEnable = nullptr;
@@ -251,6 +252,10 @@ public:
     void render (juce::AudioBuffer<float>& buffer, int startSample, int numSamples, float* preDestroyOut = nullptr);
 
     void setHostBpm (double bpm) noexcept;
+    void setFxCustomOrder (const std::array<int, (size_t) ies::dsp::FxChain::numBlocks>& order) noexcept
+    {
+        fxChain.setCustomOrder (order);
+    }
 
     // MIDI handling (sample-accurate handled by caller via segmentation).
     void noteOn (int midiNote, int velocity0to127);

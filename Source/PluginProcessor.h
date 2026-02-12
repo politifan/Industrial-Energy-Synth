@@ -45,6 +45,8 @@ public:
     {
         return engine.getFxMeters().outPeak.load (std::memory_order_relaxed);
     }
+    void setUiFxCustomOrder (const std::array<int, (size_t) ies::dsp::FxChain::numBlocks>& order) noexcept;
+    std::array<int, (size_t) ies::dsp::FxChain::numBlocks> getUiFxCustomOrder() const noexcept;
     void requestPanic() noexcept { uiPanicRequested.store (true, std::memory_order_release); }
     void enqueueUiNoteOn (int midiNoteNumber, int velocity) noexcept;
     void enqueueUiNoteOff (int midiNoteNumber) noexcept;
@@ -213,6 +215,8 @@ private:
     std::atomic<float> uiOutClipRisk { 0.0f };
     std::atomic<float> uiCpuRisk { 0.0f };
     std::atomic<bool> uiPanicRequested { false };
+    std::array<std::atomic<int>, (size_t) ies::dsp::FxChain::numBlocks> uiFxCustomOrder
+    { { 0, 1, 2, 3, 4, 5 } };
 
     static constexpr int uiAudioRingSize = 16384;
     std::array<float, (size_t) uiAudioRingSize> uiAudioRingPost {};

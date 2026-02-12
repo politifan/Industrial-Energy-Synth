@@ -346,11 +346,13 @@ namespace global
 inline constexpr const char* mix        = "fx.global.mix";        // 0..1
 inline constexpr const char* order      = "fx.global.order";      // choice
 inline constexpr const char* oversample = "fx.global.oversample"; // choice Off/2x/4x
+inline constexpr const char* morph      = "fx.global.morph";      // 0..1 FX macro morph
 
 enum Order
 {
     orderFixedA = 0,
-    orderFixedB = 1
+    orderFixedB = 1,
+    orderCustom = 2
 };
 
 enum Oversample
@@ -552,6 +554,7 @@ inline constexpr const char* labChordEnable  = "ui.labChordEnable";  // bool
 
 // Non-parameter state keys (stored as ValueTree properties inside APVTS state).
 inline constexpr const char* labChordIntervals = "ui.labChordIntervals"; // string like "0,4,7"
+inline constexpr const char* labKeyBinds = "ui.labKeyBinds"; // string map like "90:0,83:1,..."
 inline constexpr const char* editorW = "ui.editorW"; // int (main window width)
 inline constexpr const char* editorH = "ui.editorH"; // int (main window height)
 inline constexpr const char* osc1DrawWave = "ui.osc1DrawWave"; // base64 int16[128] (-32767..32767)

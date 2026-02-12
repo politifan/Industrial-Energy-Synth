@@ -916,6 +916,7 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
     paramPointers.fxGlobalMix = apvts.getRawParameterValue (params::fx::global::mix);
     paramPointers.fxGlobalOrder = apvts.getRawParameterValue (params::fx::global::order);
     paramPointers.fxGlobalOversample = apvts.getRawParameterValue (params::fx::global::oversample);
+    paramPointers.fxGlobalMorph = apvts.getRawParameterValue (params::fx::global::morph);
 
     paramPointers.fxChorusEnable = apvts.getRawParameterValue (params::fx::chorus::enable);
     paramPointers.fxChorusMix = apvts.getRawParameterValue (params::fx::chorus::mix);
@@ -1064,6 +1065,40 @@ void IndustrialEnergySynthAudioProcessor::enqueueUiAftertouch (int value0to127) 
     const auto v = (juce::uint8) juce::jlimit (0, 127, value0to127);
     // Channel Pressure (Aftertouch).
     pushUiMidiEvent ((juce::uint8) 0xD0, v, (juce::uint8) 0);
+}
+
+void IndustrialEnergySynthAudioProcessor::setUiFxCustomOrder (const std::array<int, (size_t) ies::dsp::FxChain::numBlocks>& order) noexcept
+{
+    std::array<bool, (size_t) ies::dsp::FxChain::numBlocks> used {};
+    std::array<int, (size_t) ies::dsp::FxChain::numBlocks> norm { { 0, 1, 2, 3, 4, 5 } };
+
+    int w = 0;
+    for (int v : order)
+    {
+        const int b = juce::jlimit (0, (int) ies::dsp::FxChain::numBlocks - 1, v);
+        if (! used[(size_t) b] && w < (int) norm.size())
+        {
+            norm[(size_t) w] = b;
+            used[(size_t) b] = true;
+            ++w;
+        }
+    }
+    for (int b = 0; b < (int) ies::dsp::FxChain::numBlocks && w < (int) norm.size(); ++b)
+    {
+        if (! used[(size_t) b])
+            norm[(size_t) w++] = b;
+    }
+
+    for (int i = 0; i < (int) ies::dsp::FxChain::numBlocks; ++i)
+        uiFxCustomOrder[(size_t) i].store (norm[(size_t) i], std::memory_order_relaxed);
+}
+
+std::array<int, (size_t) ies::dsp::FxChain::numBlocks> IndustrialEnergySynthAudioProcessor::getUiFxCustomOrder() const noexcept
+{
+    std::array<int, (size_t) ies::dsp::FxChain::numBlocks> out {};
+    for (int i = 0; i < (int) ies::dsp::FxChain::numBlocks; ++i)
+        out[(size_t) i] = uiFxCustomOrder[(size_t) i].load (std::memory_order_relaxed);
+    return out;
 }
 
 void IndustrialEnergySynthAudioProcessor::applyStateFromUi (juce::ValueTree state, bool keepLanguage)
@@ -1245,6 +1280,7 @@ void IndustrialEnergySynthAudioProcessor::processBlock (juce::AudioBuffer<float>
         }
     }
     engine.setHostBpm (bpm);
+    engine.setFxCustomOrder (getUiFxCustomOrder());
 
     // Update Arp params (block-rate; no sample-accurate param switching in this version).
     const bool arpEnable = (arpParams.enable != nullptr && arpParams.enable->load() >= 0.5f);
@@ -1467,6 +1503,16 @@ void IndustrialEnergySynthAudioProcessor::setStateInformation (const void* data,
     auto tree = juce::ValueTree::fromXml (*xmlState);
     migrateStateIfNeeded (tree);
     apvts.replaceState (tree);
+
+    // Restore UI custom FX order (stored as non-parameter properties).
+    std::array<int, (size_t) ies::dsp::FxChain::numBlocks> fxOrder { { 0, 1, 2, 3, 4, 5 } };
+    for (int i = 0; i < (int) ies::dsp::FxChain::numBlocks; ++i)
+    {
+        const auto key = juce::Identifier ("ui.fxOrder" + juce::String (i));
+        fxOrder[(size_t) i] = (int) tree.getProperty (key, fxOrder[(size_t) i]);
+    }
+    setUiFxCustomOrder (fxOrder);
+
     engine.reset();
     loadCustomWavesFromState();
 }
@@ -1886,11 +1932,13 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
         g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::global::mix), "FX Mix",
                                                                   juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
         g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::global::order), "FX Order",
-                                                                   juce::StringArray { "Fixed A", "Fixed B" },
+                                                                   juce::StringArray { "Fixed A", "Fixed B", "Custom" },
                                                                    (int) params::fx::global::orderFixedA));
         g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::global::oversample), "FX Oversampling",
                                                                    juce::StringArray { "Off", "2x", "4x" },
                                                                    (int) params::fx::global::osOff));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::global::morph), "FX Morph",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
         layout.add (std::move (g));
     }
 

@@ -162,15 +162,15 @@ void ShaperEditor::mouseDoubleClick (const juce::MouseEvent& e)
 void ShaperEditor::paint (juce::Graphics& g)
 {
     const auto b = getLocalBounds().toFloat();
-    g.setColour (juce::Colour (0xff0a111b).withAlpha (0.95f));
+    g.setColour (juce::Colour (0xff0d1624).withAlpha (0.97f));
     g.fillRoundedRectangle (b, 8.0f);
-    g.setColour (juce::Colour (0xff2c384a).withAlpha (0.85f));
+    g.setColour (juce::Colour (0xff36455c).withAlpha (0.92f));
     g.drawRoundedRectangle (b.reduced (0.5f), 8.0f, 1.0f);
 
     const auto p = plotBounds();
 
     // Grid
-    g.setColour (juce::Colour (0xff1f2a39).withAlpha (0.8f));
+    g.setColour (juce::Colour (0xff24354d).withAlpha (0.9f));
     for (int i = 0; i <= 4; ++i)
     {
         const auto y = juce::jmap ((float) i, 0.0f, 4.0f, p.getY(), p.getBottom());
@@ -183,7 +183,7 @@ void ShaperEditor::paint (juce::Graphics& g)
     }
 
     // Unity axis.
-    g.setColour (juce::Colour (0xff6d7d95).withAlpha (0.75f));
+    g.setColour (juce::Colour (0xff8094b2).withAlpha (0.78f));
     g.drawHorizontalLine ((int) std::round (valueToY (0.0f)), p.getX(), p.getRight());
     g.drawLine (p.getX(), p.getBottom(), p.getRight(), p.getY(), 1.0f);
 
@@ -198,7 +198,7 @@ void ShaperEditor::paint (juce::Graphics& g)
             curve.lineTo (x, y);
     }
 
-    const auto glow = accent.withAlpha (0.20f);
+    const auto glow = accent.withAlpha (0.28f);
     g.setColour (glow);
     g.strokePath (curve, juce::PathStrokeType (4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
@@ -218,4 +218,3 @@ void ShaperEditor::paint (juce::Graphics& g)
     }
 }
 } // namespace ies::ui
-
