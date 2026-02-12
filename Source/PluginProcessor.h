@@ -27,6 +27,9 @@ public:
     float getUiOutClipRisk() const noexcept { return uiOutClipRisk.load (std::memory_order_relaxed); }
     float getUiCpuRisk() const noexcept { return uiCpuRisk.load (std::memory_order_relaxed); }
     void requestPanic() noexcept { uiPanicRequested.store (true, std::memory_order_release); }
+    void enqueueUiNoteOn (int midiNoteNumber, int velocity) noexcept;
+    void enqueueUiNoteOff (int midiNoteNumber) noexcept;
+    void enqueueUiAllNotesOff() noexcept;
     void applyStateFromUi (juce::ValueTree state, bool keepLanguage);
     void copyUiAudio (float* dest, int numSamples, UiAudioTap tap = UiAudioTap::postOutput) const noexcept;
 
@@ -60,7 +63,16 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
 private:
+    struct UiMidiEvent
+    {
+        juce::uint8 status = 0;
+        juce::uint8 data1 = 0;
+        juce::uint8 data2 = 0;
+    };
+
     static APVTS::ParameterLayout createParameterLayout();
+    void pushUiMidiEvent (juce::uint8 status, juce::uint8 data1, juce::uint8 data2) noexcept;
+    void drainUiMidiToBuffer (juce::MidiBuffer& midiBuffer) noexcept;
 
     APVTS apvts;
     ies::engine::MonoSynthEngine engine;
@@ -77,6 +89,10 @@ private:
     std::atomic<int> uiAudioWritePosPost { 0 };
     std::atomic<int> uiAudioWritePosPre { 0 };
     std::vector<float> uiPreDestroyScratch;
+    static constexpr juce::uint32 uiMidiQueueSize = 512;
+    std::array<UiMidiEvent, uiMidiQueueSize> uiMidiQueue {};
+    std::atomic<juce::uint32> uiMidiWriteIndex { 0 };
+    std::atomic<juce::uint32> uiMidiReadIndex { 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (IndustrialEnergySynthAudioProcessor)
 };

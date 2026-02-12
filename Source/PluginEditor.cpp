@@ -29,6 +29,14 @@ static constexpr const char* kModSlotDepthIds[params::mod::numSlots] =
 static constexpr const char* kUiMacro1NameId = "ui.macro1Name";
 static constexpr const char* kUiMacro2NameId = "ui.macro2Name";
 
+static juce::String midiNoteName (int midiNote)
+{
+    static constexpr const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    const auto note = juce::jlimit (0, 127, midiNote);
+    const auto octave = note / 12 - 1;
+    return juce::String (names[note % 12]) + juce::String (octave);
+}
+
 // Keep this list stable once you ship factory content (names can change, ordering/IDs should not).
 static const FactoryPreset kFactoryPresets[] =
 {
@@ -1016,6 +1024,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     addAndMakeVisible (panicButton);
     panicButton.onClick = [this]
     {
+        sendLabKeyboardAllNotesOff();
         audioProcessor.requestPanic();
     };
 
@@ -2046,41 +2055,100 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     labGroup.setText ("Lab");
     addAndMakeVisible (labGroup);
-    labIntentPanel.setText ("Intent Coach");
-    addAndMakeVisible (labIntentPanel);
-    addAndMakeVisible (labIntentBody);
-    labIntentBody.setMultiLine (true);
-    labIntentBody.setReadOnly (true);
-    labIntentBody.setScrollbarsShown (true);
-    labIntentBody.setCaretVisible (false);
-    labIntentBody.setPopupMenuEnabled (false);
-    labIntentBody.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff0f1218));
-    labIntentBody.setColour (juce::TextEditor::outlineColourId, juce::Colour (0xff2a3447));
-    labIntentBody.setColour (juce::TextEditor::textColourId, juce::Colour (0xffd7def0));
 
-    labRoutingPanel.setText ("Routing Monitor");
-    addAndMakeVisible (labRoutingPanel);
-    addAndMakeVisible (labRoutingBody);
-    labRoutingBody.setMultiLine (true);
-    labRoutingBody.setReadOnly (true);
-    labRoutingBody.setScrollbarsShown (true);
-    labRoutingBody.setCaretVisible (false);
-    labRoutingBody.setPopupMenuEnabled (false);
-    labRoutingBody.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff0f1218));
-    labRoutingBody.setColour (juce::TextEditor::outlineColourId, juce::Colour (0xff2a3447));
-    labRoutingBody.setColour (juce::TextEditor::textColourId, juce::Colour (0xffd7def0));
+    addAndMakeVisible (labOctaveDown);
+    labOctaveDown.setButtonText ("Oct -");
+    labOctaveDown.onClick = [this]
+    {
+        setLabKeyboardBaseOctave (labBaseOctave - 1);
+    };
 
-    labSafetyPanel.setText ("Safety Snapshot");
-    addAndMakeVisible (labSafetyPanel);
-    addAndMakeVisible (labSafetyBody);
-    labSafetyBody.setMultiLine (true);
-    labSafetyBody.setReadOnly (true);
-    labSafetyBody.setScrollbarsShown (true);
-    labSafetyBody.setCaretVisible (false);
-    labSafetyBody.setPopupMenuEnabled (false);
-    labSafetyBody.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff0f1218));
-    labSafetyBody.setColour (juce::TextEditor::outlineColourId, juce::Colour (0xff2a3447));
-    labSafetyBody.setColour (juce::TextEditor::textColourId, juce::Colour (0xffd7def0));
+    addAndMakeVisible (labOctaveUp);
+    labOctaveUp.setButtonText ("Oct +");
+    labOctaveUp.onClick = [this]
+    {
+        setLabKeyboardBaseOctave (labBaseOctave + 1);
+    };
+
+    addAndMakeVisible (labHold);
+    labHold.onClick = [this]
+    {
+        if (! labHold.getToggleState())
+            sendLabKeyboardAllNotesOff();
+        updateLabKeyboardInfo();
+    };
+
+    addAndMakeVisible (labPanic);
+    labPanic.setButtonText ("Panic");
+    labPanic.onClick = [this]
+    {
+        sendLabKeyboardAllNotesOff();
+        audioProcessor.requestPanic();
+    };
+
+    addAndMakeVisible (labVelocity);
+    labVelocity.getSlider().setSliderStyle (juce::Slider::LinearHorizontal);
+    labVelocity.getSlider().setTextBoxStyle (juce::Slider::TextBoxRight, false, 62, 18);
+    labVelocity.getSlider().setRange (1.0, 127.0, 1.0);
+    labVelocity.getSlider().setValue (100.0, juce::dontSendNotification);
+    labVelocity.getSlider().setNumDecimalPlacesToDisplay (0);
+    labVelocity.getSlider().textFromValueFunction = [] (double v)
+    {
+        return juce::String ((int) std::lround (v));
+    };
+    labVelocity.getSlider().valueFromTextFunction = [] (const juce::String& t)
+    {
+        return t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
+    };
+    labVelocity.getSlider().onValueChange = [this]
+    {
+        updateLabKeyboardInfo();
+    };
+
+    addAndMakeVisible (labKeyWidth);
+    labKeyWidth.getSlider().setSliderStyle (juce::Slider::LinearHorizontal);
+    labKeyWidth.getSlider().setTextBoxStyle (juce::Slider::TextBoxRight, false, 52, 18);
+    labKeyWidth.getSlider().setRange (10.0, 26.0, 0.25);
+    labKeyWidth.getSlider().setValue (16.0, juce::dontSendNotification);
+    labKeyWidth.getSlider().setNumDecimalPlacesToDisplay (1);
+    labKeyWidth.getSlider().textFromValueFunction = [] (double v)
+    {
+        return juce::String (v, 1).trimCharactersAtEnd ("0").trimCharactersAtEnd (".");
+    };
+    labKeyWidth.getSlider().valueFromTextFunction = [] (const juce::String& t)
+    {
+        return t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
+    };
+    labKeyWidth.getSlider().onValueChange = [this]
+    {
+        labKeyboard.setKeyWidth ((float) labKeyWidth.getSlider().getValue());
+    };
+
+    addAndMakeVisible (labKeyboardRangeLabel);
+    labKeyboardRangeLabel.setJustificationType (juce::Justification::centredRight);
+    labKeyboardRangeLabel.setColour (juce::Label::textColourId, juce::Colour (0xffe8ebf1).withAlpha (0.85f));
+    labKeyboardRangeLabel.setMinimumHorizontalScale (0.78f);
+
+    addAndMakeVisible (labKeyboardInfoLabel);
+    labKeyboardInfoLabel.setJustificationType (juce::Justification::centredLeft);
+    labKeyboardInfoLabel.setColour (juce::Label::textColourId, juce::Colour (0xffc7d5ea).withAlpha (0.88f));
+    labKeyboardInfoLabel.setMinimumHorizontalScale (0.78f);
+
+    addAndMakeVisible (labKeyboard);
+    labKeyboardState.addListener (this);
+    labKeyboard.setAvailableRange (24, 71);
+    labKeyboard.setOctaveForMiddleC (4);
+    labKeyboard.setScrollButtonsVisible (false);
+    labKeyboard.setWantsKeyboardFocus (true);
+    labKeyboard.setMouseClickGrabsKeyboardFocus (true);
+    labKeyboard.setKeyPressBaseOctave (labBaseOctave);
+    labKeyboard.setColour (juce::MidiKeyboardComponent::whiteNoteColourId, juce::Colour (0xffd4deee));
+    labKeyboard.setColour (juce::MidiKeyboardComponent::blackNoteColourId, juce::Colour (0xff161b26));
+    labKeyboard.setColour (juce::MidiKeyboardComponent::keySeparatorLineColourId, juce::Colour (0xff253047));
+    labKeyboard.setColour (juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId, juce::Colour (0x4400c7ff));
+    labKeyboard.setColour (juce::MidiKeyboardComponent::keyDownOverlayColourId, juce::Colour (0x9900c7ff));
+    updateLabKeyboardRange();
+    updateLabKeyboardInfo();
 
     // --- Filter ---
     filterGroup.setText ("Filter");
@@ -2362,11 +2430,15 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (modInsightsPanel, cMod);
     setGroupAccent (modQuickPanel, cMod);
     setGroupAccent (labGroup, cMod);
-    setGroupAccent (labIntentPanel, cOsc1);
-    setGroupAccent (labRoutingPanel, cMod);
-    setGroupAccent (labSafetyPanel, cOut);
+    setGroupAccent (labOctaveDown, cTone);
+    setGroupAccent (labOctaveUp, cTone);
+    setGroupAccent (labHold, cTone);
+    setGroupAccent (labPanic, cPanic);
+    setGroupAccent (labVelocity, cTone);
+    setGroupAccent (labKeyWidth, cTone);
     setGroupAccent (lfo1Sync, cMod);
     setGroupAccent (lfo2Sync, cMod);
+    setGroupAccent (labKeyboard, cTone);
 
     setGroupAccent (foldPanel, cDestroy);
     setGroupAccent (clipPanel, cDestroy);
@@ -2416,6 +2488,9 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                      &lfo1Rate.getSlider(), &lfo1Phase.getSlider(),
                      &lfo2Rate.getSlider(), &lfo2Phase.getSlider() })
         setSliderAccent (*s, cMod);
+
+    for (auto* s : { &labVelocity.getSlider(), &labKeyWidth.getSlider() })
+        setSliderAccent (*s, cTone);
 
     for (int i = 0; i < params::mod::numSlots; ++i)
         setSliderAccent (modSlotDepth[(size_t) i], cMod);
@@ -2469,7 +2544,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                      &ampAttack.getSlider(), &ampDecay.getSlider(), &ampSustain.getSlider(), &ampRelease.getSlider(),
                      &macro1.getSlider(), &macro2.getSlider(),
                      &lfo1Rate.getSlider(), &lfo1Phase.getSlider(),
-                     &lfo2Rate.getSlider(), &lfo2Phase.getSlider() })
+                     &lfo2Rate.getSlider(), &lfo2Phase.getSlider(),
+                     &labVelocity.getSlider(), &labKeyWidth.getSlider() })
         refreshSliderText (*s);
     for (int i = 0; i < params::mod::numSlots; ++i)
         refreshSliderText (modSlotDepth[(size_t) i]);
@@ -2491,6 +2567,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 IndustrialEnergySynthAudioProcessorEditor::~IndustrialEnergySynthAudioProcessorEditor()
 {
     stopTimer();
+    labKeyboardState.removeListener (this);
+    sendLabKeyboardAllNotesOff();
     setLookAndFeel (nullptr);
 }
 
@@ -2670,12 +2748,12 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         return { x, row.getY(), colW, row.getHeight() };
     };
 
-    // Synth page:
-    // wide (3 cols): row1 mono/osc1/osc2, row2 osc3/destroy/shaper, row3 fenv/amp/filter, row4 tone (full-width).
-    // narrow (2 cols): row1 mono/osc1, row2 osc2/osc3, row3 destroy/shaper, row4 filter/fenv, row5 amp/tone.
-    const int rows = showSynth ? ((cols == 3) ? 4 : 5) : 1;
-    const float weights3[] { 0.96f, 1.20f, 0.96f, 0.88f };
-    const float weights2[] { 1.00f, 1.00f, 1.20f, 0.96f, 0.92f };
+    // Synth page is now compact (Destroy/Tone/Env/Shaper moved to Lab page).
+    // wide (3 cols): row1 mono/osc1/osc2, row2 osc3/filter.
+    // narrow (2 cols): row1 mono/osc1, row2 osc2/osc3, row3 filter (full-width).
+    const int rows = showSynth ? ((cols == 3) ? 2 : 3) : 1;
+    const float weights3[] { 1.0f, 1.0f };
+    const float weights2[] { 1.0f, 1.0f, 0.95f };
 
     const auto totalGapH = gap * (rows - 1);
     const auto availH = juce::jmax (1, r.getHeight() - totalGapH);
@@ -2715,14 +2793,7 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         osc2Group.setBounds (splitRow (row1, 2));
 
         osc3Group.setBounds (splitRow (row2, 0));
-        destroyGroup.setBounds (splitRow (row2, 1));
-        shaperGroup.setBounds (splitRow (row2, 2));
-
-        filterEnvGroup.setBounds (splitRow (row3, 0));
-        ampGroup.setBounds (splitRow (row3, 1));
-        filterGroup.setBounds (splitRow (row3, 2));
-
-        toneGroup.setBounds (row4);
+        filterGroup.setBounds (splitRow (row2, 1));
     }
     else if (showSynth)
     {
@@ -2732,14 +2803,7 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         osc2Group.setBounds (splitRow (row2, 0));
         osc3Group.setBounds (splitRow (row2, 1));
 
-        destroyGroup.setBounds (splitRow (row3, 0));
-        shaperGroup.setBounds (splitRow (row3, 1));
-
-        filterGroup.setBounds (splitRow (row4, 0));
-        filterEnvGroup.setBounds (splitRow (row4, 1));
-
-        ampGroup.setBounds (splitRow (row5, 0));
-        toneGroup.setBounds (splitRow (row5, 1));
+        filterGroup.setBounds (row3);
     }
     else if (showMod)
     {
@@ -3094,22 +3158,60 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     {
         auto gr = labGroup.getBounds().reduced (8, 22);
         const int panelGap = 7;
-        auto topHalf = gr.removeFromTop (gr.getHeight() / 2 - panelGap / 2);
+        const int kbH = juce::jlimit (62, 96, gr.getHeight() / 5);
+        auto keyboardArea = gr.removeFromBottom (kbH);
+        gr.removeFromBottom (3);
+        auto keyboardCtrl = gr.removeFromBottom (42);
+        gr.removeFromBottom (2);
+        auto keyboardInfo = gr.removeFromBottom (18);
+        gr.removeFromBottom (panelGap);
+
+        labKeyboard.setBounds (keyboardArea);
+
+        {
+            auto info = keyboardInfo;
+            const int rangeW = juce::jmin (220, juce::jmax (120, info.getWidth() / 3));
+            labKeyboardRangeLabel.setBounds (info.removeFromRight (rangeW));
+            info.removeFromRight (6);
+            labKeyboardInfoLabel.setBounds (info);
+        }
+
+        {
+            auto row = keyboardCtrl;
+            const int btnW = 62;
+            labOctaveDown.setBounds (row.removeFromLeft (btnW).reduced (2, 6));
+            labOctaveUp.setBounds (row.removeFromLeft (btnW).reduced (2, 6));
+            labHold.setBounds (row.removeFromLeft (76).reduced (2, 6));
+            labPanic.setBounds (row.removeFromLeft (70).reduced (2, 6));
+            row.removeFromLeft (6);
+
+            const int half = juce::jmax (110, row.getWidth() / 2 - 3);
+            labVelocity.setBounds (row.removeFromLeft (half));
+            row.removeFromLeft (6);
+            labKeyWidth.setBounds (row);
+        }
+
+        labKeyboard.setKeyWidth ((float) labKeyWidth.getSlider().getValue());
+
+        const int trioH = juce::jlimit (120, 210, gr.getHeight() / 3);
+        auto trioRow = gr.removeFromBottom (trioH);
+        gr.removeFromBottom (panelGap);
+
+        const int destroyH = juce::jlimit (130, 230, gr.getHeight() / 3);
+        destroyGroup.setBounds (gr.removeFromTop (destroyH));
         gr.removeFromTop (panelGap);
-        auto botHalf = gr;
 
-        auto leftTop = topHalf.removeFromLeft (topHalf.getWidth() / 2 - panelGap / 2);
-        topHalf.removeFromLeft (panelGap);
-        auto rightTop = topHalf;
+        toneGroup.setBounds (gr);
 
-        labIntentPanel.setBounds (leftTop);
-        labSafetyPanel.setBounds (rightTop);
-        labRoutingPanel.setBounds (botHalf);
+        auto shaperArea = trioRow.removeFromLeft (trioRow.getWidth() / 3);
+        trioRow.removeFromLeft (panelGap);
+        auto filterEnvArea = trioRow.removeFromLeft (trioRow.getWidth() / 2);
+        trioRow.removeFromLeft (panelGap);
+        auto ampArea = trioRow;
 
-        auto in = [] (juce::GroupComponent& gcomp) { return gcomp.getBounds().reduced (8, 22); };
-        labIntentBody.setBounds (in (labIntentPanel));
-        labSafetyBody.setBounds (in (labSafetyPanel));
-        labRoutingBody.setBounds (in (labRoutingPanel));
+        shaperGroup.setBounds (shaperArea);
+        filterEnvGroup.setBounds (filterEnvArea);
+        ampGroup.setBounds (ampArea);
     }
 
     // Filter internal
@@ -3198,6 +3300,9 @@ void IndustrialEnergySynthAudioProcessorEditor::setUiPage (int newPageIndex)
     setTabVisual (pageModButton, uiPage == pageMod);
     setTabVisual (pageLabButton, uiPage == pageLab);
 
+    if (uiPage == pageLab)
+        labKeyboard.grabKeyboardFocus();
+
     resized();
     repaint();
 }
@@ -3268,36 +3373,36 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     osc3Phase.setVisible (showSynth);
     osc3Detune.setVisible (showSynth);
 
-    destroyGroup.setVisible (showSynth);
-    destroyOversample.setVisible (showSynth);
-    foldPanel.setVisible (showSynth);
-    clipPanel.setVisible (showSynth);
-    modPanel.setVisible (showSynth);
-    crushPanel.setVisible (showSynth);
-    foldDrive.setVisible (showSynth);
-    foldAmount.setVisible (showSynth);
-    foldMix.setVisible (showSynth);
-    clipDrive.setVisible (showSynth);
-    clipAmount.setVisible (showSynth);
-    clipMix.setVisible (showSynth);
-    modMode.setVisible (showSynth);
-    modAmount.setVisible (showSynth);
-    modMix.setVisible (showSynth);
-    modNoteSync.setVisible (showSynth);
-    modFreq.setVisible (showSynth);
-    crushBits.setVisible (showSynth);
-    crushDownsample.setVisible (showSynth);
-    crushMix.setVisible (showSynth);
-    destroyPitchLockEnable.setVisible (showSynth);
-    destroyPitchLockMode.setVisible (showSynth);
-    destroyPitchLockAmount.setVisible (showSynth);
+    destroyGroup.setVisible (showLab);
+    destroyOversample.setVisible (showLab);
+    foldPanel.setVisible (showLab);
+    clipPanel.setVisible (showLab);
+    modPanel.setVisible (showLab);
+    crushPanel.setVisible (showLab);
+    foldDrive.setVisible (showLab);
+    foldAmount.setVisible (showLab);
+    foldMix.setVisible (showLab);
+    clipDrive.setVisible (showLab);
+    clipAmount.setVisible (showLab);
+    clipMix.setVisible (showLab);
+    modMode.setVisible (showLab);
+    modAmount.setVisible (showLab);
+    modMix.setVisible (showLab);
+    modNoteSync.setVisible (showLab);
+    modFreq.setVisible (showLab);
+    crushBits.setVisible (showLab);
+    crushDownsample.setVisible (showLab);
+    crushMix.setVisible (showLab);
+    destroyPitchLockEnable.setVisible (showLab);
+    destroyPitchLockMode.setVisible (showLab);
+    destroyPitchLockAmount.setVisible (showLab);
 
-    shaperGroup.setVisible (showSynth);
-    shaperEnable.setVisible (showSynth);
-    shaperPlacement.setVisible (showSynth);
-    shaperDrive.setVisible (showSynth);
-    shaperMix.setVisible (showSynth);
-    shaperEditor.setVisible (showSynth);
+    shaperGroup.setVisible (showLab);
+    shaperEnable.setVisible (showLab);
+    shaperPlacement.setVisible (showLab);
+    shaperDrive.setVisible (showLab);
+    shaperMix.setVisible (showLab);
+    shaperEditor.setVisible (showLab);
 
     filterGroup.setVisible (showSynth);
     filterType.setVisible (showSynth);
@@ -3306,26 +3411,26 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     filterKeyTrack.setVisible (showSynth);
     filterEnvAmount.setVisible (showSynth);
 
-    filterEnvGroup.setVisible (showSynth);
-    filterEnvPreview.setVisible (showSynth);
-    filterAttack.setVisible (showSynth);
-    filterDecay.setVisible (showSynth);
-    filterSustain.setVisible (showSynth);
-    filterRelease.setVisible (showSynth);
+    filterEnvGroup.setVisible (showLab);
+    filterEnvPreview.setVisible (showLab);
+    filterAttack.setVisible (showLab);
+    filterDecay.setVisible (showLab);
+    filterSustain.setVisible (showLab);
+    filterRelease.setVisible (showLab);
 
-    ampGroup.setVisible (showSynth);
-    ampEnvPreview.setVisible (showSynth);
-    ampAttack.setVisible (showSynth);
-    ampDecay.setVisible (showSynth);
-    ampSustain.setVisible (showSynth);
-    ampRelease.setVisible (showSynth);
+    ampGroup.setVisible (showLab);
+    ampEnvPreview.setVisible (showLab);
+    ampAttack.setVisible (showLab);
+    ampDecay.setVisible (showLab);
+    ampSustain.setVisible (showLab);
+    ampRelease.setVisible (showLab);
 
-    toneGroup.setVisible (showSynth);
-    toneEnable.setVisible (showSynth);
-    spectrumSource.setVisible (showSynth);
-    spectrumAveraging.setVisible (showSynth);
-    spectrumFreeze.setVisible (showSynth);
-    spectrumEditor.setVisible (showSynth);
+    toneGroup.setVisible (showLab);
+    toneEnable.setVisible (showLab);
+    spectrumSource.setVisible (showLab);
+    spectrumAveraging.setVisible (showLab);
+    spectrumFreeze.setVisible (showLab);
+    spectrumEditor.setVisible (showLab);
 
     outGain.setVisible (showSynth);
 
@@ -3373,12 +3478,15 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     }
 
     labGroup.setVisible (showLab);
-    labIntentPanel.setVisible (showLab);
-    labIntentBody.setVisible (showLab);
-    labRoutingPanel.setVisible (showLab);
-    labRoutingBody.setVisible (showLab);
-    labSafetyPanel.setVisible (showLab);
-    labSafetyBody.setVisible (showLab);
+    labOctaveDown.setVisible (showLab);
+    labOctaveUp.setVisible (showLab);
+    labHold.setVisible (showLab);
+    labPanic.setVisible (showLab);
+    labVelocity.setVisible (showLab);
+    labKeyWidth.setVisible (showLab);
+    labKeyboardRangeLabel.setVisible (showLab);
+    labKeyboardInfoLabel.setVisible (showLab);
+    labKeyboard.setVisible (showLab);
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::loadMacroNamesFromState()
@@ -3645,10 +3753,22 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
                               juce::dontSendNotification);
     modQuickPanel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Быстрый Coach") : juce::String ("Quick Coach"));
 
-    labGroup.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Лаб") : juce::String ("Lab"));
-    labIntentPanel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Intent Coach") : juce::String ("Intent Coach"));
-    labRoutingPanel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Монитор маршрутов") : juce::String ("Routing Monitor"));
-    labSafetyPanel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Снимок безопасности") : juce::String ("Safety Snapshot"));
+    labGroup.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Лаб: Destroy / Tone / Env") : juce::String ("Lab: Destroy / Tone / Env"));
+    labOctaveDown.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Окт -") : juce::String ("Oct -"));
+    labOctaveUp.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Окт +") : juce::String ("Oct +"));
+    labHold.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Удерж.") : juce::String ("Hold"));
+    labPanic.setButtonText (ies::ui::tr (ies::ui::Key::panic, langIdx));
+    labVelocity.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Velocity") : juce::String ("Velocity"));
+    labKeyWidth.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Ширина клавиш") : juce::String ("Key Width"));
+    labOctaveDown.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Октава вниз") : juce::String ("Octave down"));
+    labOctaveUp.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Октава вверх") : juce::String ("Octave up"));
+    labHold.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Удержание клавиш") : juce::String ("Keyboard hold"));
+    labPanic.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Стоп клавиатуры") : juce::String ("Keyboard panic"));
+    labVelocity.getSlider().setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Velocity клавиатуры") : juce::String ("Keyboard velocity"));
+    labKeyWidth.getSlider().setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Ширина клавиш") : juce::String ("Keyboard key width"));
+    labKeyboard.setName ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Клавиатура") : juce::String ("Keyboard"));
+    updateLabKeyboardRange();
+    updateLabKeyboardInfo();
     modHeaderSlot.setText (ies::ui::tr (ies::ui::Key::modSlot, langIdx), juce::dontSendNotification);
     modHeaderSrc.setText (ies::ui::tr (ies::ui::Key::modSrc, langIdx), juce::dontSendNotification);
     modHeaderDst.setText (ies::ui::tr (ies::ui::Key::modDst, langIdx), juce::dontSendNotification);
@@ -3747,12 +3867,12 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
                                          u8"Intent Layer: фокус Bass/Lead/Drone. Подсвечивает релевантные контролы и даёт быстрые подсказки."));
     intentMode.getLabel().setTooltip (intentMode.getCombo().getTooltip());
 
-    pageSynthButton.setTooltip (T ("Show Synth page (oscillators, destroy, filters, envelopes, tone, output).",
-                                   u8"Показать страницу синта (осцилляторы, destroy, фильтры, огибающие, тон, выход)."));
+    pageSynthButton.setTooltip (T ("Show Synth page (oscillators and filter core).",
+                                   u8"Показать страницу синта (осцилляторы и базовый фильтр)."));
     pageModButton.setTooltip (T ("Show Mod page (Macros, LFOs, Mod Matrix, drag-and-drop modulation).",
                                  u8"Показать страницу модуляции (макросы, LFO, матрица, drag-and-drop модуляция)."));
-    pageLabButton.setTooltip (T ("Show Lab page (intent coach, routing monitor, safety snapshot).",
-                                 u8"Показать страницу Lab (intent coach, монитор маршрутов, снимок безопасности)."));
+    pageLabButton.setTooltip (T ("Show Lab page (Destroy, big Tone EQ, Shaper + Envelopes, keyboard).",
+                                 u8"Показать страницу Lab (Destroy, большой Tone EQ, Shaper + огибающие, клавиатура)."));
     lastTouchedLabel.setTooltip (T ("Last touched modulation destination knob.",
                                     u8"Последняя тронутая ручка-цель для модуляции."));
     quickAssignMacro1.setTooltip (T ("Assign Macro 1 to the last touched destination.",
@@ -3765,6 +3885,27 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
                                    u8"Назначить LFO 2 на последнюю тронутую цель."));
     quickAssignClear.setTooltip (T ("Clear all modulation assignments from the last touched destination.",
                                     u8"Удалить все назначения модуляции с последней тронутой цели."));
+
+    labOctaveDown.setTooltip (T ("Shift keyboard range one octave down.",
+                                 u8"Сдвинуть диапазон клавиатуры на октаву вниз."));
+    labOctaveUp.setTooltip (T ("Shift keyboard range one octave up.",
+                               u8"Сдвинуть диапазон клавиатуры на октаву вверх."));
+    labHold.setTooltip (T ("Latch mode: clicked notes stay on until clicked again or Panic.",
+                           u8"Режим удержания: нажатые ноты остаются включенными до повторного нажатия или Stop."));
+    labPanic.setTooltip (T ("Force all notes off for the Lab keyboard.",
+                            u8"Принудительно выключить все ноты клавиатуры Lab."));
+    {
+        const auto tip = T ("Fixed velocity for notes played on the Lab keyboard.",
+                            u8"Фиксированная velocity для нот с клавиатуры Lab.");
+        labVelocity.getSlider().setTooltip (tip);
+        labVelocity.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Visual key width (zoom) for the Lab keyboard.",
+                            u8"Визуальная ширина клавиш (масштаб) для клавиатуры Lab.");
+        labKeyWidth.getSlider().setTooltip (tip);
+        labKeyWidth.getLabel().setTooltip (tip);
+    }
 
     glideEnable.setTooltip (T ("Enable portamento (glide) between notes.", u8"Включить портаменто (глайд) между нотами."));
     {
@@ -3987,6 +4128,132 @@ void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
         quickAssignLfo2.setEnabled (hasTarget);
     if (quickAssignClear.isEnabled() != hasTarget)
         quickAssignClear.setEnabled (hasTarget);
+
+    labOctaveDown.setEnabled (labBaseOctave > 0);
+    labOctaveUp.setEnabled (labBaseOctave < 7);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::sendLabKeyboardAllNotesOff()
+{
+    audioProcessor.enqueueUiAllNotesOff();
+    labActiveNotes.fill (false);
+
+    for (int ch = 1; ch <= 16; ++ch)
+        labKeyboardState.allNotesOff (ch);
+
+    updateLabKeyboardInfo();
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::setLabKeyboardBaseOctave (int octave)
+{
+    const auto clamped = juce::jlimit (0, 7, octave);
+    if (labBaseOctave == clamped)
+        return;
+
+    labBaseOctave = clamped;
+    updateLabKeyboardRange();
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::updateLabKeyboardRange()
+{
+    // Keep a fixed 4-octave window and slide it by base octave.
+    constexpr int spanSemitones = 48;
+    const auto start = juce::jlimit (0, 127 - spanSemitones, labBaseOctave * 12);
+    const auto end = juce::jlimit (0, 127, start + spanSemitones);
+
+    labKeyboard.setAvailableRange (start, end);
+    labKeyboard.setKeyPressBaseOctave (labBaseOctave);
+
+    const auto isRu = isRussian();
+    const auto txt = isRu
+        ? (juce::String::fromUTF8 (u8"Диапазон: ") + midiNoteName (start) + " .. " + midiNoteName (end))
+        : (juce::String ("Range: ") + midiNoteName (start) + " .. " + midiNoteName (end));
+    labKeyboardRangeLabel.setText (txt, juce::dontSendNotification);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::updateLabKeyboardInfo()
+{
+    int activeCount = 0;
+    int topNote = -1;
+    for (int n = 0; n < (int) labActiveNotes.size(); ++n)
+    {
+        if (! labActiveNotes[(size_t) n])
+            continue;
+
+        ++activeCount;
+        topNote = n;
+    }
+
+    const auto vel = (int) std::lround (labVelocity.getSlider().getValue());
+    const auto isRu = isRussian();
+
+    juce::String txt;
+    if (activeCount <= 0)
+    {
+        txt = isRu
+            ? (juce::String::fromUTF8 (u8"Готово. Vel ") + juce::String (vel)
+               + (labHold.getToggleState() ? juce::String::fromUTF8 (u8" | Hold: ВКЛ") : juce::String::fromUTF8 (u8" | Hold: ВЫКЛ")))
+            : (juce::String ("Ready. Vel ") + juce::String (vel)
+               + (labHold.getToggleState() ? " | Hold: ON" : " | Hold: OFF"));
+    }
+    else
+    {
+        txt = isRu
+            ? (juce::String::fromUTF8 (u8"Активно: ") + juce::String (activeCount)
+               + juce::String::fromUTF8 (u8" | Верхняя нота: ") + midiNoteName (topNote))
+            : (juce::String ("Active: ") + juce::String (activeCount)
+               + " | Top note: " + midiNoteName (topNote));
+    }
+
+    labKeyboardInfoLabel.setText (txt, juce::dontSendNotification);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::handleNoteOn (juce::MidiKeyboardState* source,
+                                                              int midiChannel,
+                                                              int midiNoteNumber,
+                                                              float velocity)
+{
+    juce::ignoreUnused (source, midiChannel, velocity);
+
+    const auto note = juce::jlimit (0, 127, midiNoteNumber);
+    const auto fixedVelocity = juce::jlimit (1, 127, (int) std::lround (labVelocity.getSlider().getValue()));
+
+    if (labHold.getToggleState())
+    {
+        if (labActiveNotes[(size_t) note])
+        {
+            audioProcessor.enqueueUiNoteOff (note);
+            labActiveNotes[(size_t) note] = false;
+        }
+        else
+        {
+            audioProcessor.enqueueUiNoteOn (note, fixedVelocity);
+            labActiveNotes[(size_t) note] = true;
+        }
+    }
+    else
+    {
+        audioProcessor.enqueueUiNoteOn (note, fixedVelocity);
+        labActiveNotes[(size_t) note] = true;
+    }
+
+    updateLabKeyboardInfo();
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::handleNoteOff (juce::MidiKeyboardState* source,
+                                                               int midiChannel,
+                                                               int midiNoteNumber,
+                                                               float velocity)
+{
+    juce::ignoreUnused (source, midiChannel, velocity);
+
+    const auto note = juce::jlimit (0, 127, midiNoteNumber);
+    if (labHold.getToggleState())
+        return;
+
+    audioProcessor.enqueueUiNoteOff (note);
+    labActiveNotes[(size_t) note] = false;
+    updateLabKeyboardInfo();
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
@@ -4236,7 +4503,7 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
         setActivity (lfo2Panel, l2Act);
     }
 
-    // Mod / Lab text feeds: keep dense pages informative.
+    // Mod page text feeds.
     {
         const auto isRuLang = isRussian();
         juce::String routes;
@@ -4259,7 +4526,6 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
             routes = isRuLang ? juce::String::fromUTF8 (u8"Пока нет активных маршрутов.\nВыберите Src, Dst и увеличьте Depth.")
                               : juce::String ("No active routes yet.\nPick Src, Dst, then raise Depth.");
         modInsightsBody.setText (routes, juce::dontSendNotification);
-        labRoutingBody.setText (routes, juce::dontSendNotification);
 
         juce::String coach;
         switch (currentIntent)
@@ -4282,16 +4548,6 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
         }
         coach << (isRuLang ? juce::String ("\n\nАктивных маршрутов: ") : juce::String ("\n\nActive routes: ")) << juce::String (activeCount);
         modQuickBody.setText (coach, juce::dontSendNotification);
-        labIntentBody.setText (coach, juce::dontSendNotification);
-
-        juce::String safetyText;
-        safetyText << (isRuLang ? juce::String::fromUTF8 (u8"PRE: ") : juce::String ("PRE: "))
-                   << preClipIndicator.getText() << "\n"
-                   << (isRuLang ? juce::String::fromUTF8 (u8"OUT: ") : juce::String ("OUT: "))
-                   << outClipIndicator.getText() << "\n"
-                   << (isRuLang ? juce::String::fromUTF8 (u8"Бюджет: ") : juce::String ("Budget: "))
-                   << safetyBudgetLabel.getText();
-        labSafetyBody.setText (safetyText, juce::dontSendNotification);
     }
 
     // Intent Layer v1: goal-oriented UI guidance (Bass / Lead / Drone).

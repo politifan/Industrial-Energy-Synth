@@ -19,7 +19,8 @@ class IndustrialEnergySynthAudioProcessor;
 
 class IndustrialEnergySynthAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                                         public juce::DragAndDropContainer,
-                                                        private juce::Timer
+                                                        private juce::Timer,
+                                                        private juce::MidiKeyboardStateListener
 {
 public:
     explicit IndustrialEnergySynthAudioProcessorEditor (IndustrialEnergySynthAudioProcessor&);
@@ -58,6 +59,8 @@ private:
     void applyUiPageVisibility();
 
     void timerCallback() override;
+    void handleNoteOn (juce::MidiKeyboardState* source, int midiChannel, int midiNoteNumber, float velocity) override;
+    void handleNoteOff (juce::MidiKeyboardState* source, int midiChannel, int midiNoteNumber, float velocity) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
     void mouseEnter (const juce::MouseEvent&) override;
     void mouseExit (const juce::MouseEvent&) override;
@@ -67,6 +70,10 @@ private:
     void storeMacroNameToState (int macroIndex, const juce::String& name);
     void refreshMacroNames();
     void promptMacroRename (int macroIndex);
+    void sendLabKeyboardAllNotesOff();
+    void setLabKeyboardBaseOctave (int octave);
+    void updateLabKeyboardRange();
+    void updateLabKeyboardInfo();
 
     // Top bar
     juce::TextButton initButton;
@@ -344,12 +351,18 @@ private:
 
     // Lab page (third page): consolidated diagnostics/workflow.
     juce::GroupComponent labGroup;
-    juce::GroupComponent labIntentPanel;
-    juce::TextEditor labIntentBody;
-    juce::GroupComponent labRoutingPanel;
-    juce::TextEditor labRoutingBody;
-    juce::GroupComponent labSafetyPanel;
-    juce::TextEditor labSafetyBody;
+    juce::TextButton labOctaveDown;
+    juce::TextButton labOctaveUp;
+    juce::ToggleButton labHold;
+    juce::TextButton labPanic;
+    ies::ui::KnobWithLabel labVelocity;
+    ies::ui::KnobWithLabel labKeyWidth;
+    juce::Label labKeyboardRangeLabel;
+    juce::Label labKeyboardInfoLabel;
+    juce::MidiKeyboardState labKeyboardState;
+    juce::MidiKeyboardComponent labKeyboard { labKeyboardState, juce::MidiKeyboardComponent::horizontalKeyboard };
+    int labBaseOctave = 2;
+    std::array<bool, 128> labActiveNotes {};
 
     juce::ComponentBoundsConstrainer boundsConstrainer;
     juce::ResizableBorderComponent resizeBorder { this, &boundsConstrainer };

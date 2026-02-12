@@ -214,6 +214,56 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
 
 IndustrialEnergySynthAudioProcessor::~IndustrialEnergySynthAudioProcessor() = default;
 
+void IndustrialEnergySynthAudioProcessor::pushUiMidiEvent (juce::uint8 status, juce::uint8 data1, juce::uint8 data2) noexcept
+{
+    auto write = uiMidiWriteIndex.load (std::memory_order_relaxed);
+    const auto next = write + 1;
+
+    // Bounded lock-free queue: if full, drop the newest event.
+    // Single-producer (UI) / single-consumer (audio thread), so we never write readIndex here.
+    const auto read = uiMidiReadIndex.load (std::memory_order_acquire);
+    if (next - read > uiMidiQueueSize)
+        return;
+
+    uiMidiQueue[write % uiMidiQueueSize] = UiMidiEvent { status, data1, data2 };
+    uiMidiWriteIndex.store (next, std::memory_order_release);
+}
+
+void IndustrialEnergySynthAudioProcessor::drainUiMidiToBuffer (juce::MidiBuffer& midiBuffer) noexcept
+{
+    auto read = uiMidiReadIndex.load (std::memory_order_relaxed);
+    const auto write = uiMidiWriteIndex.load (std::memory_order_acquire);
+
+    while (read < write)
+    {
+        const auto& e = uiMidiQueue[read % uiMidiQueueSize];
+        midiBuffer.addEvent (juce::MidiMessage (e.status, e.data1, e.data2), 0);
+        ++read;
+    }
+
+    uiMidiReadIndex.store (read, std::memory_order_release);
+}
+
+void IndustrialEnergySynthAudioProcessor::enqueueUiNoteOn (int midiNoteNumber, int velocity) noexcept
+{
+    const auto note = (juce::uint8) juce::jlimit (0, 127, midiNoteNumber);
+    const auto vel = (juce::uint8) juce::jlimit (1, 127, velocity);
+    pushUiMidiEvent ((juce::uint8) 0x90, note, vel);
+}
+
+void IndustrialEnergySynthAudioProcessor::enqueueUiNoteOff (int midiNoteNumber) noexcept
+{
+    const auto note = (juce::uint8) juce::jlimit (0, 127, midiNoteNumber);
+    pushUiMidiEvent ((juce::uint8) 0x80, note, (juce::uint8) 0);
+}
+
+void IndustrialEnergySynthAudioProcessor::enqueueUiAllNotesOff() noexcept
+{
+    // CC123 All Notes Off + CC120 All Sound Off.
+    pushUiMidiEvent ((juce::uint8) 0xB0, (juce::uint8) 123, (juce::uint8) 0);
+    pushUiMidiEvent ((juce::uint8) 0xB0, (juce::uint8) 120, (juce::uint8) 0);
+}
+
 void IndustrialEnergySynthAudioProcessor::applyStateFromUi (juce::ValueTree state, bool keepLanguage)
 {
     if (! state.isValid())
@@ -339,6 +389,8 @@ void IndustrialEnergySynthAudioProcessor::prepareToPlay (double sampleRate, int 
     uiPreClipRisk.store (0.0f, std::memory_order_relaxed);
     uiOutClipRisk.store (0.0f, std::memory_order_relaxed);
     uiCpuRisk.store (0.0f, std::memory_order_relaxed);
+    uiMidiReadIndex.store (0, std::memory_order_relaxed);
+    uiMidiWriteIndex.store (0, std::memory_order_relaxed);
 }
 
 void IndustrialEnergySynthAudioProcessor::releaseResources()
@@ -393,10 +445,14 @@ void IndustrialEnergySynthAudioProcessor::processBlock (juce::AudioBuffer<float>
         engine.allNotesOff();
 
     const auto totalSamples = buffer.getNumSamples();
+    juce::MidiBuffer mergedMidi;
+    mergedMidi.addEvents (midiMessages, 0, totalSamples, 0);
+    drainUiMidiToBuffer (mergedMidi);
+
     const bool capturePre = (totalSamples > 0 && (int) uiPreDestroyScratch.size() >= totalSamples);
     int cursor = 0;
 
-    for (const auto metadata : midiMessages)
+    for (const auto metadata : mergedMidi)
     {
         const auto samplePos = juce::jlimit (0, totalSamples, metadata.samplePosition);
 
