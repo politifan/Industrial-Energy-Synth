@@ -128,6 +128,28 @@ inline constexpr const char* syncDiv = "lfo2.syncDiv";
 inline constexpr const char* phase   = "lfo2.phase";
 }
 
+namespace arp
+{
+inline constexpr const char* enable   = "arp.enable";   // bool
+inline constexpr const char* latch    = "arp.latch";    // bool
+inline constexpr const char* mode     = "arp.mode";     // choice
+inline constexpr const char* sync     = "arp.sync";     // bool (tempo sync)
+inline constexpr const char* rateHz   = "arp.rateHz";   // float Hz (when sync=Off)
+inline constexpr const char* syncDiv  = "arp.syncDiv";  // choice (when sync=On)
+inline constexpr const char* gate     = "arp.gate";     // 0..1 (step gate length)
+inline constexpr const char* octaves  = "arp.octaves";  // int 1..4
+inline constexpr const char* swing    = "arp.swing";    // 0..1
+
+enum Mode
+{
+    up = 0,
+    down = 1,
+    upDown = 2,
+    random = 3,
+    asPlayed = 4
+};
+}
+
 namespace amp
 {
 inline constexpr const char* attackMs  = "amp.attackMs";
@@ -390,6 +412,11 @@ inline constexpr const char* labChordEnable  = "ui.labChordEnable";  // bool
 
 // Non-parameter state keys (stored as ValueTree properties inside APVTS state).
 inline constexpr const char* labChordIntervals = "ui.labChordIntervals"; // string like "0,4,7"
+inline constexpr const char* editorW = "ui.editorW"; // int (main window width)
+inline constexpr const char* editorH = "ui.editorH"; // int (main window height)
+inline constexpr const char* osc1DrawWave = "ui.osc1DrawWave"; // base64 int16[128] (-32767..32767)
+inline constexpr const char* osc2DrawWave = "ui.osc2DrawWave";
+inline constexpr const char* osc3DrawWave = "ui.osc3DrawWave";
 
 enum AnalyzerSource
 {

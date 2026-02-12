@@ -49,6 +49,7 @@ target_sources(IndustrialEnergySynth PRIVATE
   Source/dsp/DestroyChain.h
   Source/dsp/Lfo.h
   Source/dsp/PolyBlepOscillator.h
+  Source/dsp/WavetableSet.h
   Source/dsp/SvfFilter.h
   Source/dsp/ToneEQ.h
   Source/dsp/WaveShaper.h

@@ -1,6 +1,11 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+#include <cmath>
+#include <cstdint>
+#include <functional>
+#include <limits>
+
 namespace
 {
 static void migrateStateIfNeeded (juce::ValueTree& state)
@@ -34,6 +39,699 @@ static void migrateStateIfNeeded (juce::ValueTree& state)
 }
 } // namespace
 
+// --- Wavetables (templates + draw) ------------------------------------------
+static juce::String encodeWavePointsBase64 (const float* points, int n)
+{
+    if (points == nullptr || n <= 0)
+        return {};
+
+    juce::MemoryBlock mb;
+    mb.setSize ((size_t) n * sizeof (std::int16_t), true);
+    auto* dst = static_cast<std::int16_t*> (mb.getData());
+
+    for (int i = 0; i < n; ++i)
+    {
+        const float v = juce::jlimit (-1.0f, 1.0f, points[i]);
+        const int iv = (int) std::lround (v * 32767.0f);
+        dst[(size_t) i] = (std::int16_t) juce::jlimit (-32767, 32767, iv);
+    }
+
+    // MemoryBlock provides canonical base64 helpers; avoids API differences across JUCE versions.
+    return mb.toBase64Encoding();
+}
+
+static bool decodeWavePointsBase64 (const juce::String& b64, float* points, int n)
+{
+    if (points == nullptr || n <= 0 || b64.isEmpty())
+        return false;
+
+    juce::MemoryBlock mb;
+    if (! mb.fromBase64Encoding (b64))
+        return false;
+
+    if ((int) mb.getSize() < (int) (n * (int) sizeof (std::int16_t)))
+        return false;
+
+    const auto* src = static_cast<const std::int16_t*> (mb.getData());
+    for (int i = 0; i < n; ++i)
+        points[i] = juce::jlimit (-1.0f, 1.0f, (float) src[(size_t) i] / 32767.0f);
+
+    return true;
+}
+
+static void pointsToWavetable (ies::dsp::WavetableSet& out, const float* points, int numPoints)
+{
+    // points: y values at equidistant x in [0..1]. Ensure periodic by forcing endpoints to match.
+    std::array<float, (size_t) IndustrialEnergySynthAudioProcessor::waveDrawNumPoints> p {};
+    const int n = juce::jmin (IndustrialEnergySynthAudioProcessor::waveDrawNumPoints, juce::jmax (2, numPoints));
+    for (int i = 0; i < n; ++i)
+        p[(size_t) i] = juce::jlimit (-1.0f, 1.0f, points[i]);
+    p[0] = p[(size_t) (n - 1)];
+
+    auto& t0 = out.mip[0];
+    for (int i = 0; i < ies::dsp::WavetableSet::tableSize; ++i)
+    {
+        const float x = (float) i / (float) ies::dsp::WavetableSet::tableSize;
+        const float pos = x * (float) (n - 1);
+        const int i0 = juce::jlimit (0, n - 2, (int) std::floor (pos));
+        const int i1 = i0 + 1;
+        const float frac = pos - (float) i0;
+        const float a = p[(size_t) i0];
+        const float b = p[(size_t) i1];
+        t0[(size_t) i] = a + frac * (b - a);
+    }
+
+    ies::dsp::removeDcAndNormalise (t0.data(), ies::dsp::WavetableSet::tableSize);
+    ies::dsp::buildMipsFromLevel0 (out);
+}
+
+static void fillTemplate (ies::dsp::WavetableSet& out, const std::function<float(float)>& fn)
+{
+    auto& t0 = out.mip[0];
+    for (int i = 0; i < ies::dsp::WavetableSet::tableSize; ++i)
+    {
+        const float ph = (float) i / (float) ies::dsp::WavetableSet::tableSize;
+        t0[(size_t) i] = juce::jlimit (-1.0f, 1.0f, fn (ph));
+    }
+    ies::dsp::removeDcAndNormalise (t0.data(), ies::dsp::WavetableSet::tableSize);
+    ies::dsp::buildMipsFromLevel0 (out);
+}
+
+void IndustrialEnergySynthAudioProcessor::initWavetableTemplates()
+{
+    // 10 templates. Indices 0..9 correspond to wave indices 3..12 in osc wave choice.
+    const auto sine = [] (float ph) { return std::sin (juce::MathConstants<float>::twoPi * ph); };
+    const auto pulse = [] (float duty)
+    {
+        return [duty] (float ph) { return (ph < duty) ? 1.0f : -1.0f; };
+    };
+    const auto doubleSaw = [] (float ph)
+    {
+        const float a = ph * 2.0f - 1.0f;
+        const float b = ((ph + 0.33f) - std::floor (ph + 0.33f)) * 2.0f - 1.0f;
+        return 0.6f * a + 0.4f * b;
+    };
+    const auto folded = [] (float ph)
+    {
+        const float x = 1.6f * std::sin (juce::MathConstants<float>::twoPi * ph);
+        const float y = 2.0f * std::abs (x) - 1.0f;
+        return y;
+    };
+    const auto stairs = [] (float ph)
+    {
+        const float x = std::sin (juce::MathConstants<float>::twoPi * ph);
+        return std::round (x * 6.0f) / 6.0f;
+    };
+    const auto metal = [] (float ph)
+    {
+        float y = 0.0f;
+        y += 0.60f * std::sin (juce::MathConstants<float>::twoPi * ph * 1.0f);
+        y += 0.35f * std::sin (juce::MathConstants<float>::twoPi * ph * 3.0f);
+        y += 0.22f * std::sin (juce::MathConstants<float>::twoPi * ph * 5.0f);
+        y += 0.18f * std::sin (juce::MathConstants<float>::twoPi * ph * 7.0f);
+        y += 0.12f * std::sin (juce::MathConstants<float>::twoPi * ph * 11.0f);
+        return y;
+    };
+    const auto syncish = [] (float ph)
+    {
+        const float x = (ph < 0.72f) ? (ph / 0.72f) : 1.0f;
+        return x * 2.0f - 1.0f;
+    };
+    const auto notchTri = [] (float ph)
+    {
+        const float tri = 1.0f - 4.0f * std::abs (ph - 0.5f); // -1..1
+        const float notch = (ph > 0.45f && ph < 0.55f) ? -1.0f : 0.0f;
+        return 0.85f * tri + 0.15f * notch;
+    };
+    const auto noiseCycle = [] (float ph)
+    {
+        const int i = (int) std::floor (ph * 1024.0f);
+        std::uint32_t x = (std::uint32_t) (0x9e3779b9u ^ (std::uint32_t) i * 0x85ebca6bu);
+        x ^= (x >> 16);
+        x *= 0x7feb352du;
+        x ^= (x >> 15);
+        x *= 0x846ca68bu;
+        x ^= (x >> 16);
+        const float u = (float) (x & 0xffffu) / 65535.0f;
+        return u * 2.0f - 1.0f;
+    };
+
+    fillTemplate (wavetableTemplates[0], sine);
+    fillTemplate (wavetableTemplates[1], pulse (0.25f));
+    fillTemplate (wavetableTemplates[2], pulse (0.12f));
+    fillTemplate (wavetableTemplates[3], doubleSaw);
+    fillTemplate (wavetableTemplates[4], metal);
+    fillTemplate (wavetableTemplates[5], folded);
+    fillTemplate (wavetableTemplates[6], stairs);
+    fillTemplate (wavetableTemplates[7], notchTri);
+    fillTemplate (wavetableTemplates[8], syncish);
+    fillTemplate (wavetableTemplates[9], noiseCycle);
+}
+
+void IndustrialEnergySynthAudioProcessor::storeCustomWavePointsToState (int oscIndex, const float* points, int numPoints)
+{
+    if (oscIndex < 0 || oscIndex >= 3)
+        return;
+
+    const auto n = juce::jlimit (2, waveDrawNumPoints, numPoints);
+    const auto b64 = encodeWavePointsBase64 (points, n);
+    const char* key = (oscIndex == 0) ? params::ui::osc1DrawWave
+                    : (oscIndex == 1) ? params::ui::osc2DrawWave
+                                      : params::ui::osc3DrawWave;
+    apvts.state.setProperty (key, b64, nullptr);
+}
+
+void IndustrialEnergySynthAudioProcessor::loadCustomWavesFromState()
+{
+    for (int o = 0; o < 3; ++o)
+    {
+        const char* key = (o == 0) ? params::ui::osc1DrawWave
+                        : (o == 1) ? params::ui::osc2DrawWave
+                                  : params::ui::osc3DrawWave;
+
+        auto b64 = apvts.state.getProperty (key).toString();
+        bool ok = false;
+        if (b64.isNotEmpty())
+            ok = decodeWavePointsBase64 (b64, customWaves.points[(size_t) o].data(), waveDrawNumPoints);
+
+        if (! ok)
+        {
+            for (int i = 0; i < waveDrawNumPoints; ++i)
+            {
+                const float ph = (float) i / (float) (waveDrawNumPoints - 1);
+                customWaves.points[(size_t) o][(size_t) i] = std::sin (juce::MathConstants<float>::twoPi * ph);
+            }
+            storeCustomWavePointsToState (o, customWaves.points[(size_t) o].data(), waveDrawNumPoints);
+        }
+
+        const int inactive = 1 - customWaves.activeIndex[(size_t) o].load (std::memory_order_relaxed);
+        pointsToWavetable (customWaves.tableDoubleBuffer[(size_t) o][(size_t) inactive],
+                           customWaves.points[(size_t) o].data(),
+                           waveDrawNumPoints);
+        customWaves.activeIndex[(size_t) o].store (inactive, std::memory_order_release);
+        engine.setCustomWavetable (o, &customWaves.tableDoubleBuffer[(size_t) o][(size_t) inactive]);
+    }
+}
+
+const ies::dsp::WavetableSet* IndustrialEnergySynthAudioProcessor::getWavetableForUi (int oscIndex, int waveIndex) const noexcept
+{
+    if (waveIndex >= 3 && waveIndex <= 12)
+        return &wavetableTemplates[(size_t) juce::jlimit (0, waveTableNumTemplates - 1, waveIndex - 3)];
+
+    if (waveIndex == 13)
+    {
+        const int o = juce::jlimit (0, 2, oscIndex);
+        const int idx = customWaves.activeIndex[(size_t) o].load (std::memory_order_acquire);
+        return &customWaves.tableDoubleBuffer[(size_t) o][(size_t) juce::jlimit (0, 1, idx)];
+    }
+
+    return nullptr;
+}
+
+void IndustrialEnergySynthAudioProcessor::setCustomWaveFromUi (int oscIndex, const float* points, int numPoints)
+{
+    if (oscIndex < 0 || oscIndex >= 3 || points == nullptr)
+        return;
+
+    const int n = juce::jlimit (2, waveDrawNumPoints, numPoints);
+    for (int i = 0; i < waveDrawNumPoints; ++i)
+    {
+        const int src = juce::jmin (n - 1, i);
+        customWaves.points[(size_t) oscIndex][(size_t) i] = juce::jlimit (-1.0f, 1.0f, points[src]);
+    }
+
+    storeCustomWavePointsToState (oscIndex, customWaves.points[(size_t) oscIndex].data(), waveDrawNumPoints);
+
+    const int inactive = 1 - customWaves.activeIndex[(size_t) oscIndex].load (std::memory_order_relaxed);
+    pointsToWavetable (customWaves.tableDoubleBuffer[(size_t) oscIndex][(size_t) inactive],
+                       customWaves.points[(size_t) oscIndex].data(),
+                       waveDrawNumPoints);
+
+    customWaves.activeIndex[(size_t) oscIndex].store (inactive, std::memory_order_release);
+    engine.setCustomWavetable (oscIndex, &customWaves.tableDoubleBuffer[(size_t) oscIndex][(size_t) inactive]);
+}
+
+// --- Arp (Sequencer) ---------------------------------------------------------
+void IndustrialEnergySynthAudioProcessor::ArpState::prepare (double sampleRate) noexcept
+{
+    sr = (sampleRate > 1.0) ? sampleRate : 44100.0;
+    allNotesOff();
+    enabled = false;
+    samplesToStep = 0;
+    samplesToOff = -1;
+    noteIsOn = false;
+    currentNote = 60;
+    currentVel = 100;
+    seqIndex = 0;
+    seqDir = 1;
+    swingOdd = false;
+    rng = 0x41525031u;
+}
+
+static float arpSyncDivToBeats (int divIdx) noexcept
+{
+    const auto d = (params::lfo::SyncDiv) juce::jlimit ((int) params::lfo::div1_1, (int) params::lfo::div1_16D, divIdx);
+    switch (d)
+    {
+        case params::lfo::div1_1:   return 4.0f;
+        case params::lfo::div1_2:   return 2.0f;
+        case params::lfo::div1_4:   return 1.0f;
+        case params::lfo::div1_8:   return 0.5f;
+        case params::lfo::div1_16:  return 0.25f;
+        case params::lfo::div1_32:  return 0.125f;
+        case params::lfo::div1_4T:  return 2.0f / 3.0f;
+        case params::lfo::div1_8T:  return 1.0f / 3.0f;
+        case params::lfo::div1_16T: return 1.0f / 6.0f;
+        case params::lfo::div1_4D:  return 1.5f;
+        case params::lfo::div1_8D:  return 0.75f;
+        case params::lfo::div1_16D: return 0.375f;
+    }
+    return 1.0f;
+}
+
+void IndustrialEnergySynthAudioProcessor::ArpState::setParams (bool enableNow,
+                                                              bool latchNow,
+                                                              int modeNow,
+                                                              bool syncNow,
+                                                              float rateHzNow,
+                                                              int syncDivIndexNow,
+                                                              float gateNow,
+                                                              int octavesNow,
+                                                              float swingNow,
+                                                              double hostBpm) noexcept
+{
+    bpm = (hostBpm > 0.1) ? hostBpm : 120.0;
+
+    const auto prevEnabled = enabled;
+    enabled = enableNow;
+
+    const auto prevLatch = latchMode;
+    latchMode = latchNow;
+
+    const auto prevMode = modeIndex;
+    const auto prevOctaves = octaveCount;
+
+    modeIndex = juce::jlimit ((int) params::arp::up, (int) params::arp::asPlayed, modeNow);
+    syncMode = syncNow;
+    rate = juce::jlimit (0.01f, 50.0f, rateHzNow);
+    divIndex = juce::jlimit ((int) params::lfo::div1_1, (int) params::lfo::div1_16D, syncDivIndexNow);
+    gateFrac = juce::jlimit (0.05f, 1.0f, gateNow);
+    octaveCount = juce::jlimit (1, 4, octavesNow);
+    swingAmt = juce::jlimit (0.0f, 0.95f, swingNow);
+
+    // If latch just got disabled, drop any latched notes that are no longer physically held.
+    if (prevLatch && ! latchMode)
+        rebuildOrderFromPhysDown();
+
+    // Recompute base step from host BPM or free rate.
+    if (syncMode)
+    {
+        const auto beatsPerSecond = juce::jmax (0.001, bpm / 60.0);
+        const auto beats = (double) arpSyncDivToBeats (divIndex);
+        baseStepSamples = (int) juce::jlimit (1.0, sr * 10.0, std::round ((sr * beats) / beatsPerSecond));
+    }
+    else
+    {
+        baseStepSamples = (int) juce::jlimit (1.0, sr * 10.0, std::round (sr / (double) rate));
+    }
+
+    // Swing: keep average step length constant (alternating short/long).
+    stepShort = (int) juce::jlimit (1.0, (double) baseStepSamples, std::round ((double) baseStepSamples * (1.0 - (double) swingAmt * 0.5)));
+    stepLong  = (int) juce::jlimit (1.0, sr * 10.0, std::round ((double) baseStepSamples * (1.0 + (double) swingAmt * 0.5)));
+
+    if (prevMode != modeIndex || prevOctaves != octaveCount)
+        seqDirty = true;
+
+    // Disable behaviour: release any currently playing arp note quickly.
+    if (prevEnabled && ! enabled && noteIsOn)
+    {
+        samplesToOff = 0;
+        samplesToStep = std::numeric_limits<int>::max();
+    }
+
+    // Enable behaviour: if we already have notes held, start immediately.
+    if (! prevEnabled && enabled && noteCount > 0)
+    {
+        samplesToStep = 0;
+        swingOdd = false;
+        seqIndex = 0;
+        seqDir = 1;
+        seqDirty = true;
+    }
+}
+
+void IndustrialEnergySynthAudioProcessor::ArpState::noteOn (int midiNote, int velocity0to127) noexcept
+{
+    const auto note = juce::jlimit (0, 127, midiNote);
+    const auto vel = (std::uint8_t) juce::jlimit (1, 127, velocity0to127);
+    velByNote[(size_t) note] = vel;
+
+    const bool wasPhysNone = (physDownCount == 0);
+    if (physDown[(size_t) note] == 0)
+    {
+        physDown[(size_t) note] = 1;
+        ++physDownCount;
+    }
+
+    if (latchMode && wasPhysNone)
+    {
+        noteCount = 0;
+        noteOrder.fill (0);
+    }
+
+    // Remove if exists.
+    int idx = -1;
+    for (int i = 0; i < noteCount; ++i)
+        if (noteOrder[(size_t) i] == note) { idx = i; break; }
+
+    if (idx >= 0)
+    {
+        for (int i = idx; i < noteCount - 1; ++i)
+            noteOrder[(size_t) i] = noteOrder[(size_t) (i + 1)];
+        --noteCount;
+    }
+
+    // Append (drop oldest if full).
+    if (noteCount >= kMaxNotes)
+    {
+        for (int i = 0; i < kMaxNotes - 1; ++i)
+            noteOrder[(size_t) i] = noteOrder[(size_t) (i + 1)];
+        noteCount = kMaxNotes - 1;
+    }
+
+    noteOrder[(size_t) noteCount] = note;
+    ++noteCount;
+    seqDirty = true;
+
+    // Start instantly on first key.
+    if (enabled && noteCount == 1)
+    {
+        samplesToStep = 0;
+        swingOdd = false;
+        seqIndex = 0;
+        seqDir = 1;
+    }
+}
+
+void IndustrialEnergySynthAudioProcessor::ArpState::noteOff (int midiNote) noexcept
+{
+    const auto note = juce::jlimit (0, 127, midiNote);
+
+    if (physDown[(size_t) note] != 0)
+    {
+        physDown[(size_t) note] = 0;
+        physDownCount = juce::jmax (0, physDownCount - 1);
+    }
+
+    if (latchMode)
+        return;
+
+    int idx = -1;
+    for (int i = 0; i < noteCount; ++i)
+        if (noteOrder[(size_t) i] == note) { idx = i; break; }
+
+    if (idx < 0)
+        return;
+
+    for (int i = idx; i < noteCount - 1; ++i)
+        noteOrder[(size_t) i] = noteOrder[(size_t) (i + 1)];
+    --noteCount;
+    seqDirty = true;
+
+    if (enabled && noteCount == 0)
+    {
+        samplesToStep = std::numeric_limits<int>::max();
+        if (noteIsOn)
+            samplesToOff = 0;
+    }
+}
+
+void IndustrialEnergySynthAudioProcessor::ArpState::allNotesOff() noexcept
+{
+    physDown.fill (0);
+    physDownCount = 0;
+
+    noteCount = 0;
+    noteOrder.fill (0);
+    seqCount = 0;
+    seqNotes.fill (0);
+    seqDirty = true;
+
+    samplesToStep = std::numeric_limits<int>::max();
+    if (noteIsOn)
+        samplesToOff = 0;
+}
+
+int IndustrialEnergySynthAudioProcessor::ArpState::samplesUntilNextEvent() const noexcept
+{
+    int best = std::numeric_limits<int>::max();
+
+    if (noteIsOn && samplesToOff >= 0)
+        best = juce::jmin (best, samplesToOff);
+
+    if (enabled && noteCount > 0)
+        best = juce::jmin (best, samplesToStep);
+
+    return best;
+}
+
+void IndustrialEnergySynthAudioProcessor::ArpState::advance (int numSamples) noexcept
+{
+    if (numSamples <= 0)
+        return;
+
+    if (samplesToStep != std::numeric_limits<int>::max())
+        samplesToStep = juce::jmax (0, samplesToStep - numSamples);
+    if (samplesToOff >= 0)
+        samplesToOff = juce::jmax (0, samplesToOff - numSamples);
+}
+
+bool IndustrialEnergySynthAudioProcessor::ArpState::popEvent (Event& e) noexcept
+{
+    // Note off has priority (so gate=100% doesn't stack note-ons).
+    if (noteIsOn && samplesToOff == 0)
+    {
+        e.type = Event::noteOff;
+        e.note = currentNote;
+        e.velocity = 0;
+
+        noteIsOn = false;
+        samplesToOff = -1;
+        return true;
+    }
+
+    if (! enabled || noteCount <= 0 || samplesToStep != 0)
+        return false;
+
+    rebuildSequenceIfDirty();
+    if (seqCount <= 0)
+    {
+        samplesToStep = std::numeric_limits<int>::max();
+        return false;
+    }
+
+    const auto interval = nextIntervalSamples();
+
+    const int idx = chooseNextSeqIndex();
+    const auto note = juce::jlimit (0, 127, seqNotes[(size_t) idx]);
+    const auto vel = velocityForNote (note);
+
+    currentNote = note;
+    currentVel = vel;
+    noteIsOn = true;
+
+    e.type = Event::noteOn;
+    e.note = note;
+    e.velocity = vel;
+
+    const int gateSamples = juce::jlimit (1, interval, (int) std::lround ((double) interval * (double) gateFrac));
+    samplesToOff = gateSamples;
+    samplesToStep = interval;
+
+    return true;
+}
+
+void IndustrialEnergySynthAudioProcessor::ArpState::rebuildOrderFromPhysDown() noexcept
+{
+    noteCount = 0;
+    noteOrder.fill (0);
+
+    for (int n = 0; n < 128; ++n)
+    {
+        if (physDown[(size_t) n] == 0)
+            continue;
+
+        if (noteCount >= kMaxNotes)
+            break;
+
+        noteOrder[(size_t) noteCount] = n;
+        ++noteCount;
+    }
+
+    seqDirty = true;
+
+    if (enabled && noteCount == 0)
+    {
+        samplesToStep = std::numeric_limits<int>::max();
+        if (noteIsOn)
+            samplesToOff = 0;
+    }
+}
+
+void IndustrialEnergySynthAudioProcessor::ArpState::rebuildSequenceIfDirty() noexcept
+{
+    if (! seqDirty)
+        return;
+    rebuildSequence();
+}
+
+void IndustrialEnergySynthAudioProcessor::ArpState::rebuildSequence() noexcept
+{
+    seqCount = 0;
+
+    if (noteCount <= 0)
+    {
+        seqDirty = false;
+        return;
+    }
+
+    std::array<int, (size_t) kMaxNotes> base {};
+    int baseCount = juce::jlimit (0, kMaxNotes, noteCount);
+    for (int i = 0; i < baseCount; ++i)
+        base[(size_t) i] = noteOrder[(size_t) i];
+
+    const bool useAsPlayed = (modeIndex == (int) params::arp::asPlayed);
+    if (! useAsPlayed)
+    {
+        // Insertion sort (small N).
+        for (int i = 1; i < baseCount; ++i)
+        {
+            const auto key = base[(size_t) i];
+            int j = i - 1;
+            while (j >= 0 && base[(size_t) j] > key)
+            {
+                base[(size_t) (j + 1)] = base[(size_t) j];
+                --j;
+            }
+            base[(size_t) (j + 1)] = key;
+        }
+    }
+
+    for (int o = 0; o < octaveCount; ++o)
+    {
+        const int offset = o * 12;
+        for (int i = 0; i < baseCount; ++i)
+        {
+            const int n = base[(size_t) i] + offset;
+            if (n < 0 || n > 127)
+                continue;
+            if (seqCount >= kMaxSeqNotes)
+                break;
+            seqNotes[(size_t) seqCount] = n;
+            ++seqCount;
+        }
+        if (seqCount >= kMaxSeqNotes)
+            break;
+    }
+
+    // Reset traversal to avoid OOB if the chord changes.
+    seqIndex = 0;
+    seqDir = 1;
+    seqDirty = false;
+}
+
+int IndustrialEnergySynthAudioProcessor::ArpState::nextIntervalSamples() noexcept
+{
+    const int interval = swingOdd ? stepLong : stepShort;
+    swingOdd = ! swingOdd;
+    return juce::jmax (1, interval);
+}
+
+int IndustrialEnergySynthAudioProcessor::ArpState::chooseNextSeqIndex() noexcept
+{
+    const int n = seqCount;
+    if (n <= 1)
+        return 0;
+
+    auto xorshift32 = [&]() noexcept -> std::uint32_t
+    {
+        rng ^= (rng << 13);
+        rng ^= (rng >> 17);
+        rng ^= (rng << 5);
+        return rng;
+    };
+
+    switch ((params::arp::Mode) modeIndex)
+    {
+        case params::arp::random:
+            return (int) (xorshift32() % (std::uint32_t) n);
+
+        case params::arp::down:
+        {
+            if (seqIndex < 0 || seqIndex >= n)
+                seqIndex = n - 1;
+            const int out = seqIndex;
+            --seqIndex;
+            if (seqIndex < 0)
+                seqIndex = n - 1;
+            return out;
+        }
+
+        case params::arp::upDown:
+        {
+            if (seqIndex < 0 || seqIndex >= n)
+                seqIndex = 0;
+            const int out = seqIndex;
+
+            if (seqDir > 0)
+            {
+                if (seqIndex >= n - 1)
+                {
+                    seqDir = -1;
+                    seqIndex = n - 2;
+                }
+                else
+                {
+                    ++seqIndex;
+                }
+            }
+            else
+            {
+                if (seqIndex <= 0)
+                {
+                    seqDir = +1;
+                    seqIndex = 1;
+                }
+                else
+                {
+                    --seqIndex;
+                }
+            }
+            return out;
+        }
+
+        case params::arp::asPlayed:
+        case params::arp::up:
+        default:
+        {
+            if (seqIndex < 0 || seqIndex >= n)
+                seqIndex = 0;
+            const int out = seqIndex;
+            ++seqIndex;
+            if (seqIndex >= n)
+                seqIndex = 0;
+            return out;
+        }
+    }
+}
+
+int IndustrialEnergySynthAudioProcessor::ArpState::velocityForNote (int midiNote) const noexcept
+{
+    const auto n = juce::jlimit (0, 127, midiNote);
+    const auto v = (int) velByNote[(size_t) n];
+    return juce::jlimit (1, 127, v > 0 ? v : 100);
+}
+
 IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
     : AudioProcessor (BusesProperties()
@@ -47,6 +745,9 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
 #endif
     , apvts (*this, nullptr, "IES_PARAMS", createParameterLayout())
 {
+    initWavetableTemplates();
+    engine.setTemplateWavetables (&wavetableTemplates);
+
     paramPointers.monoEnvMode   = apvts.getRawParameterValue (params::mono::envMode);
     paramPointers.glideEnable   = apvts.getRawParameterValue (params::mono::glideEnable);
     paramPointers.glideTimeMs   = apvts.getRawParameterValue (params::mono::glideTimeMs);
@@ -211,9 +912,22 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
         paramPointers.modSlotDepth[(size_t) i] = apvts.getRawParameterValue (slotDepthIds[i]);
     }
 
+    // --- Arp (Sequencer) ---
+    arpParams.enable  = apvts.getRawParameterValue (params::arp::enable);
+    arpParams.latch   = apvts.getRawParameterValue (params::arp::latch);
+    arpParams.mode    = apvts.getRawParameterValue (params::arp::mode);
+    arpParams.sync    = apvts.getRawParameterValue (params::arp::sync);
+    arpParams.rateHz  = apvts.getRawParameterValue (params::arp::rateHz);
+    arpParams.syncDiv = apvts.getRawParameterValue (params::arp::syncDiv);
+    arpParams.gate    = apvts.getRawParameterValue (params::arp::gate);
+    arpParams.octaves = apvts.getRawParameterValue (params::arp::octaves);
+    arpParams.swing   = apvts.getRawParameterValue (params::arp::swing);
+
     paramPointers.outGainDb     = apvts.getRawParameterValue (params::out::gainDb);
 
     engine.setParamPointers (&paramPointers);
+
+    loadCustomWavesFromState();
 }
 
 IndustrialEnergySynthAudioProcessor::~IndustrialEnergySynthAudioProcessor() = default;
@@ -313,6 +1027,7 @@ void IndustrialEnergySynthAudioProcessor::applyStateFromUi (juce::ValueTree stat
     }
 
     engine.reset();
+    loadCustomWavesFromState();
 }
 
 void IndustrialEnergySynthAudioProcessor::copyUiAudio (float* dest, int numSamples, UiAudioTap tap) const noexcept
@@ -406,6 +1121,7 @@ void IndustrialEnergySynthAudioProcessor::changeProgramName (int index, const ju
 void IndustrialEnergySynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     engine.prepare (sampleRate, samplesPerBlock);
+    arp.prepare (sampleRate);
     uiPreDestroyScratch.resize ((size_t) juce::jmax (1, samplesPerBlock));
     std::fill (uiAudioRingPost.begin(), uiAudioRingPost.end(), 0.0f);
     std::fill (uiAudioRingPre.begin(), uiAudioRingPre.end(), 0.0f);
@@ -417,6 +1133,9 @@ void IndustrialEnergySynthAudioProcessor::prepareToPlay (double sampleRate, int 
     uiCpuRisk.store (0.0f, std::memory_order_relaxed);
     uiMidiReadIndex.store (0, std::memory_order_relaxed);
     uiMidiWriteIndex.store (0, std::memory_order_relaxed);
+
+    // Ensure engine uses the latest custom wavetable pointers after SR/buffer changes.
+    loadCustomWavesFromState();
 }
 
 void IndustrialEnergySynthAudioProcessor::releaseResources()
@@ -454,21 +1173,34 @@ void IndustrialEnergySynthAudioProcessor::processBlock (juce::AudioBuffer<float>
     buffer.clear();
 
     // Feed host tempo for tempo-synced modulators (LFO sync).
+    double bpm = 120.0;
+    if (auto* ph = getPlayHead())
     {
-        double bpm = 120.0;
-        if (auto* ph = getPlayHead())
+        if (const auto pos = ph->getPosition())
         {
-            if (const auto pos = ph->getPosition())
-            {
-                if (const auto hostBpm = pos->getBpm())
-                    bpm = *hostBpm;
-            }
+            if (const auto hostBpm = pos->getBpm())
+                bpm = *hostBpm;
         }
-        engine.setHostBpm (bpm);
     }
+    engine.setHostBpm (bpm);
+
+    // Update Arp params (block-rate; no sample-accurate param switching in this version).
+    const bool arpEnable = (arpParams.enable != nullptr && arpParams.enable->load() >= 0.5f);
+    const bool arpLatch = (arpParams.latch != nullptr && arpParams.latch->load() >= 0.5f);
+    const int arpMode = (arpParams.mode != nullptr) ? (int) std::lround (arpParams.mode->load()) : (int) params::arp::up;
+    const bool arpSync = (arpParams.sync == nullptr) ? true : (arpParams.sync->load() >= 0.5f);
+    const float arpRateHz = (arpParams.rateHz != nullptr) ? arpParams.rateHz->load() : 8.0f;
+    const int arpDiv = (arpParams.syncDiv != nullptr) ? (int) std::lround (arpParams.syncDiv->load()) : (int) params::lfo::div1_8;
+    const float arpGate = (arpParams.gate != nullptr) ? arpParams.gate->load() : 0.60f;
+    const int arpOctaves = (arpParams.octaves != nullptr) ? (int) std::lround (arpParams.octaves->load()) : 1;
+    const float arpSwing = (arpParams.swing != nullptr) ? arpParams.swing->load() : 0.0f;
+    arp.setParams (arpEnable, arpLatch, arpMode, arpSync, arpRateHz, arpDiv, arpGate, arpOctaves, arpSwing, bpm);
 
     if (uiPanicRequested.exchange (false, std::memory_order_acq_rel))
+    {
+        arp.allNotesOff();
         engine.allNotesOff();
+    }
 
     const auto totalSamples = buffer.getNumSamples();
     juce::MidiBuffer mergedMidi;
@@ -476,57 +1208,102 @@ void IndustrialEnergySynthAudioProcessor::processBlock (juce::AudioBuffer<float>
     drainUiMidiToBuffer (mergedMidi);
 
     const bool capturePre = (totalSamples > 0 && (int) uiPreDestroyScratch.size() >= totalSamples);
+    auto it = mergedMidi.begin();
+    const auto end = mergedMidi.end();
+
     int cursor = 0;
-
-    for (const auto metadata : mergedMidi)
+    while (cursor < totalSamples)
     {
-        const auto samplePos = juce::jlimit (0, totalSamples, metadata.samplePosition);
+        const int nextInputPos = (it != end) ? juce::jlimit (0, totalSamples, (*it).samplePosition) : totalSamples;
+        const int arpDelta = arp.samplesUntilNextEvent();
+        const int nextArpPos = (arpDelta >= 0 && arpDelta <= (totalSamples - cursor)) ? (cursor + arpDelta) : totalSamples;
+        const int nextPos = juce::jmin (totalSamples, juce::jmin (nextInputPos, nextArpPos));
 
-        const auto numToRender = samplePos - cursor;
+        const int numToRender = nextPos - cursor;
         if (numToRender > 0)
         {
             auto* preTap = capturePre ? (uiPreDestroyScratch.data() + cursor) : nullptr;
             engine.render (buffer, cursor, numToRender, preTap);
-            cursor = samplePos;
+            arp.advance (numToRender);
+            cursor = nextPos;
         }
 
-        const auto msg = metadata.getMessage();
+        // If Arp is disabled, flush any pending arp note-off before processing live input notes,
+        // otherwise a same-sample note-on could be immediately cancelled.
+        if (! arpEnable)
+        {
+            ArpState::Event e {};
+            while (arp.popEvent (e))
+            {
+                if (e.type == ArpState::Event::noteOn)
+                    engine.noteOn (e.note, e.velocity);
+                else
+                    engine.noteOff (e.note);
+            }
+        }
 
-        if (msg.isNoteOn())
+        // 1) Process all input MIDI events at this sample position.
+        while (it != end)
         {
-            engine.noteOn (msg.getNoteNumber(), (int) msg.getVelocity());
-        }
-        else if (msg.isNoteOff())
-        {
-            engine.noteOff (msg.getNoteNumber());
-        }
-        else if (msg.isAllNotesOff() || msg.isAllSoundOff())
-        {
-            engine.allNotesOff();
-        }
-        else if (msg.isController())
-        {
-            if (msg.getControllerNumber() == 1) // CC1 Mod Wheel
-                engine.setModWheel (msg.getControllerValue());
-        }
-        else if (msg.isChannelPressure())
-        {
-            engine.setAftertouch (msg.getChannelPressureValue());
-        }
-        else if (msg.isAftertouch())
-        {
-            engine.setAftertouch (msg.getAfterTouchValue());
-        }
-        else if (msg.isPitchWheel())
-        {
-            engine.setPitchBend (msg.getPitchWheelValue());
-        }
-    }
+            const auto md = *it;
+            const int samplePos = juce::jlimit (0, totalSamples, md.samplePosition);
+            if (samplePos != cursor)
+                break;
 
-    if (cursor < totalSamples)
-    {
-        auto* preTap = capturePre ? (uiPreDestroyScratch.data() + cursor) : nullptr;
-        engine.render (buffer, cursor, totalSamples - cursor, preTap);
+            const auto m = md.getMessage();
+            const auto n = m.getNoteNumber();
+
+            if (m.isNoteOn())
+            {
+                const auto v = (int) m.getVelocity();
+                arp.noteOn (n, v);
+                if (! arpEnable)
+                    engine.noteOn (n, v);
+            }
+            else if (m.isNoteOff())
+            {
+                arp.noteOff (n);
+                if (! arpEnable)
+                    engine.noteOff (n);
+            }
+            else if (m.isAllNotesOff() || m.isAllSoundOff())
+            {
+                arp.allNotesOff();
+                engine.allNotesOff();
+            }
+            else if (m.isController())
+            {
+                if (m.getControllerNumber() == 1) // CC1 Mod Wheel
+                    engine.setModWheel (m.getControllerValue());
+            }
+            else if (m.isChannelPressure())
+            {
+                engine.setAftertouch (m.getChannelPressureValue());
+            }
+            else if (m.isAftertouch())
+            {
+                engine.setAftertouch (m.getAfterTouchValue());
+            }
+            else if (m.isPitchWheel())
+            {
+                engine.setPitchBend (m.getPitchWheelValue());
+            }
+
+            ++it;
+        }
+
+        // 2) Process Arp events scheduled for this sample position.
+        if (arpEnable)
+        {
+            ArpState::Event e {};
+            while (arp.popEvent (e))
+            {
+                if (e.type == ArpState::Event::noteOn)
+                    engine.noteOn (e.note, e.velocity);
+                else
+                    engine.noteOff (e.note);
+            }
+        }
     }
 
     // UI metering (mono signal is duplicated to all channels).
@@ -629,6 +1406,7 @@ void IndustrialEnergySynthAudioProcessor::setStateInformation (const void* data,
     migrateStateIfNeeded (tree);
     apvts.replaceState (tree);
     engine.reset();
+    loadCustomWavesFromState();
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
@@ -736,6 +1514,32 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
     layout.add (makeLfoGroup ("lfo1", "LFO 1", params::lfo1::wave, params::lfo1::sync, params::lfo1::rateHz, params::lfo1::syncDiv, params::lfo1::phase));
     layout.add (makeLfoGroup ("lfo2", "LFO 2", params::lfo2::wave, params::lfo2::sync, params::lfo2::rateHz, params::lfo2::syncDiv, params::lfo2::phase));
 
+    // --- Arp (Performance) ---
+    {
+        auto arpGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("arp", "Arp", "|");
+        arpGroup->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::arp::enable), "Enable", false));
+        arpGroup->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::arp::latch), "Latch", false));
+        arpGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::arp::mode), "Mode",
+                                                                          juce::StringArray { "Up", "Down", "UpDown", "Random", "As Played" },
+                                                                          (int) params::arp::up));
+        arpGroup->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::arp::sync), "Sync", true));
+        {
+            juce::NormalisableRange<float> range (0.25f, 20.0f);
+            range.setSkewForCentre (3.0f);
+            arpGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::arp::rateHz), "Rate", range, 8.0f, "Hz"));
+        }
+        arpGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::arp::syncDiv), "Div", lfoDivChoices, (int) params::lfo::div1_8));
+        {
+            juce::NormalisableRange<float> range (0.05f, 1.0f);
+            range.setSkewForCentre (0.65f);
+            arpGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::arp::gate), "Gate", range, 0.60f));
+        }
+        arpGroup->addChild (std::make_unique<juce::AudioParameterInt> (params::makeID (params::arp::octaves), "Octaves", 1, 4, 1));
+        arpGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::arp::swing), "Swing",
+                                                                         juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        layout.add (std::move (arpGroup));
+    }
+
     // --- Mod Matrix (fixed slots; no drag/drop yet) ---
     auto modGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("mod", "Mod Matrix", "|");
     const auto modSrcChoices = juce::StringArray { "Off", "LFO 1", "LFO 2", "Macro 1", "Macro 2",
@@ -774,7 +1578,13 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
     layout.add (std::move (modGroup));
 
     // --- Oscillators ---
-    const auto waveChoices = juce::StringArray { "Saw", "Square", "Triangle" };
+    // Keep first 3 items stable for backwards compatibility (0..2).
+    // Indices:
+    // 0..2 = primitives, 3..12 = template wavetables, 13 = Draw (custom).
+    const auto waveChoices = juce::StringArray { "Saw", "Square", "Triangle",
+                                                 "Sine", "Pulse 25", "Pulse 12", "DoubleSaw", "Metal",
+                                                 "Folded", "Stairs", "NotchTri", "Syncish", "Noise",
+                                                 "Draw" };
 
     auto osc1Group = std::make_unique<juce::AudioProcessorParameterGroup> ("osc1", "Osc 1", "|");
     osc1Group->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::osc1::wave), "Wave", waveChoices, (int) params::osc::saw));

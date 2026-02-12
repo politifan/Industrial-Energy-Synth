@@ -1,6 +1,7 @@
 #include "MonoSynthEngine.h"
 
 #include <cstdint>
+#include <cmath>
 
 namespace ies::engine
 {
@@ -36,6 +37,11 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     osc1.prepare (sampleRateHz);
     osc2.prepare (sampleRateHz);
     osc3.prepare (sampleRateHz);
+
+    // Ensure we have some default custom wavetable pointers so Draw mode never dereferences null.
+    // If the processor never sets them, Draw mode will fall back to Saw.
+    for (auto& a : customTables)
+        a.store (nullptr, std::memory_order_release);
 
     lfo1.prepare (sampleRateHz);
     lfo2.prepare (sampleRateHz);
@@ -905,10 +911,28 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         osc2.setFrequency (ies::math::midiNoteToHz (note2));
         osc3.setFrequency (ies::math::midiNoteToHz (note3));
 
+        auto renderOsc = [&] (dsp::PolyBlepOscillator& o, int oscIndex, int waveIndex, bool* wrapped) noexcept
+        {
+            // 0..2 = polyBLEP primitives. 3..12 = template wavetables. 13 = Draw (custom per-osc).
+            if (waveIndex <= 2)
+                return o.process ((params::osc::Wave) juce::jlimit (0, 2, waveIndex), wrapped);
+
+            const ies::dsp::WavetableSet* wt = nullptr;
+            if (waveIndex == 13)
+                wt = customTables[(size_t) oscIndex].load (std::memory_order_acquire);
+            else if (templateBank != nullptr)
+                wt = &(*templateBank)[(size_t) juce::jlimit (0, 9, waveIndex - 3)];
+
+            if (wt == nullptr)
+                return o.process (params::osc::saw, wrapped);
+
+            return o.processWavetable (*wt, wrapped);
+        };
+
         bool wrapped1 = false;
-        const auto s1 = osc1.process ((params::osc::Wave) juce::jlimit (0, 2, w1), &wrapped1);
-        const auto s2 = osc2.process ((params::osc::Wave) juce::jlimit (0, 2, w2), nullptr);
-        const auto s3 = osc3.process ((params::osc::Wave) juce::jlimit (0, 2, w3), nullptr);
+        const auto s1 = renderOsc (osc1, 0, w1, &wrapped1);
+        const auto s2 = renderOsc (osc2, 1, w2, nullptr);
+        const auto s3 = renderOsc (osc3, 2, w3, nullptr);
 
         const auto doSync = params->osc2Sync != nullptr && (params->osc2Sync->load() >= 0.5f);
         if (doSync && wrapped1)

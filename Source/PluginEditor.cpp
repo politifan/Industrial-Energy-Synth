@@ -1004,6 +1004,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
     setLookAndFeel (&lnf);
+    toneEqWindowContent.setLookAndFeel (&lnf);
 
     // Resizable + minimum constraints.
     // Keep a sane minimum: the UI is dense (Serum-like panels) and includes a spectrum editor.
@@ -1215,6 +1216,100 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                                nullptr);
     };
 
+    // --- Overflow Menu (Serum-ish) ---
+    addAndMakeVisible (menuButton);
+    menuButton.setButtonText ("MENU");
+    menuButton.onClick = [this]
+    {
+        const auto isRu = isRussian();
+        const auto T = [isRu] (const char* en, const char* ruUtf8)
+        {
+            return isRu ? juce::String::fromUTF8 (ruUtf8) : juce::String (en);
+        };
+
+        juce::PopupMenu m;
+
+        m.addSectionHeader (T ("Pages", u8"Страницы"));
+        m.addItem (1001, T ("Synth", u8"Синт"), true, uiPage == pageSynth);
+        m.addItem (1002, T ("Mod", u8"Мод"), true, uiPage == pageMod);
+        m.addItem (1003, T ("Lab", u8"Лаб"), true, uiPage == pageLab);
+        m.addItem (1004, T ("Seq", u8"Сек"), true, uiPage == pageSeq);
+
+        m.addSeparator();
+        m.addItem (2001, T ("Panic (All Notes Off)", u8"Стоп (снять все ноты)"));
+        m.addItem (2002, T ("Init (Reset Params)", u8"Сброс (инициализация)"));
+
+        m.addSeparator();
+        m.addSectionHeader (T ("Presets", u8"Пресеты"));
+        m.addItem (3001, T ("Save preset...", u8"Сохранить пресет..."));
+        m.addItem (3002, T ("Load preset...", u8"Загрузить пресет..."));
+
+        m.addSeparator();
+        m.addSectionHeader (T ("Language", u8"Язык"));
+        m.addItem (4001, "English", true, getLanguageIndex() == (int) params::ui::en);
+        m.addItem (4002, juce::String::fromUTF8 (u8"Русский"), true, getLanguageIndex() == (int) params::ui::ru);
+
+        m.addSeparator();
+        m.addSectionHeader (T ("Intent", u8"Цель"));
+        m.addItem (5001, T ("Bass", u8"Бас"), true, currentIntent == intentBass);
+        m.addItem (5002, T ("Lead", u8"Лид"), true, currentIntent == intentLead);
+        m.addItem (5003, T ("Drone", u8"Дрон"), true, currentIntent == intentDrone);
+
+        m.addSeparator();
+        m.addSectionHeader (T ("Windows", u8"Окна"));
+        m.addItem (7001, T ("Tone EQ...", u8"Эквалайзер..."));
+
+        const auto hasTarget = (lastTouchedModDest != params::mod::dstOff);
+        if (hasTarget)
+        {
+            m.addSeparator();
+            m.addSectionHeader (T ("Quick Assign", u8"Быстрое назначение"));
+            m.addItem (6001, "M1");
+            m.addItem (6002, "M2");
+            m.addItem (6003, "LFO 1");
+            m.addItem (6004, "LFO 2");
+            m.addItem (6005, T ("Clear Target Mods", u8"Очистить модуляции цели"));
+        }
+
+        juce::Component::SafePointer<IndustrialEnergySynthAudioProcessorEditor> safeThis (this);
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton),
+                         [safeThis] (int result)
+                         {
+                             if (safeThis == nullptr || result == 0)
+                                 return;
+
+                             switch (result)
+                             {
+                                 case 1001: safeThis->setUiPage (pageSynth); break;
+                                 case 1002: safeThis->setUiPage (pageMod); break;
+                                 case 1003: safeThis->setUiPage (pageLab); break;
+                                 case 1004: safeThis->setUiPage (pageSeq); break;
+
+                                 case 2001: safeThis->panicButton.triggerClick(); break;
+                                 case 2002: safeThis->initButton.triggerClick(); break;
+
+                                 case 3001: safeThis->presetSave.triggerClick(); break;
+                                 case 3002: safeThis->presetLoad.triggerClick(); break;
+
+                                 case 4001: safeThis->language.getCombo().setSelectedId (1, juce::sendNotification); break;
+                                 case 4002: safeThis->language.getCombo().setSelectedId (2, juce::sendNotification); break;
+
+                                 case 5001: safeThis->intentMode.getCombo().setSelectedId (1, juce::sendNotification); break;
+                                 case 5002: safeThis->intentMode.getCombo().setSelectedId (2, juce::sendNotification); break;
+                                 case 5003: safeThis->intentMode.getCombo().setSelectedId (3, juce::sendNotification); break;
+
+                                 case 7001: safeThis->openToneEqWindow(); break;
+
+                                 case 6001: safeThis->assignModulation (params::mod::srcMacro1, safeThis->lastTouchedModDest); break;
+                                 case 6002: safeThis->assignModulation (params::mod::srcMacro2, safeThis->lastTouchedModDest); break;
+                                 case 6003: safeThis->assignModulation (params::mod::srcLfo1, safeThis->lastTouchedModDest); break;
+                                 case 6004: safeThis->assignModulation (params::mod::srcLfo2, safeThis->lastTouchedModDest); break;
+                                 case 6005: safeThis->clearAllModForDest (safeThis->lastTouchedModDest); break;
+                                 default: break;
+                             }
+                         });
+    };
+
     // --- UI Page Toggle ---
     addAndMakeVisible (pageSynthButton);
     pageSynthButton.onClick = [this] { setUiPage (pageSynth); };
@@ -1224,6 +1319,9 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     addAndMakeVisible (pageLabButton);
     pageLabButton.onClick = [this] { setUiPage (pageLab); };
+
+    addAndMakeVisible (pageSeqButton);
+    pageSeqButton.onClick = [this] { setUiPage (pageSeq); };
 
     // --- Quick mod assign (Last Touched target) ---
     addAndMakeVisible (lastTouchedLabel);
@@ -1378,6 +1476,17 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     osc1Wave.getCombo().addItem ("Saw", 1);
     osc1Wave.getCombo().addItem ("Square", 2);
     osc1Wave.getCombo().addItem ("Triangle", 3);
+    osc1Wave.getCombo().addItem ("Sine", 4);
+    osc1Wave.getCombo().addItem ("Pulse 25", 5);
+    osc1Wave.getCombo().addItem ("Pulse 12", 6);
+    osc1Wave.getCombo().addItem ("DoubleSaw", 7);
+    osc1Wave.getCombo().addItem ("Metal", 8);
+    osc1Wave.getCombo().addItem ("Folded", 9);
+    osc1Wave.getCombo().addItem ("Stairs", 10);
+    osc1Wave.getCombo().addItem ("NotchTri", 11);
+    osc1Wave.getCombo().addItem ("Syncish", 12);
+    osc1Wave.getCombo().addItem ("Noise", 13);
+    osc1Wave.getCombo().addItem ("Draw", 14);
     osc1WaveAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::osc1::wave, osc1Wave.getCombo());
 
     addAndMakeVisible (osc1Preview);
@@ -1433,6 +1542,17 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     osc2Wave.getCombo().addItem ("Saw", 1);
     osc2Wave.getCombo().addItem ("Square", 2);
     osc2Wave.getCombo().addItem ("Triangle", 3);
+    osc2Wave.getCombo().addItem ("Sine", 4);
+    osc2Wave.getCombo().addItem ("Pulse 25", 5);
+    osc2Wave.getCombo().addItem ("Pulse 12", 6);
+    osc2Wave.getCombo().addItem ("DoubleSaw", 7);
+    osc2Wave.getCombo().addItem ("Metal", 8);
+    osc2Wave.getCombo().addItem ("Folded", 9);
+    osc2Wave.getCombo().addItem ("Stairs", 10);
+    osc2Wave.getCombo().addItem ("NotchTri", 11);
+    osc2Wave.getCombo().addItem ("Syncish", 12);
+    osc2Wave.getCombo().addItem ("Noise", 13);
+    osc2Wave.getCombo().addItem ("Draw", 14);
     osc2WaveAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::osc2::wave, osc2Wave.getCombo());
 
     addAndMakeVisible (osc2Preview);
@@ -1479,6 +1599,17 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     osc3Wave.getCombo().addItem ("Saw", 1);
     osc3Wave.getCombo().addItem ("Square", 2);
     osc3Wave.getCombo().addItem ("Triangle", 3);
+    osc3Wave.getCombo().addItem ("Sine", 4);
+    osc3Wave.getCombo().addItem ("Pulse 25", 5);
+    osc3Wave.getCombo().addItem ("Pulse 12", 6);
+    osc3Wave.getCombo().addItem ("DoubleSaw", 7);
+    osc3Wave.getCombo().addItem ("Metal", 8);
+    osc3Wave.getCombo().addItem ("Folded", 9);
+    osc3Wave.getCombo().addItem ("Stairs", 10);
+    osc3Wave.getCombo().addItem ("NotchTri", 11);
+    osc3Wave.getCombo().addItem ("Syncish", 12);
+    osc3Wave.getCombo().addItem ("Noise", 13);
+    osc3Wave.getCombo().addItem ("Draw", 14);
     osc3WaveAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::osc3::wave, osc3Wave.getCombo());
 
     addAndMakeVisible (osc3Preview);
@@ -1511,6 +1642,70 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     osc3Detune.getSlider().textFromValueFunction = osc1Detune.getSlider().textFromValueFunction;
     osc3Detune.getSlider().valueFromTextFunction = osc1Detune.getSlider().valueFromTextFunction;
     setupSliderDoubleClickDefault (osc3Detune.getSlider(), params::osc3::detune);
+
+    // --- Osc wave previews (templates + draw) ---
+    auto hookWaveUi = [this] (ies::ui::ComboWithLabel& wave,
+                              ies::ui::WavePreview& preview,
+                              int oscIndex)
+    {
+        preview.onUserDraw = [this, oscIndex] (const float* pts, int n)
+        {
+            audioProcessor.setCustomWaveFromUi (oscIndex, pts, n);
+        };
+
+        wave.getCombo().onChange = [this, &wave, &preview, oscIndex]
+        {
+            const int idx = wave.getCombo().getSelectedItemIndex(); // 0..13
+            preview.setWaveIndex (idx);
+
+            if (idx <= 2)
+            {
+                preview.setEditable (false);
+                preview.clearDisplayTable();
+                return;
+            }
+
+            const bool draw = (idx == 13);
+            preview.setEditable (draw);
+
+            if (const auto* wt = audioProcessor.getWavetableForUi (oscIndex, idx))
+            {
+                if (draw)
+                {
+                    std::array<float, (size_t) ies::ui::WavePreview::drawPoints> pts {};
+                    const auto* table = wt->mip[0].data();
+                    for (int i = 0; i < ies::ui::WavePreview::drawPoints; ++i)
+                    {
+                        const float ph = (float) i / (float) (ies::ui::WavePreview::drawPoints - 1);
+                        const float tidx = ph * (float) ies::dsp::WavetableSet::tableSize;
+                        const int i0 = juce::jlimit (0, ies::dsp::WavetableSet::tableSize - 1, (int) std::floor (tidx));
+                        const int i1 = (i0 + 1) % ies::dsp::WavetableSet::tableSize;
+                        const float frac = tidx - (float) i0;
+                        const float a = table[(size_t) i0];
+                        const float b = table[(size_t) i1];
+                        pts[(size_t) i] = a + frac * (b - a);
+                    }
+                    preview.setDrawPoints (pts.data(), (int) pts.size());
+                }
+                else
+                {
+                    preview.setDisplayFromTable (wt->mip[0].data(), ies::dsp::WavetableSet::tableSize);
+                }
+            }
+            else
+            {
+                preview.clearDisplayTable();
+            }
+        };
+
+        // Initialise preview.
+        if (wave.getCombo().onChange != nullptr)
+            wave.getCombo().onChange();
+    };
+
+    hookWaveUi (osc1Wave, osc1Preview, 0);
+    hookWaveUi (osc2Wave, osc2Preview, 1);
+    hookWaveUi (osc3Wave, osc3Preview, 2);
 
     // --- Noise ---
     noiseGroup.setText ("Noise");
@@ -1708,6 +1903,10 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     shaperPlacementAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(),
                                                                               params::shaper::placement,
                                                                               shaperPlacement.getCombo());
+
+    toneEqOpenButton.setButtonText ("EQ");
+    toneEqOpenButton.onClick = [this] { openToneEqWindow(); };
+    addAndMakeVisible (toneEqOpenButton);
 
     addAndMakeVisible (shaperDrive);
     shaperDriveAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(),
@@ -2103,6 +2302,80 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     modQuickBody.setColour (juce::TextEditor::textColourId, juce::Colour (0xffd7def0));
     modQuickBody.setText ("Tip: set one source, one destination, then increase depth gradually.", juce::dontSendNotification);
 
+    // --- Seq / Arp (fourth page) ---
+    seqGroup.setText ("Seq");
+    addAndMakeVisible (seqGroup);
+
+    arpEnable.setButtonText ("Arp");
+    addAndMakeVisible (arpEnable);
+    arpEnableAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(), params::arp::enable, arpEnable);
+
+    arpLatch.setButtonText ("Latch");
+    addAndMakeVisible (arpLatch);
+    arpLatchAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(), params::arp::latch, arpLatch);
+
+    addAndMakeVisible (arpMode);
+    arpMode.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    arpMode.getCombo().addItem ("Up", 1);
+    arpMode.getCombo().addItem ("Down", 2);
+    arpMode.getCombo().addItem ("UpDown", 3);
+    arpMode.getCombo().addItem ("Random", 4);
+    arpMode.getCombo().addItem ("As Played", 5);
+    arpModeAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::arp::mode, arpMode.getCombo());
+
+    arpSync.setButtonText ("Sync");
+    addAndMakeVisible (arpSync);
+    arpSyncAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(), params::arp::sync, arpSync);
+
+    addAndMakeVisible (arpRate);
+    arpRate.setLabelText ("Rate");
+    arpRateAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::arp::rateHz, arpRate.getSlider());
+    arpRate.getSlider().setTextValueSuffix (" Hz");
+    arpRate.getSlider().setNumDecimalPlacesToDisplay (2);
+    setupSliderDoubleClickDefault (arpRate.getSlider(), params::arp::rateHz);
+
+    addAndMakeVisible (arpDiv);
+    arpDiv.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    arpDiv.getCombo().addItem ("1/1", 1);
+    arpDiv.getCombo().addItem ("1/2", 2);
+    arpDiv.getCombo().addItem ("1/4", 3);
+    arpDiv.getCombo().addItem ("1/8", 4);
+    arpDiv.getCombo().addItem ("1/16", 5);
+    arpDiv.getCombo().addItem ("1/32", 6);
+    arpDiv.getCombo().addItem ("1/4T", 7);
+    arpDiv.getCombo().addItem ("1/8T", 8);
+    arpDiv.getCombo().addItem ("1/16T", 9);
+    arpDiv.getCombo().addItem ("1/4D", 10);
+    arpDiv.getCombo().addItem ("1/8D", 11);
+    arpDiv.getCombo().addItem ("1/16D", 12);
+    arpDivAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::arp::syncDiv, arpDiv.getCombo());
+
+    addAndMakeVisible (arpGate);
+    arpGate.setLabelText ("Gate");
+    arpGateAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::arp::gate, arpGate.getSlider());
+    arpGate.getSlider().textFromValueFunction = [] (double v) { return juce::String ((int) std::lround (v * 100.0)) + " %"; };
+    arpGate.getSlider().valueFromTextFunction = [] (const juce::String& t)
+    {
+        const auto s = t.trim().replaceCharacter (',', '.');
+        const auto n = s.retainCharacters ("0123456789.-").getDoubleValue();
+        const auto isPercent = s.containsChar ('%') || std::abs (n) > 1.00001;
+        return isPercent ? (n / 100.0) : n;
+    };
+    setupSliderDoubleClickDefault (arpGate.getSlider(), params::arp::gate);
+
+    addAndMakeVisible (arpOctaves);
+    arpOctaves.setLabelText ("Octaves");
+    arpOctavesAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::arp::octaves, arpOctaves.getSlider());
+    arpOctaves.getSlider().setNumDecimalPlacesToDisplay (0);
+    setupSliderDoubleClickDefault (arpOctaves.getSlider(), params::arp::octaves);
+
+    addAndMakeVisible (arpSwing);
+    arpSwing.setLabelText ("Swing");
+    arpSwingAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::arp::swing, arpSwing.getSlider());
+    arpSwing.getSlider().textFromValueFunction = [] (double v) { return juce::String ((int) std::lround (v * 100.0)) + " %"; };
+    arpSwing.getSlider().valueFromTextFunction = arpGate.getSlider().valueFromTextFunction;
+    setupSliderDoubleClickDefault (arpSwing.getSlider(), params::arp::swing);
+
     labGroup.setText ("Lab");
     addAndMakeVisible (labGroup);
 
@@ -2203,6 +2476,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         audioProcessor.enqueueUiPitchBend (v14);
     };
     labPitchBend.getSlider().setDoubleClickReturnValue (true, 0.0);
+    labPitchBend.setOnReset ([this] { labPitchBend.getSlider().setValue (0.0, juce::sendNotificationSync); });
 
     addAndMakeVisible (labModWheel);
     labModWheel.getSlider().setSliderStyle (juce::Slider::LinearHorizontal);
@@ -2223,6 +2497,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     {
         audioProcessor.enqueueUiModWheel ((int) std::lround (labModWheel.getSlider().getValue()));
     };
+    labModWheel.setOnReset ([this] { labModWheel.getSlider().setValue (0.0, juce::sendNotificationSync); });
 
     addAndMakeVisible (labAftertouch);
     labAftertouch.getSlider().setSliderStyle (juce::Slider::LinearHorizontal);
@@ -2237,6 +2512,10 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     {
         audioProcessor.enqueueUiAftertouch ((int) std::lround (labAftertouch.getSlider().getValue()));
     };
+    labAftertouch.setOnReset ([this] { labAftertouch.getSlider().setValue (0.0, juce::sendNotificationSync); });
+
+    labVelocity.setOnReset ([this] { labVelocity.getSlider().setValue (100.0, juce::sendNotificationSync); });
+    labKeyWidth.setOnReset ([this] { labKeyWidth.getSlider().setValue (16.0, juce::sendNotificationSync); });
 
     addAndMakeVisible (labKeyboardMode);
     labKeyboardMode.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
@@ -2459,13 +2738,13 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     // --- Tone EQ / Spectrum (interactive) ---
     toneGroup.setText ("Tone EQ");
-    addAndMakeVisible (toneGroup);
+    toneEqWindowContent.addAndMakeVisible (toneGroup);
 
     toneEnable.setButtonText ("Enable");
-    addAndMakeVisible (toneEnable);
+    toneEqWindowContent.addAndMakeVisible (toneEnable);
     toneEnableAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(), params::tone::enable, toneEnable);
 
-    addAndMakeVisible (spectrumSource);
+    toneEqWindowContent.addAndMakeVisible (spectrumSource);
     spectrumSource.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
     spectrumSource.getCombo().addItem ("Post", 1);
     spectrumSource.getCombo().addItem ("Pre", 2);
@@ -2481,7 +2760,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                                                              spectrumSource.getCombo());
     spectrumSource.getCombo().onChange();
 
-    addAndMakeVisible (spectrumAveraging);
+    toneEqWindowContent.addAndMakeVisible (spectrumAveraging);
     spectrumAveraging.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
     spectrumAveraging.getCombo().addItem ("Fast", 1);
     spectrumAveraging.getCombo().addItem ("Medium", 2);
@@ -2505,7 +2784,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     applyAveragingUi();
 
     spectrumFreeze.setButtonText ("Freeze");
-    addAndMakeVisible (spectrumFreeze);
+    toneEqWindowContent.addAndMakeVisible (spectrumFreeze);
     spectrumFreeze.onClick = [this]
     {
         spectrumEditor.setFrozen (spectrumFreeze.getToggleState());
@@ -2515,7 +2794,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                                                           spectrumFreeze);
     spectrumEditor.setFrozen (spectrumFreeze.getToggleState());
 
-    addAndMakeVisible (spectrumEditor);
+    toneEqWindowContent.addAndMakeVisible (spectrumEditor);
     spectrumEditor.bind (audioProcessor.getAPVTS(),
                          params::tone::enable,
                          params::tone::lowCutHz,
@@ -2579,9 +2858,11 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (initButton, cOut);
     setGroupAccent (panicButton, cPanic);
     setGroupAccent (helpButton, cOut);
+    setGroupAccent (menuButton, cOut);
     setGroupAccent (pageSynthButton, cOsc1);
     setGroupAccent (pageModButton, cMod);
     setGroupAccent (pageLabButton, cTone);
+    setGroupAccent (pageSeqButton, cOut);
     setGroupAccent (quickAssignMacro1, cMod);
     setGroupAccent (quickAssignMacro2, cMod);
     setGroupAccent (quickAssignLfo1, cMod);
@@ -2598,6 +2879,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (destroyPitchLockEnable, cDestroy);
     setGroupAccent (destroyPitchLockMode, cDestroy);
     setGroupAccent (shaperEnable, cShaper);
+    setGroupAccent (toneEqOpenButton, cTone);
     setGroupAccent (filterKeyTrack, cFilter);
 
     setGroupAccent (monoGroup, cMono);
@@ -2627,6 +2909,16 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (modInsightsPanel, cMod);
     setGroupAccent (modQuickPanel, cMod);
     setGroupAccent (labGroup, cMod);
+    setGroupAccent (seqGroup, cOut);
+    setGroupAccent (arpEnable, cOut);
+    setGroupAccent (arpLatch, cOut);
+    setGroupAccent (arpMode, cOut);
+    setGroupAccent (arpSync, cOut);
+    setGroupAccent (arpRate, cOut);
+    setGroupAccent (arpDiv, cOut);
+    setGroupAccent (arpGate, cOut);
+    setGroupAccent (arpOctaves, cOut);
+    setGroupAccent (arpSwing, cOut);
     setGroupAccent (labOctaveDown, cTone);
     setGroupAccent (labOctaveUp, cTone);
     setGroupAccent (labHold, cTone);
@@ -2694,6 +2986,9 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                      &lfo1Rate.getSlider(), &lfo1Phase.getSlider(),
                      &lfo2Rate.getSlider(), &lfo2Phase.getSlider() })
         setSliderAccent (*s, cMod);
+
+    for (auto* s : { &arpRate.getSlider(), &arpGate.getSlider(), &arpOctaves.getSlider(), &arpSwing.getSlider() })
+        setSliderAccent (*s, cOut);
 
     for (auto* s : { &labVelocity.getSlider(), &labKeyWidth.getSlider(), &labPitchBend.getSlider() })
         setSliderAccent (*s, cTone);
@@ -2772,11 +3067,20 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         if (c != nullptr && c != &tooltipWindow)
             c->addMouseListener (this, deep);
 
+    // Default size, can be overridden by persisted UI state.
     setSize (1060, 620);
+    restoreEditorSizeFromState();
 }
 
 IndustrialEnergySynthAudioProcessorEditor::~IndustrialEnergySynthAudioProcessorEditor()
 {
+    if (toneEqWindow != nullptr)
+    {
+        toneEqWindow->setVisible (false);
+        toneEqWindow->setLookAndFeel (nullptr);
+        toneEqWindow.reset();
+    }
+    toneEqWindowContent.setLookAndFeel (nullptr);
     stopTimer();
     labKeyboardState.removeListener (this);
     sendLabKeyboardAllNotesOff();
@@ -2797,16 +3101,16 @@ void IndustrialEnergySynthAudioProcessorEditor::paint (juce::Graphics& g)
         g.fillAll();
     }
 
-    // Accent glow (subtle) near the Tone/Spectrum panel to hint at "energy".
+    // Accent glow (subtle) near the Shaper panel to hint at "energy".
     {
-        auto glowArea = toneGroup.getBounds().toFloat();
+        auto glowArea = shaperGroup.getBounds().toFloat();
         if (! glowArea.isEmpty())
         {
             glowArea = glowArea.expanded (120.0f, 80.0f);
             const auto centre = glowArea.getCentre();
-            juce::ColourGradient glow (juce::Colour (0xff00c7ff).withAlpha (0.10f),
+            juce::ColourGradient glow (juce::Colour (0xff00e8c6).withAlpha (0.10f),
                                        centre.x, centre.y,
-                                       juce::Colour (0xff00c7ff).withAlpha (0.0f),
+                                       juce::Colour (0xff00e8c6).withAlpha (0.0f),
                                        glowArea.getRight(), glowArea.getBottom(),
                                        true);
             g.setGradientFill (glow);
@@ -2885,52 +3189,149 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     const auto topH = 40;
     auto top = r.removeFromTop (topH);
 
-    const auto langW = juce::jmin (220, top.getWidth() / 2);
-    language.setBounds (top.removeFromRight (langW).reduced (3, 7));
-    const auto intentW = juce::jmin (236, juce::jmax (170, top.getWidth() / 4));
-    intentMode.setBounds (top.removeFromRight (intentW).reduced (3, 7));
-    intentMode.setLayout (ies::ui::ComboWithLabel::Layout::labelLeft);
-    safetyBudgetLabel.setBounds (top.removeFromRight (168).reduced (3, 8));
-    const int clipW = 62;
-    outClipIndicator.setBounds (top.removeFromRight (clipW).reduced (3, 8));
-    preClipIndicator.setBounds (top.removeFromRight (clipW).reduced (3, 8));
-    outMeter.setBounds (top.removeFromRight (96).reduced (3, 7));
-    helpButton.setBounds (top.removeFromLeft (28).reduced (3, 7));
-    pageSynthButton.setBounds (top.removeFromLeft (64).reduced (3, 7));
-    pageModButton.setBounds (top.removeFromLeft (56).reduced (3, 7));
-    pageLabButton.setBounds (top.removeFromLeft (56).reduced (3, 7));
+    const int topW = top.getWidth();
+    const bool ultraNarrow = (topW < 760);
+    const bool narrow = (topW < 980);
+    const bool medium = (topW < 1180);
 
-    const bool quickCompact = (getWidth() < 1080);
-    lastTouchedLabel.setVisible (showModTop && ! quickCompact);
-    if (showModTop && ! quickCompact)
+    // Right side: show less on narrow widths (use MENU for overflow).
+    menuButton.setVisible (true);
+    menuButton.setBounds (top.removeFromRight (68).reduced (3, 7));
+
+    const bool showLanguageTop = (topW >= 820);
+    language.setVisible (showLanguageTop);
+    if (showLanguageTop)
+    {
+        const int langW = juce::jlimit (150, 220, top.getWidth() / 4);
+        language.setBounds (top.removeFromRight (langW).reduced (3, 7));
+    }
+    else
+    {
+        language.setBounds (0, 0, 0, 0);
+    }
+
+    const bool showIntentTop = (topW >= 1040);
+    intentMode.setVisible (showIntentTop);
+    if (showIntentTop)
+    {
+        const int intentW = juce::jlimit (160, 236, top.getWidth() / 4);
+        intentMode.setBounds (top.removeFromRight (intentW).reduced (3, 7));
+        intentMode.setLayout (ies::ui::ComboWithLabel::Layout::labelLeft);
+    }
+    else
+    {
+        intentMode.setBounds (0, 0, 0, 0);
+    }
+
+    const bool showSafetyTop = (topW >= 1240);
+    safetyBudgetLabel.setVisible (showSafetyTop);
+    if (showSafetyTop)
+        safetyBudgetLabel.setBounds (top.removeFromRight (168).reduced (3, 8));
+    else
+        safetyBudgetLabel.setBounds (0, 0, 0, 0);
+
+    const bool showClipsTop = ! narrow;
+    preClipIndicator.setVisible (showClipsTop);
+    outClipIndicator.setVisible (showClipsTop);
+    if (showClipsTop)
+    {
+        const int clipW = 62;
+        outClipIndicator.setBounds (top.removeFromRight (clipW).reduced (3, 8));
+        preClipIndicator.setBounds (top.removeFromRight (clipW).reduced (3, 8));
+    }
+    else
+    {
+        preClipIndicator.setBounds (0, 0, 0, 0);
+        outClipIndicator.setBounds (0, 0, 0, 0);
+    }
+
+    const bool showMeterTop = ! medium;
+    outMeter.setVisible (showMeterTop);
+    if (showMeterTop)
+        outMeter.setBounds (top.removeFromRight (96).reduced (3, 7));
+    else
+        outMeter.setBounds (0, 0, 0, 0);
+
+    // Left side
+    helpButton.setBounds (top.removeFromLeft (28).reduced (3, 7));
+
+    const bool showPageButtons = ! ultraNarrow;
+    pageSynthButton.setVisible (showPageButtons);
+    pageModButton.setVisible (showPageButtons);
+    pageLabButton.setVisible (showPageButtons);
+    pageSeqButton.setVisible (showPageButtons);
+
+    if (showPageButtons)
+    {
+        pageSynthButton.setBounds (top.removeFromLeft (60).reduced (3, 7));
+        pageModButton.setBounds (top.removeFromLeft (52).reduced (3, 7));
+        pageLabButton.setBounds (top.removeFromLeft (52).reduced (3, 7));
+        pageSeqButton.setBounds (top.removeFromLeft (52).reduced (3, 7));
+    }
+    else
+    {
+        pageSynthButton.setBounds (0, 0, 0, 0);
+        pageModButton.setBounds (0, 0, 0, 0);
+        pageLabButton.setBounds (0, 0, 0, 0);
+        pageSeqButton.setBounds (0, 0, 0, 0);
+    }
+
+    const bool showQuickAssign = showModTop && showPageButtons && (topW >= 1080);
+    lastTouchedLabel.setVisible (showQuickAssign && (topW >= 1180));
+    if (lastTouchedLabel.isVisible())
         lastTouchedLabel.setBounds (top.removeFromLeft (124).reduced (3, 9));
 
-    if (showModTop)
+    quickAssignMacro1.setVisible (showQuickAssign);
+    quickAssignMacro2.setVisible (showQuickAssign);
+    quickAssignLfo1.setVisible (showQuickAssign);
+    quickAssignLfo2.setVisible (showQuickAssign);
+    quickAssignClear.setVisible (showQuickAssign);
+
+    if (showQuickAssign)
     {
-        const int quickW = quickCompact ? 26 : 28;
+        const int quickW = 28;
         quickAssignMacro1.setBounds (top.removeFromLeft (quickW).reduced (2, 7));
         quickAssignMacro2.setBounds (top.removeFromLeft (quickW).reduced (2, 7));
         quickAssignLfo1.setBounds (top.removeFromLeft (quickW).reduced (2, 7));
         quickAssignLfo2.setBounds (top.removeFromLeft (quickW).reduced (2, 7));
         quickAssignClear.setBounds (top.removeFromLeft (quickW).reduced (2, 7));
     }
+    else
+    {
+        quickAssignMacro1.setBounds (0, 0, 0, 0);
+        quickAssignMacro2.setBounds (0, 0, 0, 0);
+        quickAssignLfo1.setBounds (0, 0, 0, 0);
+        quickAssignLfo2.setBounds (0, 0, 0, 0);
+        quickAssignClear.setBounds (0, 0, 0, 0);
+    }
 
-    panicButton.setBounds (top.removeFromLeft (60).reduced (3, 7));
-    initButton.setBounds (top.removeFromLeft (84).reduced (3, 7));
+    // Panic/Init are moved into MENU on narrow widths.
+    const bool showPanicInit = (topW >= 920) && showPageButtons;
+    panicButton.setVisible (showPanicInit);
+    initButton.setVisible (showPanicInit);
+    if (showPanicInit)
+    {
+        panicButton.setBounds (top.removeFromLeft (60).reduced (3, 7));
+        initButton.setBounds (top.removeFromLeft (84).reduced (3, 7));
+    }
+    else
+    {
+        panicButton.setBounds (0, 0, 0, 0);
+        initButton.setBounds (0, 0, 0, 0);
+    }
 
     // Preset strip: tighten/hide optional buttons on narrow widths.
-    const bool narrow = (getWidth() < 980);
-    presetPrev.setVisible (! narrow);
-    presetNext.setVisible (! narrow);
-    presetSave.setVisible (! narrow);
-    presetLoad.setVisible (! narrow);
+    presetPrev.setVisible (! narrow && ! ultraNarrow);
+    presetNext.setVisible (! narrow && ! ultraNarrow);
+    presetSave.setVisible (! narrow && ! ultraNarrow);
+    presetLoad.setVisible (! narrow && ! ultraNarrow);
 
     if (presetPrev.isVisible())
         presetPrev.setBounds (top.removeFromLeft (28).reduced (3, 7));
     if (presetNext.isVisible())
         presetNext.setBounds (top.removeFromLeft (28).reduced (3, 7));
 
-    const auto presetW = narrow ? juce::jmin (210, top.getWidth() / 2) : 250;
+    const auto presetW = narrow ? juce::jlimit (160, 240, top.getWidth() / 2) : 250;
     preset.setBounds (top.removeFromLeft (presetW).reduced (3, 1));
 
     if (presetSave.isVisible())
@@ -2946,6 +3347,7 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     const bool showSynth = (uiPage == pageSynth);
     const bool showMod = (uiPage == pageMod);
     const bool showLab = (uiPage == pageLab);
+    const bool showSeq = (uiPage == pageSeq);
 
     const int gap = 7;
 
@@ -3041,6 +3443,10 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     else if (showLab)
     {
         labGroup.setBounds (row1);
+    }
+    else if (showSeq)
+    {
+        seqGroup.setBounds (row1);
     }
 
     auto layoutKnobGrid = [&](juce::Rectangle<int> area, std::initializer_list<juce::Component*> items)
@@ -3328,6 +3734,9 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         const int placementW = juce::jmax (140, topRow.getWidth() / 2);
         shaperPlacement.setBounds (topRow.removeFromRight (placementW));
         topRow.removeFromRight (6);
+        const int eqBtnW = 44;
+        toneEqOpenButton.setBounds (topRow.removeFromRight (eqBtnW).reduced (0, 8));
+        topRow.removeFromRight (6);
         shaperEnable.setBounds (topRow.reduced (0, 8));
         gr.removeFromTop (4);
 
@@ -3507,6 +3916,34 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         }
     }
 
+    // Seq / Arp internal
+    {
+        auto gr = seqGroup.getBounds().reduced (8, 22);
+        const bool compact = (gr.getHeight() < 240);
+
+        arpMode.setLayout (compact ? ies::ui::ComboWithLabel::Layout::labelLeft
+                                   : ies::ui::ComboWithLabel::Layout::labelTop);
+        arpDiv.setLayout (compact ? ies::ui::ComboWithLabel::Layout::labelLeft
+                                  : ies::ui::ComboWithLabel::Layout::labelTop);
+
+        const int seqRowH = compact ? 26 : 34;
+        auto seqTopRow = gr.removeFromTop (seqRowH);
+        const int togW = 76;
+        arpEnable.setBounds (seqTopRow.removeFromLeft (togW).reduced (2, 5));
+        arpLatch.setBounds (seqTopRow.removeFromLeft (togW).reduced (2, 5));
+        arpSync.setBounds (seqTopRow.removeFromLeft (togW).reduced (2, 5));
+
+        gr.removeFromTop (4);
+        auto seqComboRow = gr.removeFromTop (compact ? 28 : 40);
+        const int modeW = juce::jlimit (220, 360, seqComboRow.getWidth() / 2);
+        arpMode.setBounds (seqComboRow.removeFromLeft (modeW));
+        seqComboRow.removeFromLeft (6);
+        arpDiv.setBounds (seqComboRow);
+
+        gr.removeFromTop (4);
+        layoutKnobGrid (gr, { &arpRate, &arpGate, &arpOctaves, &arpSwing });
+    }
+
     // Lab page internal
     {
         auto gr = labGroup.getBounds().reduced (8, 22);
@@ -3594,17 +4031,15 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         auto trioRow = gr.removeFromBottom (trioH);
         gr.removeFromBottom (panelGap);
 
-        toneGroup.setBounds (gr);
+        // Main area: Shaper (Tone EQ is now a floating window).
+        shaperGroup.setBounds (gr);
 
-        auto shaperArea = trioRow.removeFromLeft (trioRow.getWidth() / 3);
+        // Bottom row: envelopes side-by-side (wider).
+        auto leftEnv = trioRow.removeFromLeft (trioRow.getWidth() / 2);
         trioRow.removeFromLeft (panelGap);
-        auto filterEnvArea = trioRow.removeFromLeft (trioRow.getWidth() / 2);
-        trioRow.removeFromLeft (panelGap);
-        auto ampArea = trioRow;
-
-        shaperGroup.setBounds (shaperArea);
-        filterEnvGroup.setBounds (filterEnvArea);
-        ampGroup.setBounds (ampArea);
+        auto rightEnv = trioRow;
+        filterEnvGroup.setBounds (leftEnv);
+        ampGroup.setBounds (rightEnv);
     }
 
     // Filter internal
@@ -3629,23 +4064,7 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         layoutKnobGrid (gr, { &filterAttack, &filterDecay, &filterSustain, &filterRelease });
     }
 
-    // Tone EQ / Spectrum internal
-    {
-        auto gr = toneGroup.getBounds().reduced (8, 22);
-        auto toneRow1 = gr.removeFromTop (20);
-        const int toggleW = juce::jmin (120, juce::jmax (88, toneRow1.getWidth() / 3));
-        toneEnable.setBounds (toneRow1.removeFromLeft (toggleW));
-        toneRow1.removeFromLeft (6);
-        spectrumFreeze.setBounds (toneRow1.removeFromLeft (juce::jmin (120, juce::jmax (84, toneRow1.getWidth() / 2))));
-        gr.removeFromTop (4);
-        auto toneRow2 = gr.removeFromTop (40);
-        const int leftW = juce::jmax (140, toneRow2.getWidth() / 2 - 3);
-        spectrumSource.setBounds (toneRow2.removeFromLeft (leftW));
-        toneRow2.removeFromLeft (6);
-        spectrumAveraging.setBounds (toneRow2);
-        gr.removeFromTop (4);
-        spectrumEditor.setBounds (gr);
-    }
+    // Tone EQ / Spectrum layout is handled by ToneEqWindowContent::resized().
 
     // Amp
     {
@@ -3658,6 +4077,109 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
     resizeCorner.setBounds (getWidth() - 18, getHeight() - 18, 18, 18);
     resizeBorder.setBounds (getLocalBounds());
+
+    storeEditorSizeToStateIfChanged();
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::restoreEditorSizeFromState()
+{
+    // Persist main editor size as non-parameter properties (saved in project/presets).
+    const auto& state = audioProcessor.getAPVTS().state;
+
+    const int defW = getWidth();
+    const int defH = getHeight();
+
+    const int w = (int) state.getProperty (params::ui::editorW, defW);
+    const int h = (int) state.getProperty (params::ui::editorH, defH);
+
+    // Must match boundsConstrainer limits set in ctor.
+    const int clampedW = juce::jlimit (680, 2600, w);
+    const int clampedH = juce::jlimit (460, 1600, h);
+
+    lastStoredEditorW = clampedW;
+    lastStoredEditorH = clampedH;
+
+    if (clampedW != defW || clampedH != defH)
+        setSize (clampedW, clampedH);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::storeEditorSizeToStateIfChanged()
+{
+    const int w = getWidth();
+    const int h = getHeight();
+
+    if (w == lastStoredEditorW && h == lastStoredEditorH)
+        return;
+
+    lastStoredEditorW = w;
+    lastStoredEditorH = h;
+
+    auto& state = audioProcessor.getAPVTS().state;
+    state.setProperty (params::ui::editorW, w, nullptr);
+    state.setProperty (params::ui::editorH, h, nullptr);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::layoutToneEqIn (juce::Rectangle<int> bounds)
+{
+    auto r = bounds;
+
+    // Give the window content some breathing room.
+    r = r.reduced (8);
+    toneGroup.setBounds (r);
+
+    auto gr = toneGroup.getBounds().reduced (8, 22);
+    auto row1 = gr.removeFromTop (24);
+    const int toggleW = juce::jmin (160, juce::jmax (110, row1.getWidth() / 3));
+    toneEnable.setBounds (row1.removeFromLeft (toggleW));
+    row1.removeFromLeft (8);
+    spectrumFreeze.setBounds (row1.removeFromLeft (juce::jmin (170, juce::jmax (110, row1.getWidth() / 2))).reduced (0, 2));
+
+    gr.removeFromTop (6);
+    auto row2 = gr.removeFromTop (44);
+    const int leftW = juce::jmax (200, row2.getWidth() / 2 - 4);
+    spectrumSource.setBounds (row2.removeFromLeft (leftW));
+    row2.removeFromLeft (8);
+    spectrumAveraging.setBounds (row2);
+
+    gr.removeFromTop (6);
+    spectrumEditor.setBounds (gr);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::openToneEqWindow()
+{
+    struct ToneEqWindow final : public juce::DocumentWindow
+    {
+        ToneEqWindow (const juce::String& name, juce::Colour bg, int buttons)
+            : juce::DocumentWindow (name, bg, buttons, true)
+        {
+            setUsingNativeTitleBar (true);
+        }
+
+        void closeButtonPressed() override
+        {
+            setVisible (false);
+        }
+    };
+
+    const auto title = ies::ui::tr (ies::ui::Key::tone, getLanguageIndex());
+
+    if (toneEqWindow == nullptr)
+    {
+        toneEqWindow = std::make_unique<ToneEqWindow> (title,
+                                                       juce::Colour (0xff0b0e13),
+                                                       juce::DocumentWindow::closeButton);
+        toneEqWindow->setLookAndFeel (&lnf);
+        toneEqWindow->setResizable (true, true);
+        toneEqWindow->setContentNonOwned (&toneEqWindowContent, false);
+        toneEqWindow->centreWithSize (980, 520);
+    }
+    else
+    {
+        toneEqWindow->setName (title);
+    }
+
+    toneEqWindow->setVisible (true);
+    toneEqWindow->toFront (true);
 }
 
 int IndustrialEnergySynthAudioProcessorEditor::getLanguageIndex() const
@@ -3668,7 +4190,7 @@ int IndustrialEnergySynthAudioProcessorEditor::getLanguageIndex() const
 
 void IndustrialEnergySynthAudioProcessorEditor::setUiPage (int newPageIndex)
 {
-    const auto clamped = juce::jlimit ((int) pageSynth, (int) pageLab, newPageIndex);
+    const auto clamped = juce::jlimit ((int) pageSynth, (int) pageSeq, newPageIndex);
     uiPage = (UiPage) clamped;
 
     applyUiPageVisibility();
@@ -3676,6 +4198,7 @@ void IndustrialEnergySynthAudioProcessorEditor::setUiPage (int newPageIndex)
     pageSynthButton.setToggleState (uiPage == pageSynth, juce::dontSendNotification);
     pageModButton.setToggleState (uiPage == pageMod, juce::dontSendNotification);
     pageLabButton.setToggleState (uiPage == pageLab, juce::dontSendNotification);
+    pageSeqButton.setToggleState (uiPage == pageSeq, juce::dontSendNotification);
 
     auto setTabVisual = [] (juce::TextButton& b, bool active)
     {
@@ -3694,6 +4217,7 @@ void IndustrialEnergySynthAudioProcessorEditor::setUiPage (int newPageIndex)
     setTabVisual (pageSynthButton, uiPage == pageSynth);
     setTabVisual (pageModButton, uiPage == pageMod);
     setTabVisual (pageLabButton, uiPage == pageLab);
+    setTabVisual (pageSeqButton, uiPage == pageSeq);
 
     if (uiPage == pageLab)
         labKeyboard.grabKeyboardFocus();
@@ -3707,14 +4231,17 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     const bool showSynth = (uiPage == pageSynth);
     const bool showMod = (uiPage == pageMod);
     const bool showLab = (uiPage == pageLab);
+    const bool showSeq = (uiPage == pageSeq);
 
     // Always visible top/status controls.
     initButton.setVisible (true);
     panicButton.setVisible (true);
     helpButton.setVisible (true);
+    menuButton.setVisible (true);
     pageSynthButton.setVisible (true);
     pageModButton.setVisible (true);
     pageLabButton.setVisible (true);
+    pageSeqButton.setVisible (true);
     lastTouchedLabel.setVisible (showMod);
     quickAssignMacro1.setVisible (showMod);
     quickAssignMacro2.setVisible (showMod);
@@ -3800,6 +4327,7 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     shaperGroup.setVisible (showLab);
     shaperEnable.setVisible (showLab);
     shaperPlacement.setVisible (showLab);
+    toneEqOpenButton.setVisible (showLab);
     shaperDrive.setVisible (showLab);
     shaperMix.setVisible (showLab);
     shaperEditor.setVisible (showLab);
@@ -3825,14 +4353,21 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     ampSustain.setVisible (showLab);
     ampRelease.setVisible (showLab);
 
-    toneGroup.setVisible (showLab);
-    toneEnable.setVisible (showLab);
-    spectrumSource.setVisible (showLab);
-    spectrumAveraging.setVisible (showLab);
-    spectrumFreeze.setVisible (showLab);
-    spectrumEditor.setVisible (showLab);
+    // Tone EQ is shown in a dedicated floating window, independent of page selection.
 
     outGain.setVisible (showSynth);
+
+    // Seq page: Arp/Performance helpers.
+    seqGroup.setVisible (showSeq);
+    arpEnable.setVisible (showSeq);
+    arpLatch.setVisible (showSeq);
+    arpMode.setVisible (showSeq);
+    arpSync.setVisible (showSeq);
+    arpRate.setVisible (showSeq);
+    arpDiv.setVisible (showSeq);
+    arpGate.setVisible (showSeq);
+    arpOctaves.setVisible (showSeq);
+    arpSwing.setVisible (showSeq);
 
     // Mod page: modulation workflow only.
     modGroup.setVisible (showMod);
@@ -4050,6 +4585,7 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     pageSynthButton.setButtonText (ies::ui::tr (ies::ui::Key::pageSynth, langIdx));
     pageModButton.setButtonText (ies::ui::tr (ies::ui::Key::pageMod, langIdx));
     pageLabButton.setButtonText (ies::ui::tr (ies::ui::Key::pageLab, langIdx));
+    pageSeqButton.setButtonText (ies::ui::tr (ies::ui::Key::pageSeq, langIdx));
     setLastTouchedModDest (lastTouchedModDest, false);
 
     monoGroup.setText (ies::ui::tr (ies::ui::Key::mono, langIdx));
@@ -4064,6 +4600,17 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     osc1Wave.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::waveSaw, langIdx));
     osc1Wave.getCombo().changeItemText (2, ies::ui::tr (ies::ui::Key::waveSquare, langIdx));
     osc1Wave.getCombo().changeItemText (3, ies::ui::tr (ies::ui::Key::waveTriangle, langIdx));
+    osc1Wave.getCombo().changeItemText (4, ies::ui::tr (ies::ui::Key::waveSine, langIdx));
+    osc1Wave.getCombo().changeItemText (5, ies::ui::tr (ies::ui::Key::wavePulse25, langIdx));
+    osc1Wave.getCombo().changeItemText (6, ies::ui::tr (ies::ui::Key::wavePulse12, langIdx));
+    osc1Wave.getCombo().changeItemText (7, ies::ui::tr (ies::ui::Key::waveDoubleSaw, langIdx));
+    osc1Wave.getCombo().changeItemText (8, ies::ui::tr (ies::ui::Key::waveMetal, langIdx));
+    osc1Wave.getCombo().changeItemText (9, ies::ui::tr (ies::ui::Key::waveFolded, langIdx));
+    osc1Wave.getCombo().changeItemText (10, ies::ui::tr (ies::ui::Key::waveStairs, langIdx));
+    osc1Wave.getCombo().changeItemText (11, ies::ui::tr (ies::ui::Key::waveNotchTri, langIdx));
+    osc1Wave.getCombo().changeItemText (12, ies::ui::tr (ies::ui::Key::waveSyncish, langIdx));
+    osc1Wave.getCombo().changeItemText (13, ies::ui::tr (ies::ui::Key::waveNoise, langIdx));
+    osc1Wave.getCombo().changeItemText (14, ies::ui::tr (ies::ui::Key::waveDraw, langIdx));
     osc1Level.setLabelText (ies::ui::tr (ies::ui::Key::level, langIdx));
     osc1Coarse.setLabelText (ies::ui::tr (ies::ui::Key::coarse, langIdx));
     osc1Fine.setLabelText (ies::ui::tr (ies::ui::Key::fine, langIdx));
@@ -4075,6 +4622,17 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     osc2Wave.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::waveSaw, langIdx));
     osc2Wave.getCombo().changeItemText (2, ies::ui::tr (ies::ui::Key::waveSquare, langIdx));
     osc2Wave.getCombo().changeItemText (3, ies::ui::tr (ies::ui::Key::waveTriangle, langIdx));
+    osc2Wave.getCombo().changeItemText (4, ies::ui::tr (ies::ui::Key::waveSine, langIdx));
+    osc2Wave.getCombo().changeItemText (5, ies::ui::tr (ies::ui::Key::wavePulse25, langIdx));
+    osc2Wave.getCombo().changeItemText (6, ies::ui::tr (ies::ui::Key::wavePulse12, langIdx));
+    osc2Wave.getCombo().changeItemText (7, ies::ui::tr (ies::ui::Key::waveDoubleSaw, langIdx));
+    osc2Wave.getCombo().changeItemText (8, ies::ui::tr (ies::ui::Key::waveMetal, langIdx));
+    osc2Wave.getCombo().changeItemText (9, ies::ui::tr (ies::ui::Key::waveFolded, langIdx));
+    osc2Wave.getCombo().changeItemText (10, ies::ui::tr (ies::ui::Key::waveStairs, langIdx));
+    osc2Wave.getCombo().changeItemText (11, ies::ui::tr (ies::ui::Key::waveNotchTri, langIdx));
+    osc2Wave.getCombo().changeItemText (12, ies::ui::tr (ies::ui::Key::waveSyncish, langIdx));
+    osc2Wave.getCombo().changeItemText (13, ies::ui::tr (ies::ui::Key::waveNoise, langIdx));
+    osc2Wave.getCombo().changeItemText (14, ies::ui::tr (ies::ui::Key::waveDraw, langIdx));
     osc2Level.setLabelText (ies::ui::tr (ies::ui::Key::level, langIdx));
     osc2Coarse.setLabelText (ies::ui::tr (ies::ui::Key::coarse, langIdx));
     osc2Fine.setLabelText (ies::ui::tr (ies::ui::Key::fine, langIdx));
@@ -4087,6 +4645,17 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     osc3Wave.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::waveSaw, langIdx));
     osc3Wave.getCombo().changeItemText (2, ies::ui::tr (ies::ui::Key::waveSquare, langIdx));
     osc3Wave.getCombo().changeItemText (3, ies::ui::tr (ies::ui::Key::waveTriangle, langIdx));
+    osc3Wave.getCombo().changeItemText (4, ies::ui::tr (ies::ui::Key::waveSine, langIdx));
+    osc3Wave.getCombo().changeItemText (5, ies::ui::tr (ies::ui::Key::wavePulse25, langIdx));
+    osc3Wave.getCombo().changeItemText (6, ies::ui::tr (ies::ui::Key::wavePulse12, langIdx));
+    osc3Wave.getCombo().changeItemText (7, ies::ui::tr (ies::ui::Key::waveDoubleSaw, langIdx));
+    osc3Wave.getCombo().changeItemText (8, ies::ui::tr (ies::ui::Key::waveMetal, langIdx));
+    osc3Wave.getCombo().changeItemText (9, ies::ui::tr (ies::ui::Key::waveFolded, langIdx));
+    osc3Wave.getCombo().changeItemText (10, ies::ui::tr (ies::ui::Key::waveStairs, langIdx));
+    osc3Wave.getCombo().changeItemText (11, ies::ui::tr (ies::ui::Key::waveNotchTri, langIdx));
+    osc3Wave.getCombo().changeItemText (12, ies::ui::tr (ies::ui::Key::waveSyncish, langIdx));
+    osc3Wave.getCombo().changeItemText (13, ies::ui::tr (ies::ui::Key::waveNoise, langIdx));
+    osc3Wave.getCombo().changeItemText (14, ies::ui::tr (ies::ui::Key::waveDraw, langIdx));
     osc3Level.setLabelText (ies::ui::tr (ies::ui::Key::level, langIdx));
     osc3Coarse.setLabelText (ies::ui::tr (ies::ui::Key::coarse, langIdx));
     osc3Fine.setLabelText (ies::ui::tr (ies::ui::Key::fine, langIdx));
@@ -4132,6 +4701,7 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
 
     shaperGroup.setText (ies::ui::tr (ies::ui::Key::shaper, langIdx));
     shaperEnable.setButtonText (ies::ui::tr (ies::ui::Key::shaperEnable, langIdx));
+    toneEqOpenButton.setButtonText ("EQ");
     shaperPlacement.setLabelText (ies::ui::tr (ies::ui::Key::shaperPlacement, langIdx));
     shaperPlacement.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::shaperPlacementPre, langIdx));
     shaperPlacement.getCombo().changeItemText (2, ies::ui::tr (ies::ui::Key::shaperPlacementPost, langIdx));
@@ -4172,7 +4742,23 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
                               juce::dontSendNotification);
     modQuickPanel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Быстрый Coach") : juce::String ("Quick Coach"));
 
-    labGroup.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Лаб: Тон / Огиб. / Клав") : juce::String ("Lab: Tone / Env / Keys"));
+    seqGroup.setText (ies::ui::tr (ies::ui::Key::seq, langIdx));
+    arpEnable.setButtonText (ies::ui::tr (ies::ui::Key::arpEnable, langIdx));
+    arpLatch.setButtonText (ies::ui::tr (ies::ui::Key::arpLatch, langIdx));
+    arpMode.setLabelText (ies::ui::tr (ies::ui::Key::arpMode, langIdx));
+    arpMode.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::arpModeUp, langIdx));
+    arpMode.getCombo().changeItemText (2, ies::ui::tr (ies::ui::Key::arpModeDown, langIdx));
+    arpMode.getCombo().changeItemText (3, ies::ui::tr (ies::ui::Key::arpModeUpDown, langIdx));
+    arpMode.getCombo().changeItemText (4, ies::ui::tr (ies::ui::Key::arpModeRandom, langIdx));
+    arpMode.getCombo().changeItemText (5, ies::ui::tr (ies::ui::Key::arpModeAsPlayed, langIdx));
+    arpSync.setButtonText (ies::ui::tr (ies::ui::Key::arpSync, langIdx));
+    arpRate.setLabelText (ies::ui::tr (ies::ui::Key::arpRate, langIdx));
+    arpDiv.setLabelText (ies::ui::tr (ies::ui::Key::arpDiv, langIdx));
+    arpGate.setLabelText (ies::ui::tr (ies::ui::Key::arpGate, langIdx));
+    arpOctaves.setLabelText (ies::ui::tr (ies::ui::Key::arpOctaves, langIdx));
+    arpSwing.setLabelText (ies::ui::tr (ies::ui::Key::arpSwing, langIdx));
+
+    labGroup.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Лаб: Shaper / Огиб. / Клав") : juce::String ("Lab: Shaper / Env / Keys"));
     labOctaveDown.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Окт -") : juce::String ("Oct -"));
     labOctaveUp.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Окт +") : juce::String ("Oct +"));
     labHold.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Удерж.") : juce::String ("Hold"));
@@ -4281,6 +4867,8 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     spectrumAveraging.getCombo().changeItemText (2, ies::ui::tr (ies::ui::Key::toneAnalyzerAvgMedium, langIdx));
     spectrumAveraging.getCombo().changeItemText (3, ies::ui::tr (ies::ui::Key::toneAnalyzerAvgSmooth, langIdx));
     spectrumFreeze.setButtonText (ies::ui::tr (ies::ui::Key::toneAnalyzerFreeze, langIdx));
+    if (toneEqWindow != nullptr)
+        toneEqWindow->setName (ies::ui::tr (ies::ui::Key::tone, langIdx));
 
     outGain.setLabelText (ies::ui::tr (ies::ui::Key::gain, langIdx));
 
@@ -4312,12 +4900,17 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
                                          u8"Intent Layer: фокус Bass/Lead/Drone. Подсвечивает релевантные контролы и даёт быстрые подсказки."));
     intentMode.getLabel().setTooltip (intentMode.getCombo().getTooltip());
 
+    menuButton.setTooltip (T ("Overflow MENU: pages, presets, language, intent and quick actions.",
+                              u8"MENU: страницы, пресеты, язык, цель и быстрые действия."));
+
     pageSynthButton.setTooltip (T ("Show Synth page (oscillators and filter core).",
                                    u8"Показать страницу синта (осцилляторы и базовый фильтр)."));
     pageModButton.setTooltip (T ("Show Mod page (Macros, LFOs, Mod Matrix, drag-and-drop modulation).",
                                  u8"Показать страницу модуляции (макросы, LFO, матрица, drag-and-drop модуляция)."));
     pageLabButton.setTooltip (T ("Show Lab page (Destroy, big Tone EQ, Shaper + Envelopes, keyboard).",
                                  u8"Показать страницу Lab (Destroy, большой Tone EQ, Shaper + огибающие, клавиатура)."));
+    pageSeqButton.setTooltip (T ("Show Seq page (Arp).",
+                                 u8"Показать страницу Сек (арпеджиатор)."));
     lastTouchedLabel.setTooltip (T ("Last touched modulation destination knob.",
                                     u8"Последняя тронутая ручка-цель для модуляции."));
     quickAssignMacro1.setTooltip (T ("Assign Macro 1 to the last touched destination.",
@@ -4330,6 +4923,49 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
                                    u8"Назначить LFO 2 на последнюю тронутую цель."));
     quickAssignClear.setTooltip (T ("Clear all modulation assignments from the last touched destination.",
                                     u8"Удалить все назначения модуляции с последней тронутой цели."));
+
+    arpEnable.setTooltip (T ("Enable the arpeggiator (monophonic).",
+                             u8"Включить арпеджиатор (моно)."));
+    arpLatch.setTooltip (T ("Latch: keep playing after you release keys, until you play a new chord or Panic.",
+                            u8"Удерж.: продолжает играть после отпускания клавиш, пока не сыграешь новый аккорд или Стоп."));
+    {
+        const auto tip = T ("Arp order mode.",
+                            u8"Режим порядка арпеджиатора.");
+        arpMode.getCombo().setTooltip (tip);
+        arpMode.getLabel().setTooltip (tip);
+    }
+    arpSync.setTooltip (T ("Sync to host tempo. When ON: use Div, when OFF: use Rate (Hz).",
+                           u8"Синхронизация с темпом. ВКЛ: используется Доля, ВЫКЛ: Скорость (Гц)."));
+    {
+        const auto tip = T ("Arp rate in Hz (used when Sync is OFF).",
+                            u8"Скорость арпеджиатора в Гц (когда Синхр. выключена).");
+        arpRate.getSlider().setTooltip (tip);
+        arpRate.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Tempo division (used when Sync is ON).",
+                            u8"Деление темпа (когда Синхр. включена).");
+        arpDiv.getCombo().setTooltip (tip);
+        arpDiv.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Gate length per step (percentage of the step).",
+                            u8"Длина ноты в шаге (процент от шага).");
+        arpGate.getSlider().setTooltip (tip);
+        arpGate.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Octave range for the arpeggio (1..4).",
+                            u8"Диапазон по октавам (1..4).");
+        arpOctaves.getSlider().setTooltip (tip);
+        arpOctaves.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Swing amount (moves off-beats).",
+                            u8"Свинг (смещает off-beat).");
+        arpSwing.getSlider().setTooltip (tip);
+        arpSwing.getLabel().setTooltip (tip);
+    }
 
     labOctaveDown.setTooltip (T ("Shift keyboard range one octave down.",
                                  u8"Сдвинуть диапазон клавиатуры на октаву вниз."));
@@ -4558,6 +5194,8 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
     }
     shaperEditor.setTooltip (T ("Drag points to shape transfer curve. Double-click point to reset.",
                                 u8"Тяни точки, чтобы менять кривую переноса. Double-click по точке: сброс."));
+    toneEqOpenButton.setTooltip (T ("Open Tone EQ window (interactive spectrum).",
+                                    u8"Открыть окно эквалайзера (интерактивный спектр)."));
 
     {
         const auto tip = T ("Main output gain in dB. Double-click to reset.",
@@ -4604,6 +5242,15 @@ void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
             lfo2Rate.setEnabled (! syncOn);
         if (lfo2Div.isEnabled() != syncOn)
             lfo2Div.setEnabled (syncOn);
+    }
+
+    // Arp: when sync is ON, use Div; when OFF, use Rate (Hz).
+    {
+        const auto syncOn = arpSync.getToggleState();
+        if (arpRate.isEnabled() == syncOn)
+            arpRate.setEnabled (! syncOn);
+        if (arpDiv.isEnabled() != syncOn)
+            arpDiv.setEnabled (syncOn);
     }
 
     const auto hasTarget = (lastTouchedModDest != params::mod::dstOff);
@@ -5946,6 +6593,18 @@ void IndustrialEnergySynthAudioProcessorEditor::setupSliderDoubleClickDefault (j
     const auto defaultValue = range.convertFrom0to1 (defaultNorm);
 
     s.setDoubleClickReturnValue (true, defaultValue);
+
+    // Also wire the per-knob reset button (when the slider lives inside a KnobWithLabel).
+    if (auto* parent = s.getParentComponent())
+    {
+        if (auto* knob = dynamic_cast<ies::ui::KnobWithLabel*> (parent))
+        {
+            knob->setOnReset ([this, paramId, v = (float) defaultValue]
+            {
+                setParamValue (paramId, v);
+            });
+        }
+    }
 }
 
 params::mod::Dest IndustrialEnergySynthAudioProcessorEditor::getModDestForComponent (juce::Component* c) const

@@ -58,6 +58,10 @@ private:
     void setLastTouchedModDest (params::mod::Dest dst, bool announce);
     void setUiPage (int newPageIndex);
     void applyUiPageVisibility();
+    void openToneEqWindow();
+    void layoutToneEqIn (juce::Rectangle<int> bounds);
+    void restoreEditorSizeFromState();
+    void storeEditorSizeToStateIfChanged();
 
     void timerCallback() override;
     void handleNoteOn (juce::MidiKeyboardState* source, int midiChannel, int midiNoteNumber, float velocity) override;
@@ -85,9 +89,11 @@ private:
     juce::TextButton initButton;
     juce::TextButton panicButton;
     juce::TextButton helpButton;
+    juce::TextButton menuButton;
     juce::TextButton pageSynthButton;
     juce::TextButton pageModButton;
     juce::TextButton pageLabButton;
+    juce::TextButton pageSeqButton;
     juce::Label lastTouchedLabel;
     juce::TextButton quickAssignMacro1;
     juce::TextButton quickAssignMacro2;
@@ -117,7 +123,8 @@ private:
     {
         pageSynth = 0,
         pageMod = 1,
-        pageLab = 2
+        pageLab = 2,
+        pageSeq = 3
     };
     UiPage uiPage = pageSynth;
 
@@ -241,6 +248,7 @@ private:
     std::unique_ptr<APVTS::ButtonAttachment> shaperEnableAttachment;
     ies::ui::ComboWithLabel shaperPlacement;
     std::unique_ptr<APVTS::ComboBoxAttachment> shaperPlacementAttachment;
+    juce::TextButton toneEqOpenButton;
     ies::ui::KnobWithLabel shaperDrive;
     std::unique_ptr<APVTS::SliderAttachment> shaperDriveAttachment;
     ies::ui::KnobWithLabel shaperMix;
@@ -297,6 +305,15 @@ private:
     std::array<float, 2048> analyzerFramePre {};
     std::array<float, 2048> analyzerFramePost {};
     ies::ui::SpectrumEditor spectrumEditor;
+
+    struct ToneEqWindowContent final : public juce::Component
+    {
+        explicit ToneEqWindowContent (IndustrialEnergySynthAudioProcessorEditor& o) : owner (o) {}
+        void resized() override { owner.layoutToneEqIn (getLocalBounds()); }
+        IndustrialEnergySynthAudioProcessorEditor& owner;
+    };
+    ToneEqWindowContent toneEqWindowContent { *this };
+    std::unique_ptr<juce::DocumentWindow> toneEqWindow;
 
     // Modulation (V1.2): Macros + 2 LFO + Mod Matrix
     juce::GroupComponent modGroup;
@@ -369,6 +386,27 @@ private:
     ies::ui::KnobWithLabel outGain;
     std::unique_ptr<APVTS::SliderAttachment> outGainAttachment;
 
+    // Sequencer / Arp page (fourth page): performance helpers (Serum-ish ARP).
+    juce::GroupComponent seqGroup;
+    juce::ToggleButton arpEnable;
+    std::unique_ptr<APVTS::ButtonAttachment> arpEnableAttachment;
+    juce::ToggleButton arpLatch;
+    std::unique_ptr<APVTS::ButtonAttachment> arpLatchAttachment;
+    ies::ui::ComboWithLabel arpMode;
+    std::unique_ptr<APVTS::ComboBoxAttachment> arpModeAttachment;
+    juce::ToggleButton arpSync;
+    std::unique_ptr<APVTS::ButtonAttachment> arpSyncAttachment;
+    ies::ui::KnobWithLabel arpRate;
+    std::unique_ptr<APVTS::SliderAttachment> arpRateAttachment;
+    ies::ui::ComboWithLabel arpDiv;
+    std::unique_ptr<APVTS::ComboBoxAttachment> arpDivAttachment;
+    ies::ui::KnobWithLabel arpGate;
+    std::unique_ptr<APVTS::SliderAttachment> arpGateAttachment;
+    ies::ui::KnobWithLabel arpOctaves;
+    std::unique_ptr<APVTS::SliderAttachment> arpOctavesAttachment;
+    ies::ui::KnobWithLabel arpSwing;
+    std::unique_ptr<APVTS::SliderAttachment> arpSwingAttachment;
+
     // Lab page (third page): consolidated diagnostics/workflow.
     juce::GroupComponent labGroup;
     juce::TextButton labOctaveDown;
@@ -416,6 +454,8 @@ private:
 
     juce::Component* hovered = nullptr;
     params::mod::Dest lastTouchedModDest = params::mod::dstOff;
+    int lastStoredEditorW = -1;
+    int lastStoredEditorH = -1;
 
     enum IntentModeIndex
     {

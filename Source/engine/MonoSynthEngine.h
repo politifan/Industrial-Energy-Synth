@@ -12,6 +12,7 @@
 #include "../dsp/PolyBlepOscillator.h"
 #include "../dsp/SvfFilter.h"
 #include "../dsp/ToneEQ.h"
+#include "../dsp/WavetableSet.h"
 #include "../dsp/WaveShaper.h"
 #include "NoteStackMono.h"
 
@@ -165,6 +166,13 @@ public:
     };
 
     void setParamPointers (const ParamPointers* ptrs) { params = ptrs; }
+    void setTemplateWavetables (const std::array<ies::dsp::WavetableSet, 10>* bank) noexcept { templateBank = bank; }
+    void setCustomWavetable (int oscIndex, const ies::dsp::WavetableSet* table) noexcept
+    {
+        if (oscIndex < 0 || oscIndex >= 3)
+            return;
+        customTables[(size_t) oscIndex].store (table, std::memory_order_release);
+    }
 
     void prepare (double sampleRate, int maxBlockSize);
     void reset();
@@ -335,6 +343,9 @@ private:
     dsp::PolyBlepOscillator osc1;
     dsp::PolyBlepOscillator osc2;
     dsp::PolyBlepOscillator osc3;
+
+    const std::array<ies::dsp::WavetableSet, 10>* templateBank = nullptr;
+    std::array<std::atomic<const ies::dsp::WavetableSet*>, 3> customTables { { nullptr, nullptr, nullptr } };
 
     dsp::Lfo lfo1;
     dsp::Lfo lfo2;

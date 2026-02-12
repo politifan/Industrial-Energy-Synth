@@ -4,6 +4,7 @@
 
 #include "../Util/Math.h"
 #include "../Params.h"
+#include "WavetableSet.h"
 
 namespace ies::dsp
 {
@@ -52,6 +53,41 @@ public:
         }
 
         phase += dt;
+
+        bool didWrap = false;
+        if (phase >= 1.0f)
+        {
+            phase -= 1.0f;
+            didWrap = true;
+        }
+
+        if (wrapped != nullptr)
+            *wrapped = didWrap;
+
+        return out;
+    }
+
+    float processWavetable (const WavetableSet& table, bool* wrapped = nullptr) noexcept
+    {
+        // Choose mip based on playback rate (size * phaseInc ~= samples advanced per output sample in table space).
+        // Higher playback rate => fewer usable harmonics => use a more filtered table.
+        int mip = 0;
+        const float rate = (float) WavetableSet::tableSize * phaseInc;
+        if (rate > 0.0f)
+            mip = juce::jlimit (0, WavetableSet::numMips - 1, (int) std::ceil (std::log2 (juce::jmax (1.0e-6f, rate))));
+
+        const auto* t = table.level (mip);
+
+        const float idx = phase * (float) WavetableSet::tableSize;
+        const int i0 = juce::jlimit (0, WavetableSet::tableSize - 1, (int) std::floor (idx));
+        const int i1 = (i0 + 1) % WavetableSet::tableSize;
+        const float frac = idx - (float) i0;
+
+        const float a = t[(size_t) i0];
+        const float b = t[(size_t) i1];
+        const float out = a + frac * (b - a);
+
+        phase += phaseInc;
 
         bool didWrap = false;
         if (phase >= 1.0f)
@@ -136,4 +172,3 @@ private:
     float triState = -0.25f;
 };
 } // namespace ies::dsp
-

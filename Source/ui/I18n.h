@@ -21,6 +21,7 @@ enum class Key
     pageSynth,
     pageMod,
     pageLab,
+    pageSeq,
     init,
     intentMode,
     intentBass,
@@ -41,6 +42,17 @@ enum class Key
     waveSaw,
     waveSquare,
     waveTriangle,
+    waveSine,
+    wavePulse25,
+    wavePulse12,
+    waveDoubleSaw,
+    waveMetal,
+    waveFolded,
+    waveStairs,
+    waveNotchTri,
+    waveSyncish,
+    waveNoise,
+    waveDraw,
     level,
     coarse,
     fine,
@@ -164,6 +176,22 @@ enum class Key
     modDstShaperDrive,
     modDstShaperMix,
 
+    seq,
+    arpEnable,
+    arpLatch,
+    arpMode,
+    arpModeUp,
+    arpModeDown,
+    arpModeUpDown,
+    arpModeRandom,
+    arpModeAsPlayed,
+    arpSync,
+    arpRate,
+    arpDiv,
+    arpGate,
+    arpOctaves,
+    arpSwing,
+
     labKeyboardMode,
     labKeyboardModePoly,
     labKeyboardModeMono,
@@ -210,6 +238,7 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::pageSynth:    return u8 (u8"Синт");
             case Key::pageMod:      return u8 (u8"Мод");
             case Key::pageLab:      return u8 (u8"Лаб");
+            case Key::pageSeq:      return u8 (u8"Сек");
             case Key::init:         return u8 (u8"Сброс");
             case Key::intentMode:   return u8 (u8"Цель");
             case Key::intentBass:   return u8 (u8"Бас");
@@ -230,6 +259,17 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::waveSaw:      return u8 (u8"Пила");
             case Key::waveSquare:   return u8 (u8"Квадрат");
             case Key::waveTriangle: return u8 (u8"Треугольник");
+            case Key::waveSine:     return u8 (u8"Синус");
+            case Key::wavePulse25:  return u8 (u8"Пульс 25%");
+            case Key::wavePulse12:  return u8 (u8"Пульс 12%");
+            case Key::waveDoubleSaw:return u8 (u8"Двойная пила");
+            case Key::waveMetal:    return u8 (u8"Металл");
+            case Key::waveFolded:   return u8 (u8"Фолд");
+            case Key::waveStairs:   return u8 (u8"Ступени");
+            case Key::waveNotchTri: return u8 (u8"Нотч-три");
+            case Key::waveSyncish:  return u8 (u8"Синк-подобн.");
+            case Key::waveNoise:    return u8 (u8"Шум-цикл");
+            case Key::waveDraw:     return u8 (u8"Рисунок");
             case Key::level:        return u8 (u8"Уровень");
             case Key::coarse:       return u8 (u8"Грубо");
             case Key::fine:         return u8 (u8"Точно");
@@ -353,6 +393,22 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::modDstShaperDrive:   return u8 (u8"Драйв (shaper)");
             case Key::modDstShaperMix:     return u8 (u8"Mix (shaper)");
 
+            case Key::seq:                return u8 (u8"Секвенсор");
+            case Key::arpEnable:          return u8 (u8"Арп");
+            case Key::arpLatch:           return u8 (u8"Удерж.");
+            case Key::arpMode:            return u8 (u8"Режим");
+            case Key::arpModeUp:          return u8 (u8"Вверх");
+            case Key::arpModeDown:        return u8 (u8"Вниз");
+            case Key::arpModeUpDown:      return u8 (u8"Вверх-вниз");
+            case Key::arpModeRandom:      return u8 (u8"Случайно");
+            case Key::arpModeAsPlayed:    return u8 (u8"Как сыграно");
+            case Key::arpSync:            return u8 (u8"Синхр.");
+            case Key::arpRate:            return u8 (u8"Скорость");
+            case Key::arpDiv:             return u8 (u8"Доля");
+            case Key::arpGate:            return u8 (u8"Gate");
+            case Key::arpOctaves:         return u8 (u8"Октавы");
+            case Key::arpSwing:           return u8 (u8"Свинг");
+
             case Key::labKeyboardMode:     return u8 (u8"Режим");
             case Key::labKeyboardModePoly: return u8 (u8"Поли");
             case Key::labKeyboardModeMono: return u8 (u8"Моно");
@@ -394,6 +450,7 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::pageSynth:    return "Synth";
             case Key::pageMod:      return "Mod";
             case Key::pageLab:      return "Lab";
+            case Key::pageSeq:      return "Seq";
             case Key::init:         return "Init";
             case Key::intentMode:   return "Intent";
             case Key::intentBass:   return "Bass";
@@ -414,6 +471,17 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::waveSaw:      return "Saw";
             case Key::waveSquare:   return "Square";
             case Key::waveTriangle: return "Triangle";
+            case Key::waveSine:     return "Sine";
+            case Key::wavePulse25:  return "Pulse 25";
+            case Key::wavePulse12:  return "Pulse 12";
+            case Key::waveDoubleSaw:return "DoubleSaw";
+            case Key::waveMetal:    return "Metal";
+            case Key::waveFolded:   return "Folded";
+            case Key::waveStairs:   return "Stairs";
+            case Key::waveNotchTri: return "NotchTri";
+            case Key::waveSyncish:  return "Syncish";
+            case Key::waveNoise:    return "Noise";
+            case Key::waveDraw:     return "Draw";
             case Key::level:        return "Level";
             case Key::coarse:       return "Coarse";
             case Key::fine:         return "Fine";
@@ -536,6 +604,22 @@ inline juce::String tr (Key key, int languageChoiceIndex)
             case Key::modDstCrushMix:      return "Crush Mix";
             case Key::modDstShaperDrive:   return "Shaper Drive";
             case Key::modDstShaperMix:     return "Shaper Mix";
+
+            case Key::seq:                return "Sequencer";
+            case Key::arpEnable:          return "Arp";
+            case Key::arpLatch:           return "Latch";
+            case Key::arpMode:            return "Mode";
+            case Key::arpModeUp:          return "Up";
+            case Key::arpModeDown:        return "Down";
+            case Key::arpModeUpDown:      return "UpDown";
+            case Key::arpModeRandom:      return "Random";
+            case Key::arpModeAsPlayed:    return "As Played";
+            case Key::arpSync:            return "Sync";
+            case Key::arpRate:            return "Rate";
+            case Key::arpDiv:             return "Div";
+            case Key::arpGate:            return "Gate";
+            case Key::arpOctaves:         return "Octaves";
+            case Key::arpSwing:           return "Swing";
 
             case Key::labKeyboardMode:     return "Mode";
             case Key::labKeyboardModePoly: return "Poly";

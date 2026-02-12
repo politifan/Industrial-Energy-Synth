@@ -158,12 +158,17 @@ public:
     const ModTargetSlider& getModSlider() const noexcept { return slider; }
     juce::Label& getLabel() noexcept { return label; }
     const juce::Label& getLabel() const noexcept { return label; }
+    juce::TextButton& getResetButton() noexcept { return resetButton; }
+    const juce::TextButton& getResetButton() const noexcept { return resetButton; }
+    void setOnReset (std::function<void()> fn) { onReset = std::move (fn); }
 
     void resized() override;
 
 private:
     ModTargetSlider slider;
     juce::Label label;
+    juce::TextButton resetButton;
+    std::function<void()> onReset;
 };
 
 class ComboWithLabel final : public juce::Component
