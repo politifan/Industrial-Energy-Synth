@@ -1,12 +1,25 @@
 #include "ParamComponents.h"
+#include <cmath>
 
 namespace ies::ui
 {
 KnobWithLabel::KnobWithLabel()
 {
     slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 66, 16);
+    slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 74, 16);
     slider.setNumDecimalPlacesToDisplay (2);
+    slider.textFromValueFunction = [] (double v)
+    {
+        const auto whole = std::round (v);
+        if (std::abs (v - whole) < 0.0001)
+            return juce::String ((int) whole);
+
+        return juce::String (v, 3).trimCharactersAtEnd ("0").trimCharactersAtEnd (".");
+    };
+    slider.valueFromTextFunction = [] (const juce::String& t)
+    {
+        return t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
+    };
     addAndMakeVisible (slider);
 
     label.setJustificationType (juce::Justification::centred);
