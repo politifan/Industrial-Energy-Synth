@@ -382,7 +382,7 @@ void IndustrialLookAndFeel::drawGroupComponentOutline (juce::Graphics& g,
     const auto a = colourFromProperty (group, "accentColour", accent);
     const auto activity = juce::jlimit (0.0f, 1.0f, floatFromProperty (group, "activity", 0.0f));
 
-    const auto fillAlpha = enabled ? 0.78f : 0.25f;
+    const auto fillAlpha = floatFromProperty (group, "fillAlpha", enabled ? 0.78f : 0.25f);
     const auto brd  = enabled ? border.withAlpha (0.95f) : border.withAlpha (0.25f);
 
     // Main panel fill: subtle gradient + tiny per-block tint so the UI feels less flat.
@@ -396,7 +396,9 @@ void IndustrialLookAndFeel::drawGroupComponentOutline (juce::Graphics& g,
 
         if (enabled)
         {
-            const auto tint = a.withAlpha (0.030f + 0.050f * activity);
+            const auto tintBase = floatFromProperty (group, "tintBase", 0.030f);
+            const auto tintAct = floatFromProperty (group, "tintAct", 0.050f);
+            const auto tint = a.withAlpha (juce::jlimit (0.0f, 1.0f, tintBase + tintAct * activity));
             g.setColour (tint);
             g.fillRoundedRectangle (bounds.reduced (2.0f), 7.0f);
         }

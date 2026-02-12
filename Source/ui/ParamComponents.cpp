@@ -41,8 +41,11 @@ void KnobWithLabel::setSliderStyle (juce::Slider::SliderStyle style)
 void KnobWithLabel::resized()
 {
     auto r = getLocalBounds();
-    const auto labelH = 14;
-    label.setBounds (r.removeFromBottom (labelH));
+    const auto labelH = label.isVisible() ? 14 : 0;
+    if (labelH > 0)
+        label.setBounds (r.removeFromBottom (labelH));
+    else
+        label.setBounds (0, 0, 0, 0);
     slider.setBounds (r);
 }
 

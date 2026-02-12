@@ -2202,11 +2202,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         const int v14 = juce::jlimit (0, 16383, (int) std::lround (8192.0 + (double) n * 8191.0));
         audioProcessor.enqueueUiPitchBend (v14);
     };
-    labPitchBend.getSlider().onDragEnd = [this]
-    {
-        // Spring return (Serum-like).
-        labPitchBend.getSlider().setValue (0.0, juce::sendNotification);
-    };
+    labPitchBend.getSlider().setDoubleClickReturnValue (true, 0.0);
 
     addAndMakeVisible (labModWheel);
     labModWheel.getSlider().setSliderStyle (juce::Slider::LinearHorizontal);
@@ -2240,11 +2236,6 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     labAftertouch.getSlider().onValueChange = [this]
     {
         audioProcessor.enqueueUiAftertouch ((int) std::lround (labAftertouch.getSlider().getValue()));
-    };
-    labAftertouch.getSlider().onDragEnd = [this]
-    {
-        // Momentary feel (press/release), like hardware aftertouch.
-        labAftertouch.getSlider().setValue (0.0, juce::sendNotification);
     };
 
     addAndMakeVisible (labKeyboardMode);
@@ -2616,6 +2607,9 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (noiseGroup, cNoise);
     setGroupAccent (noiseEnable, cNoise);
     setGroupAccent (destroyGroup, cDestroy);
+    // Destroy block needs higher contrast: it is dense and users rely on it even when amounts are low.
+    destroyGroup.getProperties().set ("tintBase", 0.06);
+    destroyGroup.getProperties().set ("tintAct", 0.10);
     setGroupAccent (shaperGroup, cShaper);
     setGroupAccent (filterGroup, cFilter);
     setGroupAccent (filterEnvGroup, cFilter);
@@ -2953,10 +2947,26 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     const bool showMod = (uiPage == pageMod);
     const bool showLab = (uiPage == pageLab);
 
+    const int gap = 7;
+
+    // Place Destroy on the Synth page as a full-width bottom strip (Serum-ish "main rack").
+    // It is a dense block; keeping it full-width avoids truncation while preserving the top grid.
+    if (showSynth)
+    {
+        const int destroyH = juce::jlimit (140, 280, r.getHeight() / 3);
+        auto destroyArea = r.removeFromBottom (destroyH);
+        if (r.getHeight() > 0)
+            r.removeFromBottom (gap);
+        destroyGroup.setBounds (destroyArea);
+    }
+    else
+    {
+        destroyGroup.setBounds (0, 0, 0, 0);
+    }
+
     // Responsive grid: 2 columns on narrow widths, 3 on wide.
     const auto w = r.getWidth();
     const int cols = (w >= 1060) ? 3 : 2;
-    const int gap = 7;
     const int colW = (w - gap * (cols - 1)) / cols;
 
     auto splitRow = [&](juce::Rectangle<int> row, int colIndex) -> juce::Rectangle<int>
@@ -3139,45 +3149,104 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
     // Destroy internal
     {
-        auto gr = destroyGroup.getBounds().reduced (8, 24);
-        const bool destroyCompact = (destroyGroup.getWidth() < 500 || destroyGroup.getHeight() < 250);
+        // Asymmetric padding: keep the bottom tight (Destroy is dense) and account for the group header explicitly.
+        auto gr = destroyGroup.getBounds().reduced (8, 8);
+        gr.removeFromTop (24);
+        gr.removeFromTop (4);
 
+        const auto wAvail = gr.getWidth();
+        const auto hAvail = gr.getHeight();
+
+        // Compact is the common case in the Lab page (height is shared with Tone/Env + keyboard).
+        const bool destroyCompact = (hAvail < 260);
+        const bool destroyStrip = (wAvail >= 820);
+
+        // In compact mode we do a "Serum-ish rack": one header + one strip of 4 mini-modules.
+        // This avoids the 2x2 grid that collapses too aggressively on short heights.
         foldPanel.setVisible (! destroyCompact);
         clipPanel.setVisible (! destroyCompact);
         modPanel.setVisible (! destroyCompact);
         crushPanel.setVisible (! destroyCompact);
 
+        // Header controls (always visible).
         {
-            auto head1 = gr.removeFromTop (36);
-            const auto osW = juce::jmin (180, juce::jmax (120, head1.getWidth() / 2));
-            destroyOversample.setBounds (head1.removeFromRight (osW));
-            head1.removeFromRight (4);
-            destroyPitchLockEnable.setBounds (head1.reduced (0, 7));
+            // Use compact combos in the header so we don't burn vertical space.
+            const auto useLabelLeft = (destroyCompact);
+            destroyOversample.setLayout (useLabelLeft ? ies::ui::ComboWithLabel::Layout::labelLeft
+                                                      : ies::ui::ComboWithLabel::Layout::labelTop);
+            destroyPitchLockMode.setLayout (useLabelLeft ? ies::ui::ComboWithLabel::Layout::labelLeft
+                                                        : ies::ui::ComboWithLabel::Layout::labelTop);
+            modMode.setLayout (useLabelLeft ? ies::ui::ComboWithLabel::Layout::labelLeft
+                                            : ies::ui::ComboWithLabel::Layout::labelTop);
 
-            gr.removeFromTop (3);
+            const int headRowH = destroyCompact ? 24 : 36;
 
-            auto head2 = gr.removeFromTop (36);
-            const auto modeW = juce::jmin (180, juce::jmax (130, head2.getWidth() / 2));
-            destroyPitchLockMode.setBounds (head2.removeFromLeft (modeW));
-            head2.removeFromLeft (4);
-            destroyPitchLockAmount.setBounds (head2);
-            gr.removeFromTop (4);
+            auto headRow1 = gr.removeFromTop (headRowH);
+            const auto osW = destroyCompact ? juce::jlimit (150, 220, headRow1.getWidth() / 3)
+                                            : juce::jmin (180, juce::jmax (120, headRow1.getWidth() / 2));
+            destroyOversample.setBounds (headRow1.removeFromRight (osW));
+            headRow1.removeFromRight (6);
+            destroyPitchLockEnable.setBounds (headRow1.reduced (0, destroyCompact ? 4 : 7));
+
+            if (destroyCompact)
+            {
+                gr.removeFromTop (3);
+                auto headRow2 = gr.removeFromTop (headRowH);
+
+                const int plModeW = juce::jlimit (170, 260, headRow2.getWidth() / 4);
+                destroyPitchLockMode.setBounds (headRow2.removeFromLeft (plModeW));
+                headRow2.removeFromLeft (6);
+
+                // Pitch lock amount as a compact slider (saves vertical space).
+                destroyPitchLockAmount.getLabel().setVisible (false);
+                destroyPitchLockAmount.setSliderStyle (juce::Slider::LinearHorizontal);
+                destroyPitchLockAmount.getSlider().setTextBoxStyle (juce::Slider::TextBoxRight, false, 58, 16);
+                const int plAmtW = juce::jlimit (180, 340, headRow2.getWidth() / 3);
+                destroyPitchLockAmount.setBounds (headRow2.removeFromLeft (plAmtW));
+                headRow2.removeFromLeft (6);
+
+                // Mod mode + Note Sync are part of Destroy; keeping them in the header leaves room for the rack knobs.
+                const int modModeW = juce::jlimit (150, 240, headRow2.getWidth() / 4);
+                modMode.setBounds (headRow2.removeFromLeft (modModeW));
+                headRow2.removeFromLeft (6);
+                modNoteSync.setBounds (headRow2.reduced (0, 3));
+
+                gr.removeFromTop (4);
+            }
+            else
+            {
+                // Restore the classic (taller) layout behavior.
+                destroyPitchLockAmount.getLabel().setVisible (true);
+                destroyPitchLockAmount.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+                destroyPitchLockAmount.getSlider().setTextBoxStyle (juce::Slider::TextBoxBelow, false, 72, 16);
+                gr.removeFromTop (3);
+
+                auto headRow2 = gr.removeFromTop (36);
+                const auto modeW = juce::jmin (180, juce::jmax (130, headRow2.getWidth() / 2));
+                destroyPitchLockMode.setBounds (headRow2.removeFromLeft (modeW));
+                headRow2.removeFromLeft (4);
+                destroyPitchLockAmount.setBounds (headRow2);
+                gr.removeFromTop (4);
+            }
         }
-        const int panelGap = destroyCompact ? 4 : 5;
-        auto left = gr.removeFromLeft (gr.getWidth() / 2 - panelGap / 2);
-        gr.removeFromLeft (panelGap);
-        auto right = gr;
 
-        auto topL = left.removeFromTop (left.getHeight() / 2 - panelGap / 2);
-        left.removeFromTop (panelGap);
-        auto botL = left;
-
-        auto topR = right.removeFromTop (right.getHeight() / 2 - panelGap / 2);
-        right.removeFromTop (panelGap);
-        auto botR = right;
+        const int panelGap = destroyCompact ? 6 : 5;
 
         if (! destroyCompact)
         {
+            // Classic 2x2 panels (roomy).
+            auto left = gr.removeFromLeft (gr.getWidth() / 2 - panelGap / 2);
+            gr.removeFromLeft (panelGap);
+            auto right = gr;
+
+            auto topL = left.removeFromTop (left.getHeight() / 2 - panelGap / 2);
+            left.removeFromTop (panelGap);
+            auto botL = left;
+
+            auto topR = right.removeFromTop (right.getHeight() / 2 - panelGap / 2);
+            right.removeFromTop (panelGap);
+            auto botR = right;
+
             foldPanel.setBounds (topL);
             clipPanel.setBounds (botL);
             modPanel.setBounds (topR);
@@ -3195,7 +3264,6 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
             {
                 auto m = inside (modPanel);
-                modMode.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
                 modMode.setBounds (m.removeFromTop (36));
                 m.removeFromTop (3);
                 modNoteSync.setBounds (m.removeFromTop (20));
@@ -3207,19 +3275,49 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         }
         else
         {
-            auto inside = [] (juce::Rectangle<int> cell) { return cell.reduced (2, 2); };
+            // Compact rack: 4 strips on one row (uses width instead of height).
+            // Fold/Clip/Mod/Crush controls are all visible even on short heights.
+            auto rack = gr;
 
-            layoutKnobGrid (inside (topL), { &foldDrive, &foldAmount, &foldMix });
-            layoutKnobGrid (inside (botL), { &clipDrive, &clipAmount, &clipMix });
-            layoutKnobGrid (inside (botR), { &crushBits, &crushDownsample, &crushMix });
+            auto inside = [] (juce::Rectangle<int> cell) { return cell.reduced (2, 1); };
 
-            auto m = inside (topR);
-            modMode.setLayout (ies::ui::ComboWithLabel::Layout::labelLeft);
-            modMode.setBounds (m.removeFromTop (24));
-            m.removeFromTop (2);
-            modNoteSync.setBounds (m.removeFromTop (18));
-            m.removeFromTop (3);
-            layoutKnobGrid (m, { &modAmount, &modMix, &modFreq });
+            if (destroyStrip)
+            {
+                const int cellGap = panelGap;
+                const int cellW = juce::jmax (1, (rack.getWidth() - cellGap * 3) / 4);
+                auto aFold = rack.removeFromLeft (cellW);
+                rack.removeFromLeft (cellGap);
+                auto aClip = rack.removeFromLeft (cellW);
+                rack.removeFromLeft (cellGap);
+                auto aMod = rack.removeFromLeft (cellW);
+                rack.removeFromLeft (cellGap);
+                auto aCrush = rack;
+
+                layoutKnobGrid (inside (aFold), { &foldDrive, &foldAmount, &foldMix });
+                layoutKnobGrid (inside (aClip), { &clipDrive, &clipAmount, &clipMix });
+                layoutKnobGrid (inside (aMod), { &modAmount, &modMix, &modFreq });
+                layoutKnobGrid (inside (aCrush), { &crushBits, &crushDownsample, &crushMix });
+            }
+            else
+            {
+                // Fallback for narrow widths: keep the old 2x2 direct layout.
+                auto left = rack.removeFromLeft (rack.getWidth() / 2 - panelGap / 2);
+                rack.removeFromLeft (panelGap);
+                auto right = rack;
+
+                auto topL = left.removeFromTop (left.getHeight() / 2 - panelGap / 2);
+                left.removeFromTop (panelGap);
+                auto botL = left;
+
+                auto topR = right.removeFromTop (right.getHeight() / 2 - panelGap / 2);
+                right.removeFromTop (panelGap);
+                auto botR = right;
+
+                layoutKnobGrid (inside (topL), { &foldDrive, &foldAmount, &foldMix });
+                layoutKnobGrid (inside (botL), { &clipDrive, &clipAmount, &clipMix });
+                layoutKnobGrid (inside (topR), { &modAmount, &modMix, &modFreq });
+                layoutKnobGrid (inside (botR), { &crushBits, &crushDownsample, &crushMix });
+            }
         }
     }
 
@@ -3496,10 +3594,6 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         auto trioRow = gr.removeFromBottom (trioH);
         gr.removeFromBottom (panelGap);
 
-        const int destroyH = juce::jlimit (130, 230, gr.getHeight() / 3);
-        destroyGroup.setBounds (gr.removeFromTop (destroyH));
-        gr.removeFromTop (panelGap);
-
         toneGroup.setBounds (gr);
 
         auto shaperArea = trioRow.removeFromLeft (trioRow.getWidth() / 3);
@@ -3679,29 +3773,29 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     noiseLevel.setVisible (showSynth);
     noiseColor.setVisible (showSynth);
 
-    destroyGroup.setVisible (showLab);
-    destroyOversample.setVisible (showLab);
-    foldPanel.setVisible (showLab);
-    clipPanel.setVisible (showLab);
-    modPanel.setVisible (showLab);
-    crushPanel.setVisible (showLab);
-    foldDrive.setVisible (showLab);
-    foldAmount.setVisible (showLab);
-    foldMix.setVisible (showLab);
-    clipDrive.setVisible (showLab);
-    clipAmount.setVisible (showLab);
-    clipMix.setVisible (showLab);
-    modMode.setVisible (showLab);
-    modAmount.setVisible (showLab);
-    modMix.setVisible (showLab);
-    modNoteSync.setVisible (showLab);
-    modFreq.setVisible (showLab);
-    crushBits.setVisible (showLab);
-    crushDownsample.setVisible (showLab);
-    crushMix.setVisible (showLab);
-    destroyPitchLockEnable.setVisible (showLab);
-    destroyPitchLockMode.setVisible (showLab);
-    destroyPitchLockAmount.setVisible (showLab);
+    destroyGroup.setVisible (showSynth);
+    destroyOversample.setVisible (showSynth);
+    foldPanel.setVisible (showSynth);
+    clipPanel.setVisible (showSynth);
+    modPanel.setVisible (showSynth);
+    crushPanel.setVisible (showSynth);
+    foldDrive.setVisible (showSynth);
+    foldAmount.setVisible (showSynth);
+    foldMix.setVisible (showSynth);
+    clipDrive.setVisible (showSynth);
+    clipAmount.setVisible (showSynth);
+    clipMix.setVisible (showSynth);
+    modMode.setVisible (showSynth);
+    modAmount.setVisible (showSynth);
+    modMix.setVisible (showSynth);
+    modNoteSync.setVisible (showSynth);
+    modFreq.setVisible (showSynth);
+    crushBits.setVisible (showSynth);
+    crushDownsample.setVisible (showSynth);
+    crushMix.setVisible (showSynth);
+    destroyPitchLockEnable.setVisible (showSynth);
+    destroyPitchLockMode.setVisible (showSynth);
+    destroyPitchLockAmount.setVisible (showSynth);
 
     shaperGroup.setVisible (showLab);
     shaperEnable.setVisible (showLab);
@@ -4078,7 +4172,7 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
                               juce::dontSendNotification);
     modQuickPanel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Быстрый Coach") : juce::String ("Quick Coach"));
 
-    labGroup.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Лаб: Destroy / Tone / Env") : juce::String ("Lab: Destroy / Tone / Env"));
+    labGroup.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Лаб: Тон / Огиб. / Клав") : juce::String ("Lab: Tone / Env / Keys"));
     labOctaveDown.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Окт -") : juce::String ("Oct -"));
     labOctaveUp.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Окт +") : juce::String ("Oct +"));
     labHold.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Удерж.") : juce::String ("Hold"));
@@ -4490,20 +4584,10 @@ void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
         modFreq.setEnabled (! noteSyncOn);
 
     const auto pitchLockOn = destroyPitchLockEnable.getToggleState();
-    if (destroyPitchLockAmount.isEnabled() != pitchLockOn)
-        destroyPitchLockAmount.setEnabled (pitchLockOn);
-    if (destroyPitchLockMode.isEnabled() != pitchLockOn)
-        destroyPitchLockMode.setEnabled (pitchLockOn);
+    juce::ignoreUnused (pitchLockOn);
 
-    const auto shaperOn = shaperEnable.getToggleState();
-    if (shaperPlacement.isEnabled() != shaperOn)
-        shaperPlacement.setEnabled (shaperOn);
-    if (shaperDrive.isEnabled() != shaperOn)
-        shaperDrive.setEnabled (shaperOn);
-    if (shaperMix.isEnabled() != shaperOn)
-        shaperMix.setEnabled (shaperOn);
-    if (shaperEditor.isEnabled() != shaperOn)
-        shaperEditor.setEnabled (shaperOn);
+    // Serum-ish UX: even when a block is bypassed, keep its controls editable (so users can "pre-dial" values).
+    // The enable toggles still control audio processing in the engine.
 
     // LFO: when sync is ON, use Div; when OFF, use Rate (Hz).
     {
@@ -4617,22 +4701,16 @@ void IndustrialEnergySynthAudioProcessorEditor::updateLabKeyboardRange()
     // Make sure the keyboard can display the full MIDI range; we control the view via setLowestVisibleKey().
     labKeyboard.setAvailableRange (0, 127);
 
-    // First-pass: compute span for the current base octave.
-    int start = juce::jlimit (0, 127, labBaseOctave * 12);
-    int end = computeEndForStart (start);
-    int span = juce::jlimit (12, 127, end - start);
-
-    // Clamp start so [start..start+span] stays within MIDI range. Keep it on C boundaries.
-    const int maxStart = juce::jmax (0, 127 - span);
-    start = juce::jlimit (0, maxStart, start);
+    // Octave scrolling: allow moving up even when the keyboard is very wide.
+    // Near the top of the MIDI range we may show fewer keys (blank space to the right),
+    // but octave buttons always work in both directions.
+    labMaxBaseOctave = 10; // C10 = MIDI 120
+    int start = juce::jlimit (0, 120, labBaseOctave * 12);
     start = (start / 12) * 12;
-
-    // Recompute end for the clamped start.
-    end = computeEndForStart (start);
-    span = juce::jlimit (12, 127, end - start);
-
-    labMaxBaseOctave = juce::jlimit (0, 10, maxStart / 12);
+    start = juce::jlimit (0, 120, start);
     labBaseOctave = juce::jlimit (0, labMaxBaseOctave, start / 12);
+
+    const int end = computeEndForStart (start);
 
     labKeyboard.setLowestVisibleKey (start);
     labKeyboard.setKeyPressBaseOctave (labBaseOctave);
@@ -4642,6 +4720,9 @@ void IndustrialEnergySynthAudioProcessorEditor::updateLabKeyboardRange()
         ? (juce::String::fromUTF8 (u8"Диапазон: ") + midiNoteName (start) + " .. " + midiNoteName (end))
         : (juce::String ("Range: ") + midiNoteName (start) + " .. " + midiNoteName (end));
     labKeyboardRangeLabel.setText (txt, juce::dontSendNotification);
+
+    // Keep octave button enabled states in sync immediately.
+    updateEnabledStates();
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::updateLabKeyboardInfo()
