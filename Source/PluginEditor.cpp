@@ -3,6 +3,7 @@
 #include "Params.h"
 
 #include <cctype>
+#include <vector>
 
 namespace
 {
@@ -1177,8 +1178,12 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
                                             safeThis->loadMacroNamesFromState();
                                             safeThis->loadLabChordFromState();
+                                            safeThis->loadFxCustomOrderFromProcessor();
+                                            safeThis->storeFxCustomOrderToState();
                                             safeThis->refreshLabels();
                                             safeThis->refreshTooltips();
+                                            safeThis->updateEnabledStates();
+                                            safeThis->resized();
                                             safeThis->rebuildPresetMenu();
                                         });
     };
@@ -2748,7 +2753,12 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     {
         addAndMakeVisible (b);
         b.setButtonText (name);
-        b.onClick = [this, idx] { selectedFxBlock = idx; resized(); };
+        b.onClick = [this, idx]
+        {
+            selectedFxBlock = idx;
+            updateEnabledStates();
+            resized();
+        };
     };
     initFxBlockButton (fxBlockChorus, "Chorus", fxChorus);
     initFxBlockButton (fxBlockDelay, "Delay", fxDelay);
@@ -2783,6 +2793,12 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     fxGlobalOrder.getCombo().addItem ("Order B", 2);
     fxGlobalOrder.getCombo().addItem ("Custom", 3);
     fxGlobalOrderAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::global::order, fxGlobalOrder.getCombo());
+    fxGlobalOrder.getCombo().onChange = [this]
+    {
+        refreshLabels();
+        updateEnabledStates();
+        resized();
+    };
 
     addAndMakeVisible (fxGlobalRoute);
     fxGlobalRoute.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
@@ -2796,6 +2812,47 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     fxGlobalOversample.getCombo().addItem ("2x", 2);
     fxGlobalOversample.getCombo().addItem ("4x", 3);
     fxGlobalOversampleAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::global::oversample, fxGlobalOversample.getCombo());
+
+    addAndMakeVisible (fxDetailBasicButton);
+    fxDetailBasicButton.setButtonText ("Basic");
+    fxDetailBasicButton.onClick = [this]
+    {
+        selectedFxDetailMode = fxBasic;
+        resized();
+    };
+
+    addAndMakeVisible (fxDetailAdvancedButton);
+    fxDetailAdvancedButton.setButtonText ("Advanced");
+    fxDetailAdvancedButton.onClick = [this]
+    {
+        selectedFxDetailMode = fxAdvanced;
+        resized();
+    };
+
+    addAndMakeVisible (fxOrderUpButton);
+    fxOrderUpButton.setButtonText ("Up");
+    fxOrderUpButton.onClick = [this]
+    {
+        moveSelectedFxBlockInCustomOrder (-1);
+    };
+
+    addAndMakeVisible (fxOrderDownButton);
+    fxOrderDownButton.setButtonText ("Down");
+    fxOrderDownButton.onClick = [this]
+    {
+        moveSelectedFxBlockInCustomOrder (1);
+    };
+
+    addAndMakeVisible (fxOrderResetButton);
+    fxOrderResetButton.setButtonText ("Reset");
+    fxOrderResetButton.onClick = [this]
+    {
+        fxCustomOrderUi = { { 0, 1, 2, 3, 4, 5 } };
+        storeFxCustomOrderToState();
+        refreshLabels();
+        updateEnabledStates();
+        resized();
+    };
 
     auto initFxKnob = [this] (ies::ui::KnobWithLabel& k, const char* label, const char* paramId, std::unique_ptr<APVTS::SliderAttachment>& a)
     {
@@ -3440,6 +3497,11 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (fxGlobalOrder, cOut);
     setGroupAccent (fxGlobalRoute, cOut);
     setGroupAccent (fxGlobalOversample, cOut);
+    setGroupAccent (fxDetailBasicButton, cOut);
+    setGroupAccent (fxDetailAdvancedButton, cOut);
+    setGroupAccent (fxOrderUpButton, cOut);
+    setGroupAccent (fxOrderDownButton, cOut);
+    setGroupAccent (fxOrderResetButton, cOut);
     setGroupAccent (fxDelayDivL, cOut);
     setGroupAccent (fxDelayDivR, cOut);
     setGroupAccent (fxDistType, cOut);
@@ -3587,6 +3649,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     loadMacroNamesFromState();
     loadLabChordFromState();
     loadLabKeyBindsFromState();
+    loadFxCustomOrderFromProcessor();
+    storeFxCustomOrderToState();
     refreshLabels();
     refreshTooltips();
 
@@ -4703,25 +4767,49 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         fxGlobalRoute.setBounds (globalRow.removeFromLeft (gw));
         globalRow.removeFromLeft (gap2);
         fxGlobalOversample.setBounds (globalRow.removeFromLeft (gw));
-        dt.removeFromTop (6);
+        dt.removeFromTop (4);
+        auto modeRow = dt.removeFromTop (26);
+        const int modeGap = 6;
+        const int modeW = juce::jmax (92, juce::jmin (138, (modeRow.getWidth() - modeGap) / 2));
+        fxDetailBasicButton.setBounds (modeRow.removeFromLeft (modeW));
+        modeRow.removeFromLeft (modeGap);
+        fxDetailAdvancedButton.setBounds (modeRow.removeFromLeft (modeW));
+        dt.removeFromTop (5);
 
-        auto layoutFxControls = [&] (juce::Rectangle<int> area, std::initializer_list<juce::Component*> comps)
+        auto orderRow = dt.removeFromTop (26);
+        const int orderGap = 6;
+        const int orderW = juce::jmax (70, juce::jmin (120, (orderRow.getWidth() - orderGap * 2) / 3));
+        fxOrderUpButton.setBounds (orderRow.removeFromLeft (orderW));
+        orderRow.removeFromLeft (orderGap);
+        fxOrderDownButton.setBounds (orderRow.removeFromLeft (orderW));
+        orderRow.removeFromLeft (orderGap);
+        fxOrderResetButton.setBounds (orderRow.removeFromLeft (orderW));
+        dt.removeFromTop (7);
+
+        auto setModeButtonVisual = [] (juce::TextButton& b, bool active)
+        {
+            b.setColour (juce::TextButton::buttonColourId, active ? juce::Colour (0xff2a3140) : juce::Colour (0xff141a24));
+            b.setColour (juce::TextButton::textColourOffId, juce::Colour (0xffe8ebf1).withAlpha (active ? 0.95f : 0.75f));
+        };
+        setModeButtonVisual (fxDetailBasicButton, selectedFxDetailMode == fxBasic);
+        setModeButtonVisual (fxDetailAdvancedButton, selectedFxDetailMode == fxAdvanced);
+
+        auto layoutFxControls = [&] (juce::Rectangle<int> area, const std::vector<juce::Component*>& comps)
         {
             const int count = (int) comps.size();
             if (count <= 0)
                 return;
 
-            const int gapC = 8;
-            const int gapR = 8;
-            int gridCols = juce::jlimit (2, 5, area.getWidth() / 190);
+            const int gapC = 7;
+            const int gapR = 7;
+            int gridCols = juce::jlimit (2, 6, area.getWidth() / 168);
             gridCols = juce::jmin (gridCols, count);
             int gridRows = (count + gridCols - 1) / gridCols;
 
-            // Keep controls readable: if cells get too short, reduce columns.
             for (;;)
             {
                 const int cellH = juce::jmax (1, (area.getHeight() - gapR * (gridRows - 1)) / gridRows);
-                if (cellH >= 74 || gridCols <= 1)
+                if (cellH >= 66 || gridCols <= 1)
                     break;
                 --gridCols;
                 gridRows = (count + gridCols - 1) / gridCols;
@@ -4743,62 +4831,88 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
             }
         };
 
-        auto setVisibleForBlock = [&] (FxBlockIndex idx, std::initializer_list<juce::Component*> comps)
+        auto hideAllFxDetail = [&]
         {
-            const bool on = (selectedFxBlock == idx);
-            for (auto* c : comps)
-                c->setVisible (on && showFx);
-            if (on && showFx)
-                layoutFxControls (dt, comps);
+            for (auto* c : { (juce::Component*) &fxChorusMix, (juce::Component*) &fxChorusRate, (juce::Component*) &fxChorusDepth,
+                             (juce::Component*) &fxChorusDelay, (juce::Component*) &fxChorusFeedback, (juce::Component*) &fxChorusStereo, (juce::Component*) &fxChorusHp,
+                             (juce::Component*) &fxDelayMix, (juce::Component*) &fxDelayTime, (juce::Component*) &fxDelayFeedback,
+                             (juce::Component*) &fxDelaySync, (juce::Component*) &fxDelayPingPong, (juce::Component*) &fxDelayDivL, (juce::Component*) &fxDelayDivR,
+                             (juce::Component*) &fxDelayFilter, (juce::Component*) &fxDelayModRate, (juce::Component*) &fxDelayModDepth, (juce::Component*) &fxDelayDuck,
+                             (juce::Component*) &fxReverbMix, (juce::Component*) &fxReverbSize, (juce::Component*) &fxReverbDecay, (juce::Component*) &fxReverbWidth,
+                             (juce::Component*) &fxReverbDamp, (juce::Component*) &fxReverbPreDelay, (juce::Component*) &fxReverbLowCut, (juce::Component*) &fxReverbHighCut, (juce::Component*) &fxReverbQuality,
+                             (juce::Component*) &fxDistMix, (juce::Component*) &fxDistDrive, (juce::Component*) &fxDistTone, (juce::Component*) &fxDistType,
+                             (juce::Component*) &fxDistPostLp, (juce::Component*) &fxDistTrim,
+                             (juce::Component*) &fxPhaserMix, (juce::Component*) &fxPhaserRate, (juce::Component*) &fxPhaserDepth, (juce::Component*) &fxPhaserFeedback,
+                             (juce::Component*) &fxPhaserCentre, (juce::Component*) &fxPhaserStages, (juce::Component*) &fxPhaserStereo,
+                             (juce::Component*) &fxOctMix, (juce::Component*) &fxOctSub, (juce::Component*) &fxOctBlend, (juce::Component*) &fxOctTone, (juce::Component*) &fxOctSensitivity,
+                             (juce::Component*) &fxXtraMix, (juce::Component*) &fxXtraFlanger, (juce::Component*) &fxXtraTremolo, (juce::Component*) &fxXtraAutopan,
+                             (juce::Component*) &fxXtraSaturator, (juce::Component*) &fxXtraClipper, (juce::Component*) &fxXtraWidth, (juce::Component*) &fxXtraTilt,
+                             (juce::Component*) &fxXtraGate, (juce::Component*) &fxXtraLofi, (juce::Component*) &fxXtraDoubler })
+                c->setVisible (false);
         };
 
-        // Common controls are always visible on FX page.
+        auto showLayoutFor = [&] (std::initializer_list<juce::Component*> basic, std::initializer_list<juce::Component*> advanced)
+        {
+            std::vector<juce::Component*> visible;
+            visible.reserve (basic.size() + (selectedFxDetailMode == fxAdvanced ? advanced.size() : 0));
+            for (auto* c : basic)
+                visible.push_back (c);
+            if (selectedFxDetailMode == fxAdvanced)
+                for (auto* c : advanced)
+                    visible.push_back (c);
+
+            for (auto* c : visible)
+                c->setVisible (showFx);
+
+            if (showFx)
+                layoutFxControls (dt, visible);
+        };
+
         fxGlobalMix.setVisible (showFx);
         fxGlobalOrder.setVisible (showFx);
+        fxGlobalRoute.setVisible (showFx);
         fxGlobalOversample.setVisible (showFx);
+        fxDetailBasicButton.setVisible (showFx);
+        fxDetailAdvancedButton.setVisible (showFx);
+        fxOrderUpButton.setVisible (showFx);
+        fxOrderDownButton.setVisible (showFx);
+        fxOrderResetButton.setVisible (showFx);
 
-        setVisibleForBlock (fxChorus, { &fxChorusMix, &fxChorusRate, &fxChorusDepth, &fxChorusDelay, &fxChorusFeedback, &fxChorusStereo, &fxChorusHp });
+        hideAllFxDetail();
+        if (showFx)
         {
-            const bool on = (selectedFxBlock == fxDelay) && showFx;
-            for (auto* c : { (juce::Component*) &fxDelayMix, (juce::Component*) &fxDelayTime, (juce::Component*) &fxDelayFeedback,
-                             (juce::Component*) &fxDelaySync, (juce::Component*) &fxDelayPingPong,
-                             (juce::Component*) &fxDelayDivL, (juce::Component*) &fxDelayDivR,
-                             (juce::Component*) &fxDelayFilter, (juce::Component*) &fxDelayModRate,
-                             (juce::Component*) &fxDelayModDepth, (juce::Component*) &fxDelayDuck })
-                c->setVisible (on);
-
-            if (on)
+            switch (selectedFxBlock)
             {
-                auto dd = dt;
-                const int delayGap = 8;
-
-                const int row1H = juce::jlimit (96, 146, dd.getHeight() / 2);
-                auto delayTopRow = dd.removeFromTop (row1H);
-                dd.removeFromTop (delayGap);
-                auto delayBottomRow = dd;
-
-                {
-                    const int toggleW = juce::jlimit (88, 108, delayTopRow.getWidth() / 7);
-                    const int toggleH = 26;
-                    auto toggles = delayTopRow.removeFromRight (toggleW * 2 + delayGap);
-                    fxDelaySync.setBounds (toggles.removeFromLeft (toggleW).withHeight (toggleH).withY (delayTopRow.getY() + 8));
-                    toggles.removeFromLeft (delayGap);
-                    fxDelayPingPong.setBounds (toggles.removeFromLeft (toggleW).withHeight (toggleH).withY (delayTopRow.getY() + 8));
-                    delayTopRow.removeFromRight (delayGap);
-
-                    layoutFxControls (delayTopRow, { &fxDelayMix, &fxDelayTime, &fxDelayFeedback });
-                }
-
-                layoutFxControls (delayBottomRow, { &fxDelayDivL, &fxDelayDivR, &fxDelayFilter, &fxDelayModRate, &fxDelayModDepth, &fxDelayDuck });
+                case fxChorus:
+                    showLayoutFor ({ &fxChorusMix, &fxChorusRate, &fxChorusDepth, &fxChorusFeedback, &fxChorusStereo },
+                                   { &fxChorusDelay, &fxChorusHp });
+                    break;
+                case fxDelay:
+                    showLayoutFor ({ &fxDelayMix, &fxDelayTime, &fxDelayFeedback, &fxDelaySync, &fxDelayPingPong },
+                                   { &fxDelayDivL, &fxDelayDivR, &fxDelayFilter, &fxDelayModRate, &fxDelayModDepth, &fxDelayDuck });
+                    break;
+                case fxReverb:
+                    showLayoutFor ({ &fxReverbMix, &fxReverbSize, &fxReverbDecay, &fxReverbWidth },
+                                   { &fxReverbDamp, &fxReverbPreDelay, &fxReverbLowCut, &fxReverbHighCut, &fxReverbQuality });
+                    break;
+                case fxDist:
+                    showLayoutFor ({ &fxDistType, &fxDistMix, &fxDistDrive, &fxDistTone },
+                                   { &fxDistPostLp, &fxDistTrim });
+                    break;
+                case fxPhaser:
+                    showLayoutFor ({ &fxPhaserMix, &fxPhaserRate, &fxPhaserDepth, &fxPhaserFeedback },
+                                   { &fxPhaserCentre, &fxPhaserStages, &fxPhaserStereo });
+                    break;
+                case fxOctaver:
+                    showLayoutFor ({ &fxOctMix, &fxOctSub, &fxOctBlend },
+                                   { &fxOctTone, &fxOctSensitivity });
+                    break;
+                case fxXtra:
+                    showLayoutFor ({ &fxXtraMix, &fxXtraFlanger, &fxXtraTremolo, &fxXtraAutopan, &fxXtraSaturator, &fxXtraClipper },
+                                   { &fxXtraWidth, &fxXtraTilt, &fxXtraGate, &fxXtraLofi, &fxXtraDoubler });
+                    break;
             }
         }
-        setVisibleForBlock (fxReverb, { &fxReverbMix, &fxReverbSize, &fxReverbDecay, &fxReverbDamp, &fxReverbPreDelay, &fxReverbWidth,
-                                        &fxReverbLowCut, &fxReverbHighCut, &fxReverbQuality });
-        setVisibleForBlock (fxDist, { &fxDistMix, &fxDistDrive, &fxDistTone, &fxDistType, &fxDistPostLp, &fxDistTrim });
-        setVisibleForBlock (fxPhaser, { &fxPhaserMix, &fxPhaserRate, &fxPhaserDepth, &fxPhaserFeedback, &fxPhaserCentre, &fxPhaserStages, &fxPhaserStereo });
-        setVisibleForBlock (fxOctaver, { &fxOctMix, &fxOctSub, &fxOctBlend, &fxOctTone, &fxOctSensitivity });
-        setVisibleForBlock (fxXtra, { &fxXtraMix, &fxXtraFlanger, &fxXtraTremolo, &fxXtraAutopan, &fxXtraSaturator,
-                                      &fxXtraClipper, &fxXtraWidth, &fxXtraTilt, &fxXtraGate, &fxXtraLofi, &fxXtraDoubler });
 
         auto setTabVisual = [] (juce::TextButton& b, bool active)
         {
@@ -5288,6 +5402,11 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     fxGlobalOrder.setVisible (showFx);
     fxGlobalRoute.setVisible (showFx);
     fxGlobalOversample.setVisible (showFx);
+    fxDetailBasicButton.setVisible (showFx);
+    fxDetailAdvancedButton.setVisible (showFx);
+    fxOrderUpButton.setVisible (showFx);
+    fxOrderDownButton.setVisible (showFx);
+    fxOrderResetButton.setVisible (showFx);
     fxChorusMix.setVisible (showFx && selectedFxBlock == fxChorus);
     fxChorusRate.setVisible (showFx && selectedFxBlock == fxChorus);
     fxChorusDepth.setVisible (showFx && selectedFxBlock == fxChorus);
@@ -5350,6 +5469,105 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
         m.setVisible (showFx);
     fxOutMeter.setVisible (showFx);
     fxOutLabel.setVisible (showFx);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::loadFxCustomOrderFromProcessor()
+{
+    auto order = audioProcessor.getUiFxCustomOrder();
+    std::array<bool, (size_t) ies::dsp::FxChain::numBlocks> used {};
+
+    int write = 0;
+    for (int v : order)
+    {
+        const int b = juce::jlimit (0, (int) ies::dsp::FxChain::numBlocks - 1, v);
+        if (used[(size_t) b] || write >= (int) fxCustomOrderUi.size())
+            continue;
+
+        fxCustomOrderUi[(size_t) write++] = b;
+        used[(size_t) b] = true;
+    }
+
+    for (int b = 0; b < (int) ies::dsp::FxChain::numBlocks && write < (int) fxCustomOrderUi.size(); ++b)
+    {
+        if (used[(size_t) b])
+            continue;
+
+        fxCustomOrderUi[(size_t) write++] = b;
+    }
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::storeFxCustomOrderToState()
+{
+    audioProcessor.setUiFxCustomOrder (fxCustomOrderUi);
+
+    auto& state = audioProcessor.getAPVTS().state;
+    for (int i = 0; i < (int) ies::dsp::FxChain::numBlocks; ++i)
+    {
+        const auto key = juce::Identifier ("ui.fxOrder" + juce::String (i));
+        state.setProperty (key, fxCustomOrderUi[(size_t) i], nullptr);
+    }
+}
+
+int IndustrialEnergySynthAudioProcessorEditor::getEngineBlockForFxUiBlock (int b) const noexcept
+{
+    switch ((FxBlockIndex) b)
+    {
+        case fxChorus:  return (int) ies::dsp::FxChain::chorus;
+        case fxDelay:   return (int) ies::dsp::FxChain::delay;
+        case fxReverb:  return (int) ies::dsp::FxChain::reverb;
+        case fxDist:    return (int) ies::dsp::FxChain::dist;
+        case fxPhaser:  return (int) ies::dsp::FxChain::phaser;
+        case fxOctaver: return (int) ies::dsp::FxChain::octaver;
+        case fxXtra:    break;
+    }
+    return -1;
+}
+
+int IndustrialEnergySynthAudioProcessorEditor::getCustomOrderPositionForEngineBlock (int engineBlock) const noexcept
+{
+    for (int i = 0; i < (int) fxCustomOrderUi.size(); ++i)
+        if (fxCustomOrderUi[(size_t) i] == engineBlock)
+            return i;
+
+    return -1;
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::moveSelectedFxBlockInCustomOrder (int delta)
+{
+    if (delta == 0)
+        return;
+    if (fxGlobalOrder.getCombo().getSelectedItemIndex() != (int) params::fx::global::orderCustom)
+        return;
+
+    const int engineBlock = getEngineBlockForFxUiBlock ((int) selectedFxBlock);
+    if (engineBlock < 0)
+        return;
+
+    const int pos = getCustomOrderPositionForEngineBlock (engineBlock);
+    if (pos < 0)
+        return;
+
+    const int target = juce::jlimit (0, (int) fxCustomOrderUi.size() - 1, pos + delta);
+    if (target == pos)
+        return;
+
+    const int moved = fxCustomOrderUi[(size_t) pos];
+    if (target > pos)
+    {
+        for (int i = pos; i < target; ++i)
+            fxCustomOrderUi[(size_t) i] = fxCustomOrderUi[(size_t) (i + 1)];
+    }
+    else
+    {
+        for (int i = pos; i > target; --i)
+            fxCustomOrderUi[(size_t) i] = fxCustomOrderUi[(size_t) (i - 1)];
+    }
+    fxCustomOrderUi[(size_t) target] = moved;
+
+    storeFxCustomOrderToState();
+    refreshLabels();
+    updateEnabledStates();
+    resized();
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::loadMacroNamesFromState()
@@ -5716,19 +5934,41 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     fxGroup.setText ("FX");
     fxRackPanel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Цепь") : juce::String ("Rack"));
     fxDetailPanel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Параметры") : juce::String ("Block"));
-    fxBlockChorus.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Хорус") : juce::String ("Chorus"));
-    fxBlockDelay.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Дилей") : juce::String ("Delay"));
-    fxBlockReverb.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Реверб") : juce::String ("Reverb"));
-    fxBlockDist.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Дист") : juce::String ("Dist"));
-    fxBlockPhaser.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Фэйзер") : juce::String ("Phaser"));
-    fxBlockOctaver.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Октавер") : juce::String ("Octaver"));
-    fxBlockXtra.setButtonText ("Xtra");
+    const auto isCustomOrder = (fxGlobalOrder.getCombo().getSelectedItemIndex() == (int) params::fx::global::orderCustom);
+    const auto withCustomOrderPrefix = [this, isCustomOrder] (const juce::String& base, FxBlockIndex block) -> juce::String
+    {
+        if (! isCustomOrder)
+            return base;
+
+        const int engineBlock = getEngineBlockForFxUiBlock ((int) block);
+        const int pos = getCustomOrderPositionForEngineBlock (engineBlock);
+        if (pos < 0)
+            return base;
+
+        return juce::String (pos + 1) + ". " + base;
+    };
+
+    fxBlockChorus.setButtonText (withCustomOrderPrefix ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Хорус") : juce::String ("Chorus"), fxChorus));
+    fxBlockDelay.setButtonText (withCustomOrderPrefix ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Дилей") : juce::String ("Delay"), fxDelay));
+    fxBlockReverb.setButtonText (withCustomOrderPrefix ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Реверб") : juce::String ("Reverb"), fxReverb));
+    fxBlockDist.setButtonText (withCustomOrderPrefix ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Дист") : juce::String ("Dist"), fxDist));
+    fxBlockPhaser.setButtonText (withCustomOrderPrefix ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Фэйзер") : juce::String ("Phaser"), fxPhaser));
+    fxBlockOctaver.setButtonText (withCustomOrderPrefix ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Октавер") : juce::String ("Octaver"), fxOctaver));
+    fxBlockXtra.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Экстра") : juce::String ("Xtra"));
     fxGlobalMix.setLabelText ("FX Mix");
     fxGlobalOrder.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Порядок") : juce::String ("Order"));
+    fxGlobalOrder.getCombo().changeItemText (1, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Порядок A") : juce::String ("Order A"));
+    fxGlobalOrder.getCombo().changeItemText (2, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Порядок B") : juce::String ("Order B"));
+    fxGlobalOrder.getCombo().changeItemText (3, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Польз.") : juce::String ("Custom"));
     fxGlobalRoute.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Роутинг") : juce::String ("Route"));
     fxGlobalRoute.getCombo().changeItemText (1, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Последовательно") : juce::String ("Serial"));
     fxGlobalRoute.getCombo().changeItemText (2, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Параллельно") : juce::String ("Parallel"));
     fxGlobalOversample.setLabelText ("OS");
+    fxDetailBasicButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Базово") : juce::String ("Basic"));
+    fxDetailAdvancedButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Расшир.") : juce::String ("Advanced"));
+    fxOrderUpButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Выше") : juce::String ("Up"));
+    fxOrderDownButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Ниже") : juce::String ("Down"));
+    fxOrderResetButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Сброс") : juce::String ("Reset"));
     fxChorusMix.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Микс") : juce::String ("Mix"));
     fxChorusRate.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Скорость") : juce::String ("Rate"));
     fxChorusDepth.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Глубина") : juce::String ("Depth"));
@@ -6192,6 +6432,16 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
         fxGlobalOversample.getCombo().setTooltip (tip);
         fxGlobalOversample.getLabel().setTooltip (tip);
     }
+    fxDetailBasicButton.setTooltip (T ("Compact essential controls for the selected FX block.",
+                                       u8"Компактный набор основных контролов выбранного FX-блока."));
+    fxDetailAdvancedButton.setTooltip (T ("Show full parameter set for the selected FX block.",
+                                          u8"Показать полный набор параметров выбранного FX-блока."));
+    fxOrderUpButton.setTooltip (T ("Move selected FX block earlier in Custom order.",
+                                   u8"Сдвинуть выбранный FX-блок выше в пользовательском порядке."));
+    fxOrderDownButton.setTooltip (T ("Move selected FX block later in Custom order.",
+                                     u8"Сдвинуть выбранный FX-блок ниже в пользовательском порядке."));
+    fxOrderResetButton.setTooltip (T ("Reset Custom order to default: Chorus > Delay > Reverb > Dist > Phaser > Octaver.",
+                                      u8"Сбросить пользовательский порядок к умолчанию: Chorus > Delay > Reverb > Dist > Phaser > Octaver."));
     {
         const auto tip = T ("Enable/disable this FX block.",
                             u8"Включение/выключение выбранного FX-блока.");
@@ -6451,6 +6701,24 @@ void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
 
     labOctaveDown.setEnabled (labBaseOctave > 0);
     labOctaveUp.setEnabled (labBaseOctave < labMaxBaseOctave);
+
+    const bool isCustomOrder = (fxGlobalOrder.getCombo().getSelectedItemIndex() == (int) params::fx::global::orderCustom);
+    const int selectedEngineBlock = getEngineBlockForFxUiBlock ((int) selectedFxBlock);
+    const int selectedPos = (selectedEngineBlock >= 0) ? getCustomOrderPositionForEngineBlock (selectedEngineBlock) : -1;
+
+    fxOrderUpButton.setEnabled (isCustomOrder && selectedPos > 0);
+    fxOrderDownButton.setEnabled (isCustomOrder && selectedPos >= 0 && selectedPos < (int) ies::dsp::FxChain::numBlocks - 1);
+
+    bool isDefaultOrder = true;
+    for (int i = 0; i < (int) ies::dsp::FxChain::numBlocks; ++i)
+    {
+        if (fxCustomOrderUi[(size_t) i] != i)
+        {
+            isDefaultOrder = false;
+            break;
+        }
+    }
+    fxOrderResetButton.setEnabled (isCustomOrder && ! isDefaultOrder);
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::sendLabKeyboardAllNotesOff (bool resetControllers)
@@ -7581,6 +7849,12 @@ void IndustrialEnergySynthAudioProcessorEditor::resetAllParamsKeepLanguage()
         param->setValueNotifyingHost (param->getDefaultValue());
         param->endChangeGesture();
     }
+
+    fxCustomOrderUi = { { 0, 1, 2, 3, 4, 5 } };
+    storeFxCustomOrderToState();
+    refreshLabels();
+    updateEnabledStates();
+    resized();
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::rebuildPresetMenu()
@@ -7682,8 +7956,12 @@ void IndustrialEnergySynthAudioProcessorEditor::loadPresetByComboSelection()
 
     loadMacroNamesFromState();
     loadLabChordFromState();
+    loadFxCustomOrderFromProcessor();
+    storeFxCustomOrderToState();
     refreshLabels();
     refreshTooltips();
+    updateEnabledStates();
+    resized();
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::setParamValue (const char* paramId, float actualValue)

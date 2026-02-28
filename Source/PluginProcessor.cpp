@@ -1164,6 +1164,15 @@ void IndustrialEnergySynthAudioProcessor::applyStateFromUi (juce::ValueTree stat
 
     apvts.replaceState (state);
 
+    // Restore UI custom FX order (stored as non-parameter properties).
+    std::array<int, (size_t) ies::dsp::FxChain::numBlocks> fxOrder { { 0, 1, 2, 3, 4, 5 } };
+    for (int i = 0; i < (int) ies::dsp::FxChain::numBlocks; ++i)
+    {
+        const auto key = juce::Identifier ("ui.fxOrder" + juce::String (i));
+        fxOrder[(size_t) i] = (int) state.getProperty (key, fxOrder[(size_t) i]);
+    }
+    setUiFxCustomOrder (fxOrder);
+
     if (keepLanguage && langParam != nullptr)
     {
         langParam->beginChangeGesture();
@@ -1534,6 +1543,13 @@ juce::AudioProcessorEditor* IndustrialEnergySynthAudioProcessor::createEditor()
 void IndustrialEnergySynthAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
+    const auto fxOrder = getUiFxCustomOrder();
+    for (int i = 0; i < (int) ies::dsp::FxChain::numBlocks; ++i)
+    {
+        const auto key = juce::Identifier ("ui.fxOrder" + juce::String (i));
+        state.setProperty (key, fxOrder[(size_t) i], nullptr);
+    }
+
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
     copyXmlToBinary (*xml, destData);
 }

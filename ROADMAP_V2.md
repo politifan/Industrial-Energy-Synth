@@ -13,6 +13,7 @@
 - (2026-02-28) FX Routing Pro v1: добавлен `fx.global.route` (`Serial/Parallel`) в APVTS + DSP + UI.
 - (2026-02-28) Modulation 2.0 (FX-aware) v1: Mod Matrix расширена destination-ами для `FX Xtra` + интеграция в аудио-движок с клампами и сглаживанием.
 - (2026-02-28) Factory preset safety: reset/default логика пресетов обновлена под новые `fx.global.route` и `fx.xtra.*` параметры.
+- (2026-02-28) FX Compact UX v2: добавлен переключаемый режим `Basic/Advanced` для каждого FX-блока + более плотная раскладка контролов в detail-панели.
 - (2026-02-11) Synth Layout Compact v2: удалён отдельный `Output` блок, `Gain` перенесён в `Mono`; пересобрана сетка страницы `Synth` для меньшего пустого пространства.
 - (2026-02-11) Dense UI Fit Fixes: устранён клиппинг контролов/лейблов в `Destroy/Filter`, увеличены текст-боксы значений и вертикальные интервалы.
 - (2026-02-11) Fast Destroy Reset: double-click по заголовку `Destroy` сбрасывает параметры блока к дефолту.
@@ -202,6 +203,7 @@
 - Добавлены destinations Mod Matrix для `fx.xtra.*` + применение модуляции в аудио-движке.
 - Добавлены factory-default reset значения для новых FX параметров.
 - Обновлены tooltip-подсказки и визуальные mod-rings для FX/Xtra ручек.
+- Добавлен режим `Basic/Advanced` на FX-странице: compact essentials vs full control set для выбранного блока.
 
 ### 2026-02-12
 - Добавлен каркас `FXChain` (Chorus / Delay / Reverb / Distortion / Phaser / Octaver) с per-block mix + global FX mix.

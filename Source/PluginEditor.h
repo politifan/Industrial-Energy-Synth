@@ -43,6 +43,11 @@ private:
     void refreshTooltips();
     void updateEnabledStates();
     void updateStatusFromComponent (juce::Component*);
+    void loadFxCustomOrderFromProcessor();
+    void storeFxCustomOrderToState();
+    void moveSelectedFxBlockInCustomOrder (int delta);
+    int getEngineBlockForFxUiBlock (int b) const noexcept;
+    int getCustomOrderPositionForEngineBlock (int engineBlock) const noexcept;
     void resetAllParamsKeepLanguage();
     void rebuildPresetMenu();
     void loadPresetByComboSelection();
@@ -434,6 +439,11 @@ private:
     ies::ui::ComboWithLabel fxGlobalOrder;
     ies::ui::ComboWithLabel fxGlobalRoute;
     ies::ui::ComboWithLabel fxGlobalOversample;
+    juce::TextButton fxDetailBasicButton;
+    juce::TextButton fxDetailAdvancedButton;
+    juce::TextButton fxOrderUpButton;
+    juce::TextButton fxOrderDownButton;
+    juce::TextButton fxOrderResetButton;
     std::unique_ptr<APVTS::SliderAttachment> fxGlobalMixAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> fxGlobalOrderAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> fxGlobalRouteAttachment;
@@ -575,7 +585,14 @@ private:
         fxOctaver = 5,
         fxXtra = 6
     };
+    enum FxDetailMode
+    {
+        fxBasic = 0,
+        fxAdvanced = 1
+    };
     FxBlockIndex selectedFxBlock = fxChorus;
+    FxDetailMode selectedFxDetailMode = fxBasic;
+    std::array<int, (size_t) ies::dsp::FxChain::numBlocks> fxCustomOrderUi { { 0, 1, 2, 3, 4, 5 } };
 
     // Sequencer / Arp page (fourth page): performance helpers (Serum-ish ARP).
     juce::GroupComponent seqGroup;
