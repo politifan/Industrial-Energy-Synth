@@ -200,6 +200,7 @@ public:
         // FX global
         std::atomic<float>* fxGlobalMix = nullptr;
         std::atomic<float>* fxGlobalOrder = nullptr;
+        std::atomic<float>* fxGlobalRoute = nullptr;
         std::atomic<float>* fxGlobalOversample = nullptr;
         std::atomic<float>* fxGlobalMorph = nullptr;
 
@@ -265,6 +266,20 @@ public:
         std::atomic<float>* fxOctBlend = nullptr;
         std::atomic<float>* fxOctSensitivity = nullptr;
         std::atomic<float>* fxOctTone = nullptr;
+
+        // FX Xtra (V2.3)
+        std::atomic<float>* fxXtraEnable = nullptr;
+        std::atomic<float>* fxXtraMix = nullptr;
+        std::atomic<float>* fxXtraFlangerAmount = nullptr;
+        std::atomic<float>* fxXtraTremoloAmount = nullptr;
+        std::atomic<float>* fxXtraAutopanAmount = nullptr;
+        std::atomic<float>* fxXtraSaturatorAmount = nullptr;
+        std::atomic<float>* fxXtraClipperAmount = nullptr;
+        std::atomic<float>* fxXtraWidthAmount = nullptr;
+        std::atomic<float>* fxXtraTiltAmount = nullptr;
+        std::atomic<float>* fxXtraGateAmount = nullptr;
+        std::atomic<float>* fxXtraLofiAmount = nullptr;
+        std::atomic<float>* fxXtraDoublerAmount = nullptr;
 
         std::atomic<float>* outGainDb = nullptr;
     };
@@ -348,6 +363,8 @@ private:
     void applyNoteChange (int newMidiNote, bool gateWasAlreadyOn);
     void resetOscPhasesFromParams();
     void resetLfoPhasesFromParams();
+    void resetXtraState();
+    void processXtraBlock (float* left, float* right, int numSamples, bool enabled, float mix01) noexcept;
 
     float computeDriftCents (juce::Random& rng, float& driftState, float alpha, float detuneAmount01) noexcept;
 
@@ -476,6 +493,19 @@ private:
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> outGain;
 
+    // FX Xtra smoothing (V2.3).
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> fxXtraMixSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> fxXtraFlangerSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> fxXtraTremoloSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> fxXtraAutopanSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> fxXtraSaturatorSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> fxXtraClipperSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> fxXtraWidthSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> fxXtraTiltSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> fxXtraGateSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> fxXtraLofiSm;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> fxXtraDoublerSm;
+
     // MIDI performance sources (for Mod Matrix).
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> modWheelSm;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> aftertouchSm;
@@ -501,6 +531,28 @@ private:
     juce::dsp::Oversampling<float> destroyOversampling2x { 1, 1, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, false };
     juce::dsp::Oversampling<float> destroyOversampling4x { 1, 2, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, false };
     int destroyOversamplingFactorPrev = 1;
+
+    // FX Xtra state.
+    std::vector<float> xtraDelayL;
+    std::vector<float> xtraDelayR;
+    int xtraDelayWrite = 0;
+    float xtraFlangerPhase = 0.0f;
+    float xtraTremoloPhase = 0.0f;
+    float xtraAutopanPhase = 0.0f;
+    float xtraGatePhase = 0.0f;
+    float xtraSaturatorLpL = 0.0f;
+    float xtraSaturatorLpR = 0.0f;
+    float xtraTiltLpL = 0.0f;
+    float xtraTiltLpR = 0.0f;
+    float xtraLofiHoldL = 0.0f;
+    float xtraLofiHoldR = 0.0f;
+    int xtraLofiCounter = 0;
+    float xtraDoublerPhase = 0.0f;
+
+    std::vector<float> fxDryL;
+    std::vector<float> fxDryR;
+    std::vector<float> fxParallelL;
+    std::vector<float> fxParallelR;
 
     // Scratch buffers (allocated in prepare; no allocations in render).
     juce::AudioBuffer<float> destroyBuffer;

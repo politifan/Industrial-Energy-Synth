@@ -332,7 +332,22 @@ enum Dest
     dstFxPhaserMix = 27,
 
     dstFxOctaverAmount = 28,
-    dstFxOctaverMix = 29
+    dstFxOctaverMix = 29,
+
+    // FX Xtra (V2.3)
+    dstFxXtraFlangerAmount = 30,
+    dstFxXtraTremoloAmount = 31,
+    dstFxXtraAutopanAmount = 32,
+    dstFxXtraSaturatorAmount = 33,
+    dstFxXtraClipperAmount = 34,
+    dstFxXtraWidthAmount = 35,
+    dstFxXtraTiltAmount = 36,
+    dstFxXtraGateAmount = 37,
+    dstFxXtraLofiAmount = 38,
+    dstFxXtraDoublerAmount = 39,
+    dstFxXtraMix = 40,
+
+    dstLast = dstFxXtraMix
 };
 }
 
@@ -345,6 +360,7 @@ namespace global
 {
 inline constexpr const char* mix        = "fx.global.mix";        // 0..1
 inline constexpr const char* order      = "fx.global.order";      // choice
+inline constexpr const char* route      = "fx.global.route";      // choice serial/parallel
 inline constexpr const char* oversample = "fx.global.oversample"; // choice Off/2x/4x
 inline constexpr const char* morph      = "fx.global.morph";      // 0..1 FX macro morph
 
@@ -360,6 +376,12 @@ enum Oversample
     osOff = 0,
     os2x  = 1,
     os4x  = 2
+};
+
+enum Route
+{
+    routeSerial = 0,
+    routeParallel = 1
 };
 }
 

@@ -949,6 +949,7 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
     // --- FX chain ---
     paramPointers.fxGlobalMix = apvts.getRawParameterValue (params::fx::global::mix);
     paramPointers.fxGlobalOrder = apvts.getRawParameterValue (params::fx::global::order);
+    paramPointers.fxGlobalRoute = apvts.getRawParameterValue (params::fx::global::route);
     paramPointers.fxGlobalOversample = apvts.getRawParameterValue (params::fx::global::oversample);
     paramPointers.fxGlobalMorph = apvts.getRawParameterValue (params::fx::global::morph);
 
@@ -1008,6 +1009,19 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
     paramPointers.fxOctBlend = apvts.getRawParameterValue (params::fx::octaver::blend);
     paramPointers.fxOctSensitivity = apvts.getRawParameterValue (params::fx::octaver::sensitivity);
     paramPointers.fxOctTone = apvts.getRawParameterValue (params::fx::octaver::tone);
+
+    paramPointers.fxXtraEnable = apvts.getRawParameterValue (params::fx::xtra::enable);
+    paramPointers.fxXtraMix = apvts.getRawParameterValue (params::fx::xtra::mix);
+    paramPointers.fxXtraFlangerAmount = apvts.getRawParameterValue (params::fx::xtra::flangerAmount);
+    paramPointers.fxXtraTremoloAmount = apvts.getRawParameterValue (params::fx::xtra::tremoloAmount);
+    paramPointers.fxXtraAutopanAmount = apvts.getRawParameterValue (params::fx::xtra::autopanAmount);
+    paramPointers.fxXtraSaturatorAmount = apvts.getRawParameterValue (params::fx::xtra::saturatorAmount);
+    paramPointers.fxXtraClipperAmount = apvts.getRawParameterValue (params::fx::xtra::clipperAmount);
+    paramPointers.fxXtraWidthAmount = apvts.getRawParameterValue (params::fx::xtra::widthAmount);
+    paramPointers.fxXtraTiltAmount = apvts.getRawParameterValue (params::fx::xtra::tiltAmount);
+    paramPointers.fxXtraGateAmount = apvts.getRawParameterValue (params::fx::xtra::gateAmount);
+    paramPointers.fxXtraLofiAmount = apvts.getRawParameterValue (params::fx::xtra::lofiAmount);
+    paramPointers.fxXtraDoublerAmount = apvts.getRawParameterValue (params::fx::xtra::doublerAmount);
 
     // --- Arp (Sequencer) ---
     arpParams.enable  = apvts.getRawParameterValue (params::arp::enable);
@@ -1696,7 +1710,11 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
         "FX Reverb Size", "FX Reverb Damp", "FX Reverb Mix",
         "FX Dist Drive", "FX Dist Tone", "FX Dist Mix",
         "FX Phaser Rate", "FX Phaser Depth", "FX Phaser Feedback", "FX Phaser Mix",
-        "FX Octaver Amount", "FX Octaver Mix"
+        "FX Octaver Amount", "FX Octaver Mix",
+        "FX Xtra Flanger", "FX Xtra Tremolo", "FX Xtra AutoPan",
+        "FX Xtra Saturator", "FX Xtra Clipper", "FX Xtra Width",
+        "FX Xtra Tilt", "FX Xtra Gate", "FX Xtra LoFi",
+        "FX Xtra Doubler", "FX Xtra Mix"
     };
 
     auto addModSlot = [&] (const char* srcId, const char* dstId, const char* depthId, int slotIndex)
@@ -2003,6 +2021,9 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
         g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::global::order), "FX Order",
                                                                    juce::StringArray { "Fixed A", "Fixed B", "Custom" },
                                                                    (int) params::fx::global::orderFixedA));
+        g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::global::route), "FX Route",
+                                                                   juce::StringArray { "Serial", "Parallel" },
+                                                                   (int) params::fx::global::routeSerial));
         g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::global::oversample), "FX Oversampling",
                                                                    juce::StringArray { "Off", "2x", "4x" },
                                                                    (int) params::fx::global::osOff));
@@ -2169,6 +2190,35 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
                                                                   juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f));
         g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::octaver::tone), "Tone",
                                                                   juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f));
+        layout.add (std::move (g));
+    }
+
+    // --- FX Xtra (10 lightweight helpers) ---
+    {
+        auto g = std::make_unique<juce::AudioProcessorParameterGroup> ("fx.xtra", "FX Xtra", "|");
+        g->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (params::fx::xtra::enable), "Enable", false));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::xtra::mix), "Mix",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::xtra::flangerAmount), "Flanger",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::xtra::tremoloAmount), "Tremolo",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::xtra::autopanAmount), "AutoPan",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::xtra::saturatorAmount), "Saturator",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::xtra::clipperAmount), "Clipper",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::xtra::widthAmount), "Width",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::xtra::tiltAmount), "Tilt",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::xtra::gateAmount), "Gate",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::xtra::lofiAmount), "LoFi",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::xtra::doublerAmount), "Doubler",
+                                                                  juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
         layout.add (std::move (g));
     }
 

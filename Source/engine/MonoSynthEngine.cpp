@@ -11,6 +11,25 @@ static int msToSamples (double sampleRate, float ms) noexcept
     return (int) std::lround (sampleRate * (double) clampedMs / 1000.0);
 }
 
+static float readDelayLinear (const std::vector<float>& buf, int writePos, float delaySamples) noexcept
+{
+    if (buf.empty())
+        return 0.0f;
+
+    const int size = (int) buf.size();
+    float rp = (float) writePos - delaySamples;
+    int i0 = (int) std::floor (rp);
+    float frac = rp - (float) i0;
+
+    while (i0 < 0)
+        i0 += size;
+
+    const int i1 = (i0 + 1) % size;
+    const float a = buf[(size_t) i0];
+    const float b = buf[(size_t) i1];
+    return a + frac * (b - a);
+}
+
 void MonoSynthEngine::prepare (double sr, int maxBlockSize)
 {
     sampleRateHz = (sr > 0.0) ? sr : 44100.0;
@@ -53,6 +72,10 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     toneEq.prepare (sampleRateHz);
     shaper.prepare (sampleRateHz);
     fxChain.prepare (sampleRateHz, maxBlockSize, 2);
+    const int xtraDelaySamples = juce::jmax (64, (int) std::ceil (sampleRateHz * 0.08));
+    xtraDelayL.assign ((size_t) xtraDelaySamples + 4u, 0.0f);
+    xtraDelayR.assign ((size_t) xtraDelaySamples + 4u, 0.0f);
+    resetXtraState();
 
     // Oversampling/scratch buffers are allocated up-front (no audio-thread allocations).
     const auto maxN = juce::jmax (1, maxBlockSize);
@@ -74,6 +97,10 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     shaperMix.resize ((size_t) maxN);
     filterModCutoffSemis.resize ((size_t) maxN);
     filterModResAdd.resize ((size_t) maxN);
+    fxDryL.resize ((size_t) maxN);
+    fxDryR.resize ((size_t) maxN);
+    fxParallelL.resize ((size_t) maxN);
+    fxParallelR.resize ((size_t) maxN);
 
     destroyOversampling2x.initProcessing ((size_t) maxN);
     destroyOversampling4x.initProcessing ((size_t) maxN);
@@ -125,6 +152,29 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     noiseColorSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->noiseColor : nullptr, 0.75f));
     noiseRngState = 0x726f6e65u;
     noiseLp = 0.0f;
+
+    fxXtraMixSm.reset (sampleRateHz, smoothSeconds);
+    fxXtraMixSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraMix : nullptr, 0.0f));
+    fxXtraFlangerSm.reset (sampleRateHz, smoothSeconds);
+    fxXtraFlangerSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraFlangerAmount : nullptr, 0.0f));
+    fxXtraTremoloSm.reset (sampleRateHz, smoothSeconds);
+    fxXtraTremoloSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraTremoloAmount : nullptr, 0.0f));
+    fxXtraAutopanSm.reset (sampleRateHz, smoothSeconds);
+    fxXtraAutopanSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraAutopanAmount : nullptr, 0.0f));
+    fxXtraSaturatorSm.reset (sampleRateHz, smoothSeconds);
+    fxXtraSaturatorSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraSaturatorAmount : nullptr, 0.0f));
+    fxXtraClipperSm.reset (sampleRateHz, smoothSeconds);
+    fxXtraClipperSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraClipperAmount : nullptr, 0.0f));
+    fxXtraWidthSm.reset (sampleRateHz, smoothSeconds);
+    fxXtraWidthSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraWidthAmount : nullptr, 0.0f));
+    fxXtraTiltSm.reset (sampleRateHz, smoothSeconds);
+    fxXtraTiltSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraTiltAmount : nullptr, 0.0f));
+    fxXtraGateSm.reset (sampleRateHz, smoothSeconds);
+    fxXtraGateSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraGateAmount : nullptr, 0.0f));
+    fxXtraLofiSm.reset (sampleRateHz, smoothSeconds);
+    fxXtraLofiSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraLofiAmount : nullptr, 0.0f));
+    fxXtraDoublerSm.reset (sampleRateHz, smoothSeconds);
+    fxXtraDoublerSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraDoublerAmount : nullptr, 0.0f));
 
     filterCutoffHzSm.reset (sampleRateHz, smoothSeconds);
     filterCutoffHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->filterCutoffHz : nullptr, 2000.0f));
@@ -275,6 +325,7 @@ void MonoSynthEngine::reset()
     toneEq.reset();
     shaper.reset();
     fxChain.reset();
+    resetXtraState();
     toneCoeffCountdown = 0;
     toneEnabledPrev = false;
 
@@ -391,6 +442,18 @@ void MonoSynthEngine::reset()
     noiseRngState = 0x726f6e65u;
     noiseLp = 0.0f;
 
+    fxXtraMixSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraMix : nullptr, 0.0f));
+    fxXtraFlangerSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraFlangerAmount : nullptr, 0.0f));
+    fxXtraTremoloSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraTremoloAmount : nullptr, 0.0f));
+    fxXtraAutopanSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraAutopanAmount : nullptr, 0.0f));
+    fxXtraSaturatorSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraSaturatorAmount : nullptr, 0.0f));
+    fxXtraClipperSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraClipperAmount : nullptr, 0.0f));
+    fxXtraWidthSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraWidthAmount : nullptr, 0.0f));
+    fxXtraTiltSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraTiltAmount : nullptr, 0.0f));
+    fxXtraGateSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraGateAmount : nullptr, 0.0f));
+    fxXtraLofiSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraLofiAmount : nullptr, 0.0f));
+    fxXtraDoublerSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->fxXtraDoublerAmount : nullptr, 0.0f));
+
     outGain.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (loadParam (params != nullptr ? params->outGainDb : nullptr, 0.0f), -100.0f));
     modWheelSm.setCurrentAndTargetValue (0.0f);
     aftertouchSm.setCurrentAndTargetValue (0.0f);
@@ -474,6 +537,202 @@ float MonoSynthEngine::computeDriftCents (juce::Random& rng, float& state, float
 
     constexpr float maxCents = 30.0f;
     return state * (maxCents * detuneAmount01);
+}
+
+void MonoSynthEngine::resetXtraState()
+{
+    std::fill (xtraDelayL.begin(), xtraDelayL.end(), 0.0f);
+    std::fill (xtraDelayR.begin(), xtraDelayR.end(), 0.0f);
+    xtraDelayWrite = 0;
+
+    xtraFlangerPhase = 0.0f;
+    xtraTremoloPhase = 0.0f;
+    xtraAutopanPhase = 0.0f;
+    xtraGatePhase = 0.0f;
+    xtraDoublerPhase = 0.0f;
+
+    xtraSaturatorLpL = 0.0f;
+    xtraSaturatorLpR = 0.0f;
+    xtraTiltLpL = 0.0f;
+    xtraTiltLpR = 0.0f;
+
+    xtraLofiHoldL = 0.0f;
+    xtraLofiHoldR = 0.0f;
+    xtraLofiCounter = 0;
+}
+
+void MonoSynthEngine::processXtraBlock (float* left, float* right, int numSamples, bool enabled, float mix01) noexcept
+{
+    if (left == nullptr || numSamples <= 0)
+        return;
+
+    auto sat = [] (float x) noexcept
+    {
+        return std::tanh (x);
+    };
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const float dryL = left[i];
+        const float dryR = (right != nullptr) ? right[i] : dryL;
+
+        float wetL = dryL;
+        float wetR = dryR;
+
+        const float flangerAmt = fxXtraFlangerSm.getNextValue();
+        const float tremoloAmt = fxXtraTremoloSm.getNextValue();
+        const float autopanAmt = fxXtraAutopanSm.getNextValue();
+        const float saturatorAmt = fxXtraSaturatorSm.getNextValue();
+        const float clipperAmt = fxXtraClipperSm.getNextValue();
+        const float widthAmt = fxXtraWidthSm.getNextValue();
+        const float tiltAmt = fxXtraTiltSm.getNextValue();
+        const float gateAmt = fxXtraGateSm.getNextValue();
+        const float lofiAmt = fxXtraLofiSm.getNextValue();
+        const float doublerAmt = fxXtraDoublerSm.getNextValue();
+        const float xtraMix = fxXtraMixSm.getNextValue();
+
+        if (enabled)
+        {
+            if (! xtraDelayL.empty())
+            {
+                const float inMid = 0.5f * (wetL + wetR);
+                const float inSide = 0.5f * (wetL - wetR);
+
+                const float flangerRateHz = juce::jmap (flangerAmt, 0.08f, 0.85f);
+                const float flangerDepthMs = juce::jmap (flangerAmt, 0.0f, 5.5f);
+                const float flangerBaseMs = juce::jmap (flangerAmt, 1.4f, 4.4f);
+                const float flangerFeedback = juce::jmap (flangerAmt, 0.0f, 0.65f);
+
+                xtraFlangerPhase += flangerRateHz / (float) sampleRateHz;
+                xtraFlangerPhase -= std::floor (xtraFlangerPhase);
+                const float flLfo = std::sin (juce::MathConstants<float>::twoPi * xtraFlangerPhase);
+                const float flDelaySamp = juce::jlimit (1.0f, (float) (xtraDelayL.size() - 3),
+                                                        (flangerBaseMs + flangerDepthMs * flLfo) * 0.001f * (float) sampleRateHz);
+                const float flReadL = readDelayLinear (xtraDelayL, xtraDelayWrite, flDelaySamp);
+                const float flReadR = readDelayLinear (xtraDelayR, xtraDelayWrite, flDelaySamp);
+
+                const float doublerRateHz = juce::jmap (doublerAmt, 0.05f, 1.2f);
+                xtraDoublerPhase += doublerRateHz / (float) sampleRateHz;
+                xtraDoublerPhase -= std::floor (xtraDoublerPhase);
+                const float dph = juce::MathConstants<float>::twoPi * xtraDoublerPhase;
+                const float dSampL = (11.0f + 5.0f * std::sin (dph * 1.3f)) * 0.001f * (float) sampleRateHz;
+                const float dSampR = (16.0f + 6.0f * std::sin (dph * 0.9f + 1.1f)) * 0.001f * (float) sampleRateHz;
+                const float dbReadL = readDelayLinear (xtraDelayL, xtraDelayWrite, juce::jlimit (1.0f, (float) (xtraDelayL.size() - 3), dSampL));
+                const float dbReadR = readDelayLinear (xtraDelayR, xtraDelayWrite, juce::jlimit (1.0f, (float) (xtraDelayR.size() - 3), dSampR));
+
+                wetL += flReadL * (0.45f * flangerAmt);
+                wetR += flReadR * (0.45f * flangerAmt);
+                wetL += (dbReadR - inSide) * (0.22f * doublerAmt);
+                wetR += (dbReadL + inSide) * (0.22f * doublerAmt);
+
+                xtraDelayL[(size_t) xtraDelayWrite] = inMid + inSide + flReadL * flangerFeedback;
+                xtraDelayR[(size_t) xtraDelayWrite] = inMid - inSide + flReadR * flangerFeedback;
+                xtraDelayWrite = (xtraDelayWrite + 1) % (int) xtraDelayL.size();
+            }
+
+            if (tremoloAmt > 1.0e-5f)
+            {
+                const float rateHz = juce::jmap (tremoloAmt, 0.35f, 13.0f);
+                xtraTremoloPhase += rateHz / (float) sampleRateHz;
+                xtraTremoloPhase -= std::floor (xtraTremoloPhase);
+                const float lfo = 0.5f + 0.5f * std::sin (juce::MathConstants<float>::twoPi * xtraTremoloPhase);
+                const float gain = juce::jmap (tremoloAmt, 1.0f, 0.2f + 0.8f * lfo);
+                wetL *= gain;
+                wetR *= gain;
+            }
+
+            if (autopanAmt > 1.0e-5f)
+            {
+                const float rateHz = juce::jmap (autopanAmt, 0.15f, 8.0f);
+                xtraAutopanPhase += rateHz / (float) sampleRateHz;
+                xtraAutopanPhase -= std::floor (xtraAutopanPhase);
+                const float pan = std::sin (juce::MathConstants<float>::twoPi * xtraAutopanPhase) * (0.95f * autopanAmt);
+                const float gL = std::sqrt (juce::jlimit (0.0f, 1.0f, 0.5f * (1.0f - pan))) * 1.41421356f;
+                const float gR = std::sqrt (juce::jlimit (0.0f, 1.0f, 0.5f * (1.0f + pan))) * 1.41421356f;
+                wetL *= gL;
+                wetR *= gR;
+            }
+
+            if (saturatorAmt > 1.0e-5f)
+            {
+                const float pre = 1.0f + 11.0f * saturatorAmt;
+                const float hpCoeff = 0.035f + 0.12f * saturatorAmt;
+                xtraSaturatorLpL += hpCoeff * (wetL - xtraSaturatorLpL);
+                xtraSaturatorLpR += hpCoeff * (wetR - xtraSaturatorLpR);
+                const float hpL = wetL - xtraSaturatorLpL;
+                const float hpR = wetR - xtraSaturatorLpR;
+                wetL = sat (wetL * pre + hpL * (0.35f * saturatorAmt));
+                wetR = sat (wetR * pre + hpR * (0.35f * saturatorAmt));
+            }
+
+            if (clipperAmt > 1.0e-5f)
+            {
+                const float t = juce::jmap (clipperAmt, 1.0f, 0.18f);
+                wetL = juce::jlimit (-t, t, wetL) / juce::jmax (0.05f, t);
+                wetR = juce::jlimit (-t, t, wetR) / juce::jmax (0.05f, t);
+            }
+
+            if (widthAmt > 1.0e-5f)
+            {
+                const float mid = 0.5f * (wetL + wetR);
+                const float side = 0.5f * (wetL - wetR);
+                const float sideGain = 1.0f + 1.8f * widthAmt;
+                wetL = mid + side * sideGain;
+                wetR = mid - side * sideGain;
+            }
+
+            if (tiltAmt > 1.0e-5f)
+            {
+                const float alpha = 0.0045f + 0.01f * tiltAmt;
+                xtraTiltLpL += alpha * (wetL - xtraTiltLpL);
+                xtraTiltLpR += alpha * (wetR - xtraTiltLpR);
+                const float hiL = wetL - xtraTiltLpL;
+                const float hiR = wetR - xtraTiltLpR;
+                const float lowGain = 1.0f - 0.75f * tiltAmt;
+                const float hiGain = 1.0f + 1.5f * tiltAmt;
+                wetL = xtraTiltLpL * lowGain + hiL * hiGain;
+                wetR = xtraTiltLpR * lowGain + hiR * hiGain;
+            }
+
+            if (gateAmt > 1.0e-5f)
+            {
+                const float rateHz = juce::jmap (gateAmt, 1.0f, 22.0f);
+                xtraGatePhase += rateHz / (float) sampleRateHz;
+                xtraGatePhase -= std::floor (xtraGatePhase);
+                const float square = (std::sin (juce::MathConstants<float>::twoPi * xtraGatePhase) > 0.0f) ? 1.0f : 0.0f;
+                const float floorGain = juce::jmap (gateAmt, 1.0f, 0.06f);
+                const float gain = juce::jmap (square, floorGain, 1.0f);
+                wetL *= gain;
+                wetR *= gain;
+            }
+
+            if (lofiAmt > 1.0e-5f)
+            {
+                const int downsample = juce::jlimit (1, 26, 1 + (int) std::lround (lofiAmt * 25.0f));
+                const float bits = juce::jmap (lofiAmt, 16.0f, 5.0f);
+                const float levels = std::pow (2.0f, bits - 1.0f);
+                const float invLevels = 1.0f / juce::jmax (2.0f, levels);
+
+                if (xtraLofiCounter <= 0)
+                {
+                    xtraLofiHoldL = std::round (wetL * levels) * invLevels;
+                    xtraLofiHoldR = std::round (wetR * levels) * invLevels;
+                    xtraLofiCounter = downsample;
+                }
+
+                --xtraLofiCounter;
+                wetL = xtraLofiHoldL;
+                wetR = xtraLofiHoldR;
+            }
+        }
+
+        const float finalMix = juce::jlimit (0.0f, 1.0f, enabled ? xtraMix : 0.0f) * juce::jlimit (0.0f, 1.0f, mix01);
+        left[i] = dryL + (wetL - dryL) * finalMix;
+        if (right != nullptr)
+            right[i] = dryR + (wetR - dryR) * finalMix;
+        else
+            left[i] = 0.5f * (left[i] + (dryR + (wetR - dryR) * finalMix));
+    }
 }
 
 void MonoSynthEngine::resetOscPhasesFromParams()
@@ -654,6 +913,18 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
     setTargetIfChanged (noiseLevelSm, params->noiseLevel != nullptr ? params->noiseLevel->load() : 0.0f);
     setTargetIfChanged (noiseColorSm, params->noiseColor != nullptr ? params->noiseColor->load() : 0.75f);
 
+    setTargetIfChanged (fxXtraMixSm, params->fxXtraMix != nullptr ? params->fxXtraMix->load() : 0.0f);
+    setTargetIfChanged (fxXtraFlangerSm, params->fxXtraFlangerAmount != nullptr ? params->fxXtraFlangerAmount->load() : 0.0f);
+    setTargetIfChanged (fxXtraTremoloSm, params->fxXtraTremoloAmount != nullptr ? params->fxXtraTremoloAmount->load() : 0.0f);
+    setTargetIfChanged (fxXtraAutopanSm, params->fxXtraAutopanAmount != nullptr ? params->fxXtraAutopanAmount->load() : 0.0f);
+    setTargetIfChanged (fxXtraSaturatorSm, params->fxXtraSaturatorAmount != nullptr ? params->fxXtraSaturatorAmount->load() : 0.0f);
+    setTargetIfChanged (fxXtraClipperSm, params->fxXtraClipperAmount != nullptr ? params->fxXtraClipperAmount->load() : 0.0f);
+    setTargetIfChanged (fxXtraWidthSm, params->fxXtraWidthAmount != nullptr ? params->fxXtraWidthAmount->load() : 0.0f);
+    setTargetIfChanged (fxXtraTiltSm, params->fxXtraTiltAmount != nullptr ? params->fxXtraTiltAmount->load() : 0.0f);
+    setTargetIfChanged (fxXtraGateSm, params->fxXtraGateAmount != nullptr ? params->fxXtraGateAmount->load() : 0.0f);
+    setTargetIfChanged (fxXtraLofiSm, params->fxXtraLofiAmount != nullptr ? params->fxXtraLofiAmount->load() : 0.0f);
+    setTargetIfChanged (fxXtraDoublerSm, params->fxXtraDoublerAmount != nullptr ? params->fxXtraDoublerAmount->load() : 0.0f);
+
     setTargetIfChanged (filterCutoffHzSm, params->filterCutoffHz != nullptr ? params->filterCutoffHz->load() : 2000.0f);
     setTargetIfChanged (filterResKnobSm,  params->filterResonance != nullptr ? params->filterResonance->load() : 0.25f);
     setTargetIfChanged (filterEnvAmountSm, params->filterEnvAmount != nullptr ? params->filterEnvAmount->load() : 0.0f);
@@ -806,7 +1077,11 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         || (int) shaperDriveDb.size() < numSamples
         || (int) shaperMix.size() < numSamples
         || (int) filterModCutoffSemis.size() < numSamples
-        || (int) filterModResAdd.size() < numSamples)
+        || (int) filterModResAdd.size() < numSamples
+        || (int) fxDryL.size() < numSamples
+        || (int) fxDryR.size() < numSamples
+        || (int) fxParallelL.size() < numSamples
+        || (int) fxParallelR.size() < numSamples)
     {
         buffer.clear (startSample, numSamples);
         return;
@@ -897,7 +1172,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         const auto dep = params->modSlotDepth[(size_t) s] != nullptr ? params->modSlotDepth[(size_t) s]->load() : 0.0f;
 
         slots[(size_t) s].src = juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, src);
-        slots[(size_t) s].dst = juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstFxOctaverMix, dst);
+        slots[(size_t) s].dst = juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstLast, dst);
         slots[(size_t) s].depth = juce::jlimit (-1.0f, 1.0f, dep);
     }
 
@@ -932,6 +1207,17 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
     float fxModPhaserMixSum = 0.0f;
     float fxModOctAmountSum = 0.0f;
     float fxModOctMixSum = 0.0f;
+    float fxModXtraFlangerSum = 0.0f;
+    float fxModXtraTremoloSum = 0.0f;
+    float fxModXtraAutopanSum = 0.0f;
+    float fxModXtraSaturatorSum = 0.0f;
+    float fxModXtraClipperSum = 0.0f;
+    float fxModXtraWidthSum = 0.0f;
+    float fxModXtraTiltSum = 0.0f;
+    float fxModXtraGateSum = 0.0f;
+    float fxModXtraLofiSum = 0.0f;
+    float fxModXtraDoublerSum = 0.0f;
+    float fxModXtraMixSum = 0.0f;
     for (int i = 0; i < numSamples; ++i)
     {
         const auto midiNote = noteGlide.getNext();
@@ -982,6 +1268,17 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         float modFxPhaserMixAdd = 0.0f;
         float modFxOctAmountAdd = 0.0f;
         float modFxOctMixAdd = 0.0f;
+        float modFxXtraFlangerAdd = 0.0f;
+        float modFxXtraTremoloAdd = 0.0f;
+        float modFxXtraAutopanAdd = 0.0f;
+        float modFxXtraSaturatorAdd = 0.0f;
+        float modFxXtraClipperAdd = 0.0f;
+        float modFxXtraWidthAdd = 0.0f;
+        float modFxXtraTiltAdd = 0.0f;
+        float modFxXtraGateAdd = 0.0f;
+        float modFxXtraLofiAdd = 0.0f;
+        float modFxXtraDoublerAdd = 0.0f;
+        float modFxXtraMixAdd = 0.0f;
 
         // Slot depths are in [-1..1]. Dest scaling is per-destination.
         constexpr float cutoffMaxSemis = 48.0f;
@@ -1041,6 +1338,17 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
                 case params::mod::dstFxPhaserMix: modFxPhaserMixAdd += amt; break;
                 case params::mod::dstFxOctaverAmount: modFxOctAmountAdd += amt; break;
                 case params::mod::dstFxOctaverMix: modFxOctMixAdd += amt; break;
+                case params::mod::dstFxXtraFlangerAmount: modFxXtraFlangerAdd += amt; break;
+                case params::mod::dstFxXtraTremoloAmount: modFxXtraTremoloAdd += amt; break;
+                case params::mod::dstFxXtraAutopanAmount: modFxXtraAutopanAdd += amt; break;
+                case params::mod::dstFxXtraSaturatorAmount: modFxXtraSaturatorAdd += amt; break;
+                case params::mod::dstFxXtraClipperAmount: modFxXtraClipperAdd += amt; break;
+                case params::mod::dstFxXtraWidthAmount: modFxXtraWidthAdd += amt; break;
+                case params::mod::dstFxXtraTiltAmount: modFxXtraTiltAdd += amt; break;
+                case params::mod::dstFxXtraGateAmount: modFxXtraGateAdd += amt; break;
+                case params::mod::dstFxXtraLofiAmount: modFxXtraLofiAdd += amt; break;
+                case params::mod::dstFxXtraDoublerAmount: modFxXtraDoublerAdd += amt; break;
+                case params::mod::dstFxXtraMix: modFxXtraMixAdd += amt; break;
             }
         }
 
@@ -1062,6 +1370,17 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         fxModPhaserMixSum += modFxPhaserMixAdd;
         fxModOctAmountSum += modFxOctAmountAdd;
         fxModOctMixSum += modFxOctMixAdd;
+        fxModXtraFlangerSum += modFxXtraFlangerAdd;
+        fxModXtraTremoloSum += modFxXtraTremoloAdd;
+        fxModXtraAutopanSum += modFxXtraAutopanAdd;
+        fxModXtraSaturatorSum += modFxXtraSaturatorAdd;
+        fxModXtraClipperSum += modFxXtraClipperAdd;
+        fxModXtraWidthSum += modFxXtraWidthAdd;
+        fxModXtraTiltSum += modFxXtraTiltAdd;
+        fxModXtraGateSum += modFxXtraGateAdd;
+        fxModXtraLofiSum += modFxXtraLofiAdd;
+        fxModXtraDoublerSum += modFxXtraDoublerAdd;
+        fxModXtraMixSum += modFxXtraMixAdd;
 
         filterModCutoffSemis[(size_t) i] = juce::jlimit (-96.0f, 96.0f, modCutSemis);
         filterModResAdd[(size_t) i] = modResAdd;
@@ -1446,7 +1765,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
             buffer.setSample (ch, sampleIndex, sig);
     }
 
-    // 8) FX Rack (post synth signal, stereo domain).
+    // 8) FX Rack (post synth signal, stereo domain) + FX Xtra + routing.
     {
         const float invN = 1.0f / (float) juce::jmax (1, numSamples);
         const auto avg = [&] (float s) noexcept { return s * invN; };
@@ -1544,7 +1863,54 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
 
         const auto fxOrder = loadi (params->fxGlobalOrder, (int) params::fx::global::orderFixedA);
         const auto fxOs = loadi (params->fxGlobalOversample, (int) params::fx::global::osOff);
+        const auto fxRoute = loadi (params->fxGlobalRoute, (int) params::fx::global::routeSerial);
+
+        const bool xtraEnabled = loadb (params->fxXtraEnable, false);
+        const auto xtraMix = juce::jlimit (0.0f, 1.0f, loadf (params->fxXtraMix, 0.0f) + avg (fxModXtraMixSum) * 0.45f);
+        setTargetIfChanged (fxXtraMixSm, xtraMix);
+        setTargetIfChanged (fxXtraFlangerSm, juce::jlimit (0.0f, 1.0f, loadf (params->fxXtraFlangerAmount, 0.0f) + avg (fxModXtraFlangerSum) * 0.5f));
+        setTargetIfChanged (fxXtraTremoloSm, juce::jlimit (0.0f, 1.0f, loadf (params->fxXtraTremoloAmount, 0.0f) + avg (fxModXtraTremoloSum) * 0.5f));
+        setTargetIfChanged (fxXtraAutopanSm, juce::jlimit (0.0f, 1.0f, loadf (params->fxXtraAutopanAmount, 0.0f) + avg (fxModXtraAutopanSum) * 0.5f));
+        setTargetIfChanged (fxXtraSaturatorSm, juce::jlimit (0.0f, 1.0f, loadf (params->fxXtraSaturatorAmount, 0.0f) + avg (fxModXtraSaturatorSum) * 0.45f));
+        setTargetIfChanged (fxXtraClipperSm, juce::jlimit (0.0f, 1.0f, loadf (params->fxXtraClipperAmount, 0.0f) + avg (fxModXtraClipperSum) * 0.45f));
+        setTargetIfChanged (fxXtraWidthSm, juce::jlimit (0.0f, 1.0f, loadf (params->fxXtraWidthAmount, 0.0f) + avg (fxModXtraWidthSum) * 0.45f));
+        setTargetIfChanged (fxXtraTiltSm, juce::jlimit (0.0f, 1.0f, loadf (params->fxXtraTiltAmount, 0.0f) + avg (fxModXtraTiltSum) * 0.45f));
+        setTargetIfChanged (fxXtraGateSm, juce::jlimit (0.0f, 1.0f, loadf (params->fxXtraGateAmount, 0.0f) + avg (fxModXtraGateSum) * 0.45f));
+        setTargetIfChanged (fxXtraLofiSm, juce::jlimit (0.0f, 1.0f, loadf (params->fxXtraLofiAmount, 0.0f) + avg (fxModXtraLofiSum) * 0.45f));
+        setTargetIfChanged (fxXtraDoublerSm, juce::jlimit (0.0f, 1.0f, loadf (params->fxXtraDoublerAmount, 0.0f) + avg (fxModXtraDoublerSum) * 0.45f));
+
+        auto* outL = buffer.getWritePointer (0, startSample);
+        auto* outR = (buffer.getNumChannels() > 1) ? buffer.getWritePointer (1, startSample) : nullptr;
+
+        for (int i = 0; i < numSamples; ++i)
+        {
+            fxDryL[(size_t) i] = outL[i];
+            fxDryR[(size_t) i] = (outR != nullptr) ? outR[i] : outL[i];
+        }
+
         fxChain.process (buffer, startSample, numSamples, fxOs, fxOrder, fxp);
+
+        if (fxRoute == (int) params::fx::global::routeParallel)
+        {
+            for (int i = 0; i < numSamples; ++i)
+            {
+                fxParallelL[(size_t) i] = fxDryL[(size_t) i];
+                fxParallelR[(size_t) i] = fxDryR[(size_t) i];
+            }
+
+            processXtraBlock (fxParallelL.data(), fxParallelR.data(), numSamples, xtraEnabled, xtraMix);
+
+            for (int i = 0; i < numSamples; ++i)
+            {
+                outL[i] = 0.5f * (outL[i] + fxParallelL[(size_t) i]);
+                if (outR != nullptr)
+                    outR[i] = 0.5f * (outR[i] + fxParallelR[(size_t) i]);
+            }
+        }
+        else
+        {
+            processXtraBlock (outL, outR, numSamples, xtraEnabled, xtraMix);
+        }
     }
 }
 } // namespace ies::engine

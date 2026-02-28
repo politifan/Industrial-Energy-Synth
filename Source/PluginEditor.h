@@ -397,7 +397,7 @@ private:
     juce::TextEditor modQuickBody;
 
     // Drag-ring depth editing: we keep track of the most recently assigned slot per destination.
-    std::array<int, (size_t) params::mod::dstFxOctaverMix + 1> modLastSlotByDest {};
+    std::array<int, (size_t) params::mod::dstLast + 1> modLastSlotByDest {};
     int modDepthDragSlot = -1;
     params::mod::Dest modDepthDragDest = params::mod::dstOff;
     float modDepthDragStart = 0.0f;
@@ -417,12 +417,14 @@ private:
     juce::TextButton fxBlockDist;
     juce::TextButton fxBlockPhaser;
     juce::TextButton fxBlockOctaver;
+    juce::TextButton fxBlockXtra;
     juce::ToggleButton fxChorusEnable;
     juce::ToggleButton fxDelayEnable;
     juce::ToggleButton fxReverbEnable;
     juce::ToggleButton fxDistEnable;
     juce::ToggleButton fxPhaserEnable;
     juce::ToggleButton fxOctaverEnable;
+    juce::ToggleButton fxXtraEnable;
     std::array<ies::ui::LevelMeter, 6> fxPreMeters;
     std::array<ies::ui::LevelMeter, 6> fxPostMeters;
     ies::ui::LevelMeter fxOutMeter;
@@ -430,9 +432,11 @@ private:
 
     ies::ui::KnobWithLabel fxGlobalMix;
     ies::ui::ComboWithLabel fxGlobalOrder;
+    ies::ui::ComboWithLabel fxGlobalRoute;
     ies::ui::ComboWithLabel fxGlobalOversample;
     std::unique_ptr<APVTS::SliderAttachment> fxGlobalMixAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> fxGlobalOrderAttachment;
+    std::unique_ptr<APVTS::ComboBoxAttachment> fxGlobalRouteAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> fxGlobalOversampleAttachment;
 
     ies::ui::KnobWithLabel fxChorusMix;
@@ -537,6 +541,30 @@ private:
     std::unique_ptr<APVTS::SliderAttachment> fxOctToneAttachment;
     std::unique_ptr<APVTS::SliderAttachment> fxOctSensitivityAttachment;
 
+    ies::ui::KnobWithLabel fxXtraMix;
+    ies::ui::KnobWithLabel fxXtraFlanger;
+    ies::ui::KnobWithLabel fxXtraTremolo;
+    ies::ui::KnobWithLabel fxXtraAutopan;
+    ies::ui::KnobWithLabel fxXtraSaturator;
+    ies::ui::KnobWithLabel fxXtraClipper;
+    ies::ui::KnobWithLabel fxXtraWidth;
+    ies::ui::KnobWithLabel fxXtraTilt;
+    ies::ui::KnobWithLabel fxXtraGate;
+    ies::ui::KnobWithLabel fxXtraLofi;
+    ies::ui::KnobWithLabel fxXtraDoubler;
+    std::unique_ptr<APVTS::ButtonAttachment> fxXtraEnableAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxXtraMixAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxXtraFlangerAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxXtraTremoloAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxXtraAutopanAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxXtraSaturatorAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxXtraClipperAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxXtraWidthAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxXtraTiltAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxXtraGateAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxXtraLofiAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxXtraDoublerAttachment;
+
     enum FxBlockIndex
     {
         fxChorus = 0,
@@ -544,7 +572,8 @@ private:
         fxReverb = 2,
         fxDist = 3,
         fxPhaser = 4,
-        fxOctaver = 5
+        fxOctaver = 5,
+        fxXtra = 6
     };
     FxBlockIndex selectedFxBlock = fxChorus;
 

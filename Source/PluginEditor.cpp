@@ -2189,6 +2189,35 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         dst.addItem ("Crush Mix", 10);
         dst.addItem ("Shaper Drive", 11);
         dst.addItem ("Shaper Mix", 12);
+        dst.addItem ("FX Chorus Rate", 13);
+        dst.addItem ("FX Chorus Depth", 14);
+        dst.addItem ("FX Chorus Mix", 15);
+        dst.addItem ("FX Delay Time", 16);
+        dst.addItem ("FX Delay Feedback", 17);
+        dst.addItem ("FX Delay Mix", 18);
+        dst.addItem ("FX Reverb Size", 19);
+        dst.addItem ("FX Reverb Damp", 20);
+        dst.addItem ("FX Reverb Mix", 21);
+        dst.addItem ("FX Dist Drive", 22);
+        dst.addItem ("FX Dist Tone", 23);
+        dst.addItem ("FX Dist Mix", 24);
+        dst.addItem ("FX Phaser Rate", 25);
+        dst.addItem ("FX Phaser Depth", 26);
+        dst.addItem ("FX Phaser Feedback", 27);
+        dst.addItem ("FX Phaser Mix", 28);
+        dst.addItem ("FX Octaver Amount", 29);
+        dst.addItem ("FX Octaver Mix", 30);
+        dst.addItem ("FX Xtra Flanger", 31);
+        dst.addItem ("FX Xtra Tremolo", 32);
+        dst.addItem ("FX Xtra AutoPan", 33);
+        dst.addItem ("FX Xtra Saturator", 34);
+        dst.addItem ("FX Xtra Clipper", 35);
+        dst.addItem ("FX Xtra Width", 36);
+        dst.addItem ("FX Xtra Tilt", 37);
+        dst.addItem ("FX Xtra Gate", 38);
+        dst.addItem ("FX Xtra LoFi", 39);
+        dst.addItem ("FX Xtra Doubler", 40);
+        dst.addItem ("FX Xtra Mix", 41);
         addAndMakeVisible (dst);
         modSlotDstAttachment[(size_t) i] = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), kModSlotDstIds[i], dst);
 
@@ -2220,7 +2249,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                                               if (s >= 0 && s < params::mod::numSlots)
                                                               {
                                                                   const auto dNow = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff,
-                                                                                                                     (int) params::mod::dstShaperMix,
+                                                                                                                     (int) params::mod::dstLast,
                                                                                                                      modSlotDst[(size_t) s].getSelectedItemIndex());
                                                                   const auto srcNow = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff,
                                                                                                                           (int) params::mod::srcRandom,
@@ -2234,7 +2263,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                                           for (int i = params::mod::numSlots - 1; i >= 0; --i)
                                                           {
                                                               const auto dNow = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff,
-                                                                                                                 (int) params::mod::dstShaperMix,
+                                                                                                                 (int) params::mod::dstLast,
                                                                                                                  modSlotDst[(size_t) i].getSelectedItemIndex());
                                                               const auto srcNow = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff,
                                                                                                                       (int) params::mod::srcRandom,
@@ -2301,6 +2330,35 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     bindTarget (crushMix, params::mod::dstCrushMix);
     bindTarget (shaperDrive, params::mod::dstShaperDrive);
     bindTarget (shaperMix, params::mod::dstShaperMix);
+    bindTarget (fxChorusRate, params::mod::dstFxChorusRate);
+    bindTarget (fxChorusDepth, params::mod::dstFxChorusDepth);
+    bindTarget (fxChorusMix, params::mod::dstFxChorusMix);
+    bindTarget (fxDelayTime, params::mod::dstFxDelayTime);
+    bindTarget (fxDelayFeedback, params::mod::dstFxDelayFeedback);
+    bindTarget (fxDelayMix, params::mod::dstFxDelayMix);
+    bindTarget (fxReverbSize, params::mod::dstFxReverbSize);
+    bindTarget (fxReverbDamp, params::mod::dstFxReverbDamp);
+    bindTarget (fxReverbMix, params::mod::dstFxReverbMix);
+    bindTarget (fxDistDrive, params::mod::dstFxDistDrive);
+    bindTarget (fxDistTone, params::mod::dstFxDistTone);
+    bindTarget (fxDistMix, params::mod::dstFxDistMix);
+    bindTarget (fxPhaserRate, params::mod::dstFxPhaserRate);
+    bindTarget (fxPhaserDepth, params::mod::dstFxPhaserDepth);
+    bindTarget (fxPhaserFeedback, params::mod::dstFxPhaserFeedback);
+    bindTarget (fxPhaserMix, params::mod::dstFxPhaserMix);
+    bindTarget (fxOctSub, params::mod::dstFxOctaverAmount);
+    bindTarget (fxOctMix, params::mod::dstFxOctaverMix);
+    bindTarget (fxXtraFlanger, params::mod::dstFxXtraFlangerAmount);
+    bindTarget (fxXtraTremolo, params::mod::dstFxXtraTremoloAmount);
+    bindTarget (fxXtraAutopan, params::mod::dstFxXtraAutopanAmount);
+    bindTarget (fxXtraSaturator, params::mod::dstFxXtraSaturatorAmount);
+    bindTarget (fxXtraClipper, params::mod::dstFxXtraClipperAmount);
+    bindTarget (fxXtraWidth, params::mod::dstFxXtraWidthAmount);
+    bindTarget (fxXtraTilt, params::mod::dstFxXtraTiltAmount);
+    bindTarget (fxXtraGate, params::mod::dstFxXtraGateAmount);
+    bindTarget (fxXtraLofi, params::mod::dstFxXtraLofiAmount);
+    bindTarget (fxXtraDoubler, params::mod::dstFxXtraDoublerAmount);
+    bindTarget (fxXtraMix, params::mod::dstFxXtraMix);
 
     modInsightsPanel.setText ("Mod Insights");
     addAndMakeVisible (modInsightsPanel);
@@ -2698,6 +2756,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     initFxBlockButton (fxBlockDist, "Dist", fxDist);
     initFxBlockButton (fxBlockPhaser, "Phaser", fxPhaser);
     initFxBlockButton (fxBlockOctaver, "Octaver", fxOctaver);
+    initFxBlockButton (fxBlockXtra, "Xtra", fxXtra);
 
     auto initFxEnable = [this] (juce::ToggleButton& b, const char* text, const char* id, std::unique_ptr<APVTS::ButtonAttachment>& a)
     {
@@ -2711,6 +2770,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     initFxEnable (fxDistEnable, "On", params::fx::dist::enable, fxDistEnableAttachment);
     initFxEnable (fxPhaserEnable, "On", params::fx::phaser::enable, fxPhaserEnableAttachment);
     initFxEnable (fxOctaverEnable, "On", params::fx::octaver::enable, fxOctEnableAttachment);
+    initFxEnable (fxXtraEnable, "On", params::fx::xtra::enable, fxXtraEnableAttachment);
 
     addAndMakeVisible (fxGlobalMix);
     fxGlobalMixAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::fx::global::mix, fxGlobalMix.getSlider());
@@ -2723,6 +2783,12 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     fxGlobalOrder.getCombo().addItem ("Order B", 2);
     fxGlobalOrder.getCombo().addItem ("Custom", 3);
     fxGlobalOrderAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::global::order, fxGlobalOrder.getCombo());
+
+    addAndMakeVisible (fxGlobalRoute);
+    fxGlobalRoute.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    fxGlobalRoute.getCombo().addItem ("Serial", 1);
+    fxGlobalRoute.getCombo().addItem ("Parallel", 2);
+    fxGlobalRouteAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::global::route, fxGlobalRoute.getCombo());
 
     addAndMakeVisible (fxGlobalOversample);
     fxGlobalOversample.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
@@ -2900,6 +2966,29 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setCompactText (fxOctTone.getSlider(), 2);
     initFxKnob (fxOctSensitivity, "Sensitivity", params::fx::octaver::sensitivity, fxOctSensitivityAttachment);
     setCompactText (fxOctSensitivity.getSlider(), 2);
+
+    initFxKnob (fxXtraMix, "Mix", params::fx::xtra::mix, fxXtraMixAttachment);
+    setCompactText (fxXtraMix.getSlider(), 2);
+    initFxKnob (fxXtraFlanger, "Flanger", params::fx::xtra::flangerAmount, fxXtraFlangerAttachment);
+    setCompactText (fxXtraFlanger.getSlider(), 2);
+    initFxKnob (fxXtraTremolo, "Tremolo", params::fx::xtra::tremoloAmount, fxXtraTremoloAttachment);
+    setCompactText (fxXtraTremolo.getSlider(), 2);
+    initFxKnob (fxXtraAutopan, "AutoPan", params::fx::xtra::autopanAmount, fxXtraAutopanAttachment);
+    setCompactText (fxXtraAutopan.getSlider(), 2);
+    initFxKnob (fxXtraSaturator, "Saturator", params::fx::xtra::saturatorAmount, fxXtraSaturatorAttachment);
+    setCompactText (fxXtraSaturator.getSlider(), 2);
+    initFxKnob (fxXtraClipper, "Clipper", params::fx::xtra::clipperAmount, fxXtraClipperAttachment);
+    setCompactText (fxXtraClipper.getSlider(), 2);
+    initFxKnob (fxXtraWidth, "Width", params::fx::xtra::widthAmount, fxXtraWidthAttachment);
+    setCompactText (fxXtraWidth.getSlider(), 2);
+    initFxKnob (fxXtraTilt, "Tilt", params::fx::xtra::tiltAmount, fxXtraTiltAttachment);
+    setCompactText (fxXtraTilt.getSlider(), 2);
+    initFxKnob (fxXtraGate, "Gate", params::fx::xtra::gateAmount, fxXtraGateAttachment);
+    setCompactText (fxXtraGate.getSlider(), 2);
+    initFxKnob (fxXtraLofi, "LoFi", params::fx::xtra::lofiAmount, fxXtraLofiAttachment);
+    setCompactText (fxXtraLofi.getSlider(), 2);
+    initFxKnob (fxXtraDoubler, "Doubler", params::fx::xtra::doublerAmount, fxXtraDoublerAttachment);
+    setCompactText (fxXtraDoubler.getSlider(), 2);
 
     for (int i = 0; i < (int) fxPreMeters.size(); ++i)
     {
@@ -3338,15 +3427,18 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (fxBlockDist, cOut);
     setGroupAccent (fxBlockPhaser, cOut);
     setGroupAccent (fxBlockOctaver, cOut);
+    setGroupAccent (fxBlockXtra, cOut);
     setGroupAccent (fxChorusEnable, cOut);
     setGroupAccent (fxDelayEnable, cOut);
     setGroupAccent (fxReverbEnable, cOut);
     setGroupAccent (fxDistEnable, cOut);
     setGroupAccent (fxPhaserEnable, cOut);
     setGroupAccent (fxOctaverEnable, cOut);
+    setGroupAccent (fxXtraEnable, cOut);
     setGroupAccent (fxDelaySync, cOut);
     setGroupAccent (fxDelayPingPong, cOut);
     setGroupAccent (fxGlobalOrder, cOut);
+    setGroupAccent (fxGlobalRoute, cOut);
     setGroupAccent (fxGlobalOversample, cOut);
     setGroupAccent (fxDelayDivL, cOut);
     setGroupAccent (fxDelayDivR, cOut);
@@ -3445,7 +3537,9 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                      &fxDistMix.getSlider(), &fxDistDrive.getSlider(), &fxDistTone.getSlider(), &fxDistPostLp.getSlider(), &fxDistTrim.getSlider(),
                      &fxPhaserMix.getSlider(), &fxPhaserRate.getSlider(), &fxPhaserDepth.getSlider(), &fxPhaserFeedback.getSlider(),
                      &fxPhaserCentre.getSlider(), &fxPhaserStereo.getSlider(),
-                     &fxOctMix.getSlider(), &fxOctSub.getSlider(), &fxOctBlend.getSlider(), &fxOctTone.getSlider(), &fxOctSensitivity.getSlider() })
+                     &fxOctMix.getSlider(), &fxOctSub.getSlider(), &fxOctBlend.getSlider(), &fxOctTone.getSlider(), &fxOctSensitivity.getSlider(),
+                     &fxXtraMix.getSlider(), &fxXtraFlanger.getSlider(), &fxXtraTremolo.getSlider(), &fxXtraAutopan.getSlider(), &fxXtraSaturator.getSlider(),
+                     &fxXtraClipper.getSlider(), &fxXtraWidth.getSlider(), &fxXtraTilt.getSlider(), &fxXtraGate.getSlider(), &fxXtraLofi.getSlider(), &fxXtraDoubler.getSlider() })
         setSliderAccent (*s, cOut);
 
     for (auto* s : { &labVelocity.getSlider(), &labKeyWidth.getSlider(), &labPitchBend.getSlider() })
@@ -3528,7 +3622,9 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                      &fxDistMix.getSlider(), &fxDistDrive.getSlider(), &fxDistTone.getSlider(), &fxDistPostLp.getSlider(), &fxDistTrim.getSlider(),
                      &fxPhaserMix.getSlider(), &fxPhaserRate.getSlider(), &fxPhaserDepth.getSlider(), &fxPhaserFeedback.getSlider(),
                      &fxPhaserCentre.getSlider(), &fxPhaserStereo.getSlider(),
-                     &fxOctMix.getSlider(), &fxOctSub.getSlider(), &fxOctBlend.getSlider(), &fxOctTone.getSlider(), &fxOctSensitivity.getSlider() })
+                     &fxOctMix.getSlider(), &fxOctSub.getSlider(), &fxOctBlend.getSlider(), &fxOctTone.getSlider(), &fxOctSensitivity.getSlider(),
+                     &fxXtraMix.getSlider(), &fxXtraFlanger.getSlider(), &fxXtraTremolo.getSlider(), &fxXtraAutopan.getSlider(), &fxXtraSaturator.getSlider(),
+                     &fxXtraClipper.getSlider(), &fxXtraWidth.getSlider(), &fxXtraTilt.getSlider(), &fxXtraGate.getSlider(), &fxXtraLofi.getSlider(), &fxXtraDoubler.getSlider() })
         refreshSliderText (*s);
     for (int i = 0; i < params::mod::numSlots; ++i)
         refreshSliderText (modSlotDepth[(size_t) i]);
@@ -4585,18 +4681,28 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         placeRackRow (fxBlockDist, fxDistEnable, fxPreMeters[3], fxPostMeters[3]);
         placeRackRow (fxBlockPhaser, fxPhaserEnable, fxPreMeters[4], fxPostMeters[4]);
         placeRackRow (fxBlockOctaver, fxOctaverEnable, fxPreMeters[5], fxPostMeters[5]);
+        {
+            auto row = rk.removeFromTop (rowHFx);
+            rk.removeFromTop (blockGap);
+            const int enW = 44;
+            fxBlockXtra.setBounds (row.removeFromLeft (juce::jmax (80, row.getWidth() - enW - 6)));
+            row.removeFromLeft (6);
+            fxXtraEnable.setBounds (row.removeFromLeft (enW).reduced (0, 4));
+        }
 
         fxOutLabel.setBounds (rk.removeFromTop (20));
         fxOutMeter.setBounds (rk.removeFromTop (16).reduced (0, 1));
 
         auto dt = detail.reduced (8, 22);
         auto globalRow = dt.removeFromTop (72);
-        const int gw = juce::jmax (100, (globalRow.getWidth() - gap2 * 2) / 3);
+        const int gw = juce::jmax (88, (globalRow.getWidth() - gap2 * 3) / 4);
         fxGlobalMix.setBounds (globalRow.removeFromLeft (gw));
         globalRow.removeFromLeft (gap2);
         fxGlobalOrder.setBounds (globalRow.removeFromLeft (gw));
         globalRow.removeFromLeft (gap2);
-        fxGlobalOversample.setBounds (globalRow);
+        fxGlobalRoute.setBounds (globalRow.removeFromLeft (gw));
+        globalRow.removeFromLeft (gap2);
+        fxGlobalOversample.setBounds (globalRow.removeFromLeft (gw));
         dt.removeFromTop (6);
 
         auto layoutFxControls = [&] (juce::Rectangle<int> area, std::initializer_list<juce::Component*> comps)
@@ -4691,6 +4797,8 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         setVisibleForBlock (fxDist, { &fxDistMix, &fxDistDrive, &fxDistTone, &fxDistType, &fxDistPostLp, &fxDistTrim });
         setVisibleForBlock (fxPhaser, { &fxPhaserMix, &fxPhaserRate, &fxPhaserDepth, &fxPhaserFeedback, &fxPhaserCentre, &fxPhaserStages, &fxPhaserStereo });
         setVisibleForBlock (fxOctaver, { &fxOctMix, &fxOctSub, &fxOctBlend, &fxOctTone, &fxOctSensitivity });
+        setVisibleForBlock (fxXtra, { &fxXtraMix, &fxXtraFlanger, &fxXtraTremolo, &fxXtraAutopan, &fxXtraSaturator,
+                                      &fxXtraClipper, &fxXtraWidth, &fxXtraTilt, &fxXtraGate, &fxXtraLofi, &fxXtraDoubler });
 
         auto setTabVisual = [] (juce::TextButton& b, bool active)
         {
@@ -4703,6 +4811,7 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         setTabVisual (fxBlockDist, selectedFxBlock == fxDist);
         setTabVisual (fxBlockPhaser, selectedFxBlock == fxPhaser);
         setTabVisual (fxBlockOctaver, selectedFxBlock == fxOctaver);
+        setTabVisual (fxBlockXtra, selectedFxBlock == fxXtra);
     }
 
     // Filter internal
@@ -5167,14 +5276,17 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     fxBlockDist.setVisible (showFx);
     fxBlockPhaser.setVisible (showFx);
     fxBlockOctaver.setVisible (showFx);
+    fxBlockXtra.setVisible (showFx);
     fxChorusEnable.setVisible (showFx);
     fxDelayEnable.setVisible (showFx);
     fxReverbEnable.setVisible (showFx);
     fxDistEnable.setVisible (showFx);
     fxPhaserEnable.setVisible (showFx);
     fxOctaverEnable.setVisible (showFx);
+    fxXtraEnable.setVisible (showFx);
     fxGlobalMix.setVisible (showFx);
     fxGlobalOrder.setVisible (showFx);
+    fxGlobalRoute.setVisible (showFx);
     fxGlobalOversample.setVisible (showFx);
     fxChorusMix.setVisible (showFx && selectedFxBlock == fxChorus);
     fxChorusRate.setVisible (showFx && selectedFxBlock == fxChorus);
@@ -5221,6 +5333,17 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     fxOctBlend.setVisible (showFx && selectedFxBlock == fxOctaver);
     fxOctTone.setVisible (showFx && selectedFxBlock == fxOctaver);
     fxOctSensitivity.setVisible (showFx && selectedFxBlock == fxOctaver);
+    fxXtraMix.setVisible (showFx && selectedFxBlock == fxXtra);
+    fxXtraFlanger.setVisible (showFx && selectedFxBlock == fxXtra);
+    fxXtraTremolo.setVisible (showFx && selectedFxBlock == fxXtra);
+    fxXtraAutopan.setVisible (showFx && selectedFxBlock == fxXtra);
+    fxXtraSaturator.setVisible (showFx && selectedFxBlock == fxXtra);
+    fxXtraClipper.setVisible (showFx && selectedFxBlock == fxXtra);
+    fxXtraWidth.setVisible (showFx && selectedFxBlock == fxXtra);
+    fxXtraTilt.setVisible (showFx && selectedFxBlock == fxXtra);
+    fxXtraGate.setVisible (showFx && selectedFxBlock == fxXtra);
+    fxXtraLofi.setVisible (showFx && selectedFxBlock == fxXtra);
+    fxXtraDoubler.setVisible (showFx && selectedFxBlock == fxXtra);
     for (auto& m : fxPreMeters)
         m.setVisible (showFx);
     for (auto& m : fxPostMeters)
@@ -5599,8 +5722,12 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     fxBlockDist.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Дист") : juce::String ("Dist"));
     fxBlockPhaser.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Фэйзер") : juce::String ("Phaser"));
     fxBlockOctaver.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Октавер") : juce::String ("Octaver"));
+    fxBlockXtra.setButtonText ("Xtra");
     fxGlobalMix.setLabelText ("FX Mix");
     fxGlobalOrder.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Порядок") : juce::String ("Order"));
+    fxGlobalRoute.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Роутинг") : juce::String ("Route"));
+    fxGlobalRoute.getCombo().changeItemText (1, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Последовательно") : juce::String ("Serial"));
+    fxGlobalRoute.getCombo().changeItemText (2, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Параллельно") : juce::String ("Parallel"));
     fxGlobalOversample.setLabelText ("OS");
     fxChorusMix.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Микс") : juce::String ("Mix"));
     fxChorusRate.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Скорость") : juce::String ("Rate"));
@@ -5645,11 +5772,22 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     fxOctBlend.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Blend") : juce::String ("Blend"));
     fxOctTone.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Тон") : juce::String ("Tone"));
     fxOctSensitivity.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Трекинг") : juce::String ("Sensitivity"));
+    fxXtraMix.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Микс") : juce::String ("Mix"));
+    fxXtraFlanger.setLabelText ("Flanger");
+    fxXtraTremolo.setLabelText ("Tremolo");
+    fxXtraAutopan.setLabelText ("AutoPan");
+    fxXtraSaturator.setLabelText ("Saturator");
+    fxXtraClipper.setLabelText ("Clipper");
+    fxXtraWidth.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Ширина") : juce::String ("Width"));
+    fxXtraTilt.setLabelText ("Tilt");
+    fxXtraGate.setLabelText ("Gate");
+    fxXtraLofi.setLabelText ("LoFi");
+    fxXtraDoubler.setLabelText ("Doubler");
     fxOutLabel.setText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"FX Выход") : juce::String ("FX Out"),
                         juce::dontSendNotification);
     fxDelaySync.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Синхр.") : juce::String ("Sync"));
     fxDelayPingPong.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Пинг-понг") : juce::String ("PingPong"));
-    for (auto* b : { &fxChorusEnable, &fxDelayEnable, &fxReverbEnable, &fxDistEnable, &fxPhaserEnable, &fxOctaverEnable })
+    for (auto* b : { &fxChorusEnable, &fxDelayEnable, &fxReverbEnable, &fxDistEnable, &fxPhaserEnable, &fxOctaverEnable, &fxXtraEnable })
         b->setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Вкл") : juce::String ("On"));
     modHeaderSlot.setText (ies::ui::tr (ies::ui::Key::modSlot, langIdx), juce::dontSendNotification);
     modHeaderSrc.setText (ies::ui::tr (ies::ui::Key::modSrc, langIdx), juce::dontSendNotification);
@@ -5690,6 +5828,35 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
         modSlotDst[(size_t) i].changeItemText (10, ies::ui::tr (ies::ui::Key::modDstCrushMix, langIdx));
         modSlotDst[(size_t) i].changeItemText (11, ies::ui::tr (ies::ui::Key::modDstShaperDrive, langIdx));
         modSlotDst[(size_t) i].changeItemText (12, ies::ui::tr (ies::ui::Key::modDstShaperMix, langIdx));
+        modSlotDst[(size_t) i].changeItemText (13, "FX Chorus Rate");
+        modSlotDst[(size_t) i].changeItemText (14, "FX Chorus Depth");
+        modSlotDst[(size_t) i].changeItemText (15, "FX Chorus Mix");
+        modSlotDst[(size_t) i].changeItemText (16, "FX Delay Time");
+        modSlotDst[(size_t) i].changeItemText (17, "FX Delay Feedback");
+        modSlotDst[(size_t) i].changeItemText (18, "FX Delay Mix");
+        modSlotDst[(size_t) i].changeItemText (19, "FX Reverb Size");
+        modSlotDst[(size_t) i].changeItemText (20, "FX Reverb Damp");
+        modSlotDst[(size_t) i].changeItemText (21, "FX Reverb Mix");
+        modSlotDst[(size_t) i].changeItemText (22, "FX Dist Drive");
+        modSlotDst[(size_t) i].changeItemText (23, "FX Dist Tone");
+        modSlotDst[(size_t) i].changeItemText (24, "FX Dist Mix");
+        modSlotDst[(size_t) i].changeItemText (25, "FX Phaser Rate");
+        modSlotDst[(size_t) i].changeItemText (26, "FX Phaser Depth");
+        modSlotDst[(size_t) i].changeItemText (27, "FX Phaser Feedback");
+        modSlotDst[(size_t) i].changeItemText (28, "FX Phaser Mix");
+        modSlotDst[(size_t) i].changeItemText (29, "FX Octaver Amount");
+        modSlotDst[(size_t) i].changeItemText (30, "FX Octaver Mix");
+        modSlotDst[(size_t) i].changeItemText (31, "FX Xtra Flanger");
+        modSlotDst[(size_t) i].changeItemText (32, "FX Xtra Tremolo");
+        modSlotDst[(size_t) i].changeItemText (33, "FX Xtra AutoPan");
+        modSlotDst[(size_t) i].changeItemText (34, "FX Xtra Saturator");
+        modSlotDst[(size_t) i].changeItemText (35, "FX Xtra Clipper");
+        modSlotDst[(size_t) i].changeItemText (36, "FX Xtra Width");
+        modSlotDst[(size_t) i].changeItemText (37, "FX Xtra Tilt");
+        modSlotDst[(size_t) i].changeItemText (38, "FX Xtra Gate");
+        modSlotDst[(size_t) i].changeItemText (39, "FX Xtra LoFi");
+        modSlotDst[(size_t) i].changeItemText (40, "FX Xtra Doubler");
+        modSlotDst[(size_t) i].changeItemText (41, "FX Xtra Mix");
     }
 
     refreshMacroNames();
@@ -6005,6 +6172,96 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
             modSlotDst[(size_t) i].setTooltip (tipDst);
             modSlotDepth[(size_t) i].setTooltip (tipDepth);
         }
+    }
+
+    {
+        const auto tip = T ("Select FX rack order profile.",
+                            u8"Выбор профиля порядка FX-цепочки.");
+        fxGlobalOrder.getCombo().setTooltip (tip);
+        fxGlobalOrder.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("FX route mode: Serial = FX rack then Xtra. Parallel = FX rack and Xtra run in two branches and are blended.",
+                            u8"Режим роутинга FX: Последовательно = сначала FX-цепь, затем Xtra. Параллельно = FX-цепь и Xtra работают в двух ветках и смешиваются.");
+        fxGlobalRoute.getCombo().setTooltip (tip);
+        fxGlobalRoute.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("FX oversampling quality. Higher values reduce aliasing but cost more CPU.",
+                            u8"Качество оверсэмплинга FX. Большее значение снижает алиасинг, но увеличивает нагрузку CPU.");
+        fxGlobalOversample.getCombo().setTooltip (tip);
+        fxGlobalOversample.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Enable/disable this FX block.",
+                            u8"Включение/выключение выбранного FX-блока.");
+        for (auto* b : { &fxChorusEnable, &fxDelayEnable, &fxReverbEnable, &fxDistEnable, &fxPhaserEnable, &fxOctaverEnable, &fxXtraEnable })
+            b->setTooltip (tip);
+    }
+    fxBlockChorus.setTooltip (T ("Select Chorus block controls.", u8"Показать параметры блока Chorus."));
+    fxBlockDelay.setTooltip (T ("Select Delay block controls.", u8"Показать параметры блока Delay."));
+    fxBlockReverb.setTooltip (T ("Select Reverb block controls.", u8"Показать параметры блока Reverb."));
+    fxBlockDist.setTooltip (T ("Select Dist block controls.", u8"Показать параметры блока Dist."));
+    fxBlockPhaser.setTooltip (T ("Select Phaser block controls.", u8"Показать параметры блока Phaser."));
+    fxBlockOctaver.setTooltip (T ("Select Octaver block controls.", u8"Показать параметры блока Octaver."));
+    fxBlockXtra.setTooltip (T ("Select Xtra block controls (Flanger/Tremolo/AutoPan/Saturator/Clipper/Width/Tilt/Gate/LoFi/Doubler).",
+                               u8"Показать параметры блока Xtra (Flanger/Tremolo/AutoPan/Saturator/Clipper/Width/Tilt/Gate/LoFi/Doubler)."));
+    fxOutMeter.setTooltip (T ("FX output peak meter.", u8"Пиковый индикатор выхода FX."));
+    fxOutLabel.setTooltip (fxOutMeter.getTooltip());
+    {
+        const auto tip = T ("Amount of Flanger effect in Xtra block.", u8"Количество эффекта Flanger в блоке Xtra.");
+        fxXtraFlanger.getSlider().setTooltip (tip);
+        fxXtraFlanger.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Amount of Tremolo effect in Xtra block.", u8"Количество эффекта Tremolo в блоке Xtra.");
+        fxXtraTremolo.getSlider().setTooltip (tip);
+        fxXtraTremolo.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Amount of AutoPan effect in Xtra block.", u8"Количество эффекта AutoPan в блоке Xtra.");
+        fxXtraAutopan.getSlider().setTooltip (tip);
+        fxXtraAutopan.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Amount of Saturator effect in Xtra block.", u8"Количество эффекта Saturator в блоке Xtra.");
+        fxXtraSaturator.getSlider().setTooltip (tip);
+        fxXtraSaturator.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Amount of Clipper effect in Xtra block.", u8"Количество эффекта Clipper в блоке Xtra.");
+        fxXtraClipper.getSlider().setTooltip (tip);
+        fxXtraClipper.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Stereo width amount in Xtra block.", u8"Количество расширения стерео в блоке Xtra.");
+        fxXtraWidth.getSlider().setTooltip (tip);
+        fxXtraWidth.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Tilt EQ amount in Xtra block.", u8"Количество tilt-EQ в блоке Xtra.");
+        fxXtraTilt.getSlider().setTooltip (tip);
+        fxXtraTilt.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Gate amount in Xtra block.", u8"Количество гейта в блоке Xtra.");
+        fxXtraGate.getSlider().setTooltip (tip);
+        fxXtraGate.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("LoFi amount (sample/bit degradation) in Xtra block.", u8"Количество LoFi (деградация bit/sample) в блоке Xtra.");
+        fxXtraLofi.getSlider().setTooltip (tip);
+        fxXtraLofi.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Doubler amount in Xtra block.", u8"Количество Doubler в блоке Xtra.");
+        fxXtraDoubler.getSlider().setTooltip (tip);
+        fxXtraDoubler.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Dry/wet blend for Xtra block output.", u8"Баланс dry/wet на выходе блока Xtra.");
+        fxXtraMix.getSlider().setTooltip (tip);
+        fxXtraMix.getLabel().setTooltip (tip);
     }
 
     modNoteSync.setTooltip (T ("When ON, Mod Freq follows the played note frequency (pitch-synced).",
@@ -7231,7 +7488,7 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
 
             for (int i = 0; i < params::mod::numSlots; ++i)
             {
-                const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+                const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstLast, modSlotDst[(size_t) i].getSelectedItemIndex());
                 if (d != dst)
                     continue;
 
@@ -7298,7 +7555,16 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
                 s.repaint();
         };
 
-        for (auto* k : { &osc1Level, &osc2Level, &osc3Level, &filterCutoff, &filterReso, &foldAmount, &clipAmount, &modAmount, &crushMix, &shaperDrive, &shaperMix })
+        for (auto* k : { &osc1Level, &osc2Level, &osc3Level, &filterCutoff, &filterReso,
+                         &foldAmount, &clipAmount, &modAmount, &crushMix, &shaperDrive, &shaperMix,
+                         &fxChorusRate, &fxChorusDepth, &fxChorusMix,
+                         &fxDelayTime, &fxDelayFeedback, &fxDelayMix,
+                         &fxReverbSize, &fxReverbDamp, &fxReverbMix,
+                         &fxDistDrive, &fxDistTone, &fxDistMix,
+                         &fxPhaserRate, &fxPhaserDepth, &fxPhaserFeedback, &fxPhaserMix,
+                         &fxOctSub, &fxOctMix,
+                         &fxXtraFlanger, &fxXtraTremolo, &fxXtraAutopan, &fxXtraSaturator, &fxXtraClipper,
+                         &fxXtraWidth, &fxXtraTilt, &fxXtraGate, &fxXtraLofi, &fxXtraDoubler, &fxXtraMix })
             updateFor (*k);
     }
 }
@@ -7451,7 +7717,7 @@ void IndustrialEnergySynthAudioProcessorEditor::clearAllModForDest (params::mod:
 
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
-        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstLast, modSlotDst[(size_t) i].getSelectedItemIndex());
         const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
         if (d == dst && s != params::mod::srcOff)
             clearModSlot (i);
@@ -7477,7 +7743,7 @@ void IndustrialEnergySynthAudioProcessorEditor::assignModulation (params::mod::S
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
         const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
-        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstShaperMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstLast, modSlotDst[(size_t) i].getSelectedItemIndex());
 
         if (s == src && d == dst)
             existing = i;
@@ -7574,6 +7840,17 @@ void IndustrialEnergySynthAudioProcessorEditor::assignModulation (params::mod::S
                 case params::mod::dstFxPhaserMix:      return "FX Phaser Mix";
                 case params::mod::dstFxOctaverAmount:  return "FX Octaver Amount";
                 case params::mod::dstFxOctaverMix:     return "FX Octaver Mix";
+                case params::mod::dstFxXtraFlangerAmount: return "FX Xtra Flanger";
+                case params::mod::dstFxXtraTremoloAmount: return "FX Xtra Tremolo";
+                case params::mod::dstFxXtraAutopanAmount: return "FX Xtra AutoPan";
+                case params::mod::dstFxXtraSaturatorAmount: return "FX Xtra Saturator";
+                case params::mod::dstFxXtraClipperAmount: return "FX Xtra Clipper";
+                case params::mod::dstFxXtraWidthAmount: return "FX Xtra Width";
+                case params::mod::dstFxXtraTiltAmount: return "FX Xtra Tilt";
+                case params::mod::dstFxXtraGateAmount: return "FX Xtra Gate";
+                case params::mod::dstFxXtraLofiAmount: return "FX Xtra LoFi";
+                case params::mod::dstFxXtraDoublerAmount: return "FX Xtra Doubler";
+                case params::mod::dstFxXtraMix: return "FX Xtra Mix";
                 default: break;
             }
             return "Off";
@@ -7597,7 +7874,7 @@ void IndustrialEnergySynthAudioProcessorEditor::showModulationMenu (params::mod:
     juce::Array<int> matchingSlots;
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
-        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstFxOctaverMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstLast, modSlotDst[(size_t) i].getSelectedItemIndex());
         const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
         if (d == dst && s != params::mod::srcOff)
             matchingSlots.add (i);
@@ -7666,6 +7943,7 @@ void IndustrialEnergySynthAudioProcessorEditor::applyFactoryPreset (int factoryI
     {
         setParamValue (params::fx::global::mix, 0.0f);
         setParamValue (params::fx::global::order, (float) params::fx::global::orderFixedA);
+        setParamValue (params::fx::global::route, (float) params::fx::global::routeSerial);
         setParamValue (params::fx::global::oversample, (float) params::fx::global::osOff);
 
         setParamValue (params::fx::chorus::enable, 0.0f);
@@ -7724,6 +8002,19 @@ void IndustrialEnergySynthAudioProcessorEditor::applyFactoryPreset (int factoryI
         setParamValue (params::fx::octaver::blend, 0.5f);
         setParamValue (params::fx::octaver::sensitivity, 0.5f);
         setParamValue (params::fx::octaver::tone, 0.5f);
+
+        setParamValue (params::fx::xtra::enable, 0.0f);
+        setParamValue (params::fx::xtra::mix, 0.0f);
+        setParamValue (params::fx::xtra::flangerAmount, 0.0f);
+        setParamValue (params::fx::xtra::tremoloAmount, 0.0f);
+        setParamValue (params::fx::xtra::autopanAmount, 0.0f);
+        setParamValue (params::fx::xtra::saturatorAmount, 0.0f);
+        setParamValue (params::fx::xtra::clipperAmount, 0.0f);
+        setParamValue (params::fx::xtra::widthAmount, 0.0f);
+        setParamValue (params::fx::xtra::tiltAmount, 0.0f);
+        setParamValue (params::fx::xtra::gateAmount, 0.0f);
+        setParamValue (params::fx::xtra::lofiAmount, 0.0f);
+        setParamValue (params::fx::xtra::doublerAmount, 0.0f);
     };
     setFxDefaults();
 
@@ -7859,6 +8150,35 @@ params::mod::Dest IndustrialEnergySynthAudioProcessorEditor::getModDestForCompon
     if (s == &crushMix.getSlider())     return params::mod::dstCrushMix;
     if (s == &shaperDrive.getSlider())  return params::mod::dstShaperDrive;
     if (s == &shaperMix.getSlider())    return params::mod::dstShaperMix;
+    if (s == &fxChorusRate.getSlider()) return params::mod::dstFxChorusRate;
+    if (s == &fxChorusDepth.getSlider()) return params::mod::dstFxChorusDepth;
+    if (s == &fxChorusMix.getSlider()) return params::mod::dstFxChorusMix;
+    if (s == &fxDelayTime.getSlider()) return params::mod::dstFxDelayTime;
+    if (s == &fxDelayFeedback.getSlider()) return params::mod::dstFxDelayFeedback;
+    if (s == &fxDelayMix.getSlider()) return params::mod::dstFxDelayMix;
+    if (s == &fxReverbSize.getSlider()) return params::mod::dstFxReverbSize;
+    if (s == &fxReverbDamp.getSlider()) return params::mod::dstFxReverbDamp;
+    if (s == &fxReverbMix.getSlider()) return params::mod::dstFxReverbMix;
+    if (s == &fxDistDrive.getSlider()) return params::mod::dstFxDistDrive;
+    if (s == &fxDistTone.getSlider()) return params::mod::dstFxDistTone;
+    if (s == &fxDistMix.getSlider()) return params::mod::dstFxDistMix;
+    if (s == &fxPhaserRate.getSlider()) return params::mod::dstFxPhaserRate;
+    if (s == &fxPhaserDepth.getSlider()) return params::mod::dstFxPhaserDepth;
+    if (s == &fxPhaserFeedback.getSlider()) return params::mod::dstFxPhaserFeedback;
+    if (s == &fxPhaserMix.getSlider()) return params::mod::dstFxPhaserMix;
+    if (s == &fxOctSub.getSlider()) return params::mod::dstFxOctaverAmount;
+    if (s == &fxOctMix.getSlider()) return params::mod::dstFxOctaverMix;
+    if (s == &fxXtraFlanger.getSlider()) return params::mod::dstFxXtraFlangerAmount;
+    if (s == &fxXtraTremolo.getSlider()) return params::mod::dstFxXtraTremoloAmount;
+    if (s == &fxXtraAutopan.getSlider()) return params::mod::dstFxXtraAutopanAmount;
+    if (s == &fxXtraSaturator.getSlider()) return params::mod::dstFxXtraSaturatorAmount;
+    if (s == &fxXtraClipper.getSlider()) return params::mod::dstFxXtraClipperAmount;
+    if (s == &fxXtraWidth.getSlider()) return params::mod::dstFxXtraWidthAmount;
+    if (s == &fxXtraTilt.getSlider()) return params::mod::dstFxXtraTiltAmount;
+    if (s == &fxXtraGate.getSlider()) return params::mod::dstFxXtraGateAmount;
+    if (s == &fxXtraLofi.getSlider()) return params::mod::dstFxXtraLofiAmount;
+    if (s == &fxXtraDoubler.getSlider()) return params::mod::dstFxXtraDoublerAmount;
+    if (s == &fxXtraMix.getSlider()) return params::mod::dstFxXtraMix;
 
     return params::mod::dstOff;
 }
@@ -7902,6 +8222,17 @@ void IndustrialEnergySynthAudioProcessorEditor::setLastTouchedModDest (params::m
             case params::mod::dstFxPhaserMix:      return "FX Phaser Mix";
             case params::mod::dstFxOctaverAmount:  return "FX Octaver Amount";
             case params::mod::dstFxOctaverMix:     return "FX Octaver Mix";
+            case params::mod::dstFxXtraFlangerAmount: return "FX Xtra Flanger";
+            case params::mod::dstFxXtraTremoloAmount: return "FX Xtra Tremolo";
+            case params::mod::dstFxXtraAutopanAmount: return "FX Xtra AutoPan";
+            case params::mod::dstFxXtraSaturatorAmount: return "FX Xtra Saturator";
+            case params::mod::dstFxXtraClipperAmount: return "FX Xtra Clipper";
+            case params::mod::dstFxXtraWidthAmount: return "FX Xtra Width";
+            case params::mod::dstFxXtraTiltAmount: return "FX Xtra Tilt";
+            case params::mod::dstFxXtraGateAmount: return "FX Xtra Gate";
+            case params::mod::dstFxXtraLofiAmount: return "FX Xtra LoFi";
+            case params::mod::dstFxXtraDoublerAmount: return "FX Xtra Doubler";
+            case params::mod::dstFxXtraMix: return "FX Xtra Mix";
             case params::mod::dstOff:              break;
         }
         return "-";
@@ -7911,7 +8242,7 @@ void IndustrialEnergySynthAudioProcessorEditor::setLastTouchedModDest (params::m
     float sumFE = 0.0f, sumAE = 0.0f, sumR = 0.0f;
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
-        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstFxOctaverMix, modSlotDst[(size_t) i].getSelectedItemIndex());
+        const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstLast, modSlotDst[(size_t) i].getSelectedItemIndex());
         if (d != dst)
             continue;
 

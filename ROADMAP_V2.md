@@ -9,6 +9,10 @@
 - **Качество**: стабильность в Reaper, быстрый UI, ноль аллокаций в аудио‑потоке, предсказуемая автомейшн‑кривая.
 
 ## Текущий статус (реализовано в коде)
+- (2026-02-28) FX Expansion Pack v1: добавлен блок `FX Xtra` (Flanger/Tremolo/AutoPan/Saturator/Clipper/Width/Tilt/Gate/LoFi/Doubler) с `enable + mix + amount` для каждого эффекта.
+- (2026-02-28) FX Routing Pro v1: добавлен `fx.global.route` (`Serial/Parallel`) в APVTS + DSP + UI.
+- (2026-02-28) Modulation 2.0 (FX-aware) v1: Mod Matrix расширена destination-ами для `FX Xtra` + интеграция в аудио-движок с клампами и сглаживанием.
+- (2026-02-28) Factory preset safety: reset/default логика пресетов обновлена под новые `fx.global.route` и `fx.xtra.*` параметры.
 - (2026-02-11) Synth Layout Compact v2: удалён отдельный `Output` блок, `Gain` перенесён в `Mono`; пересобрана сетка страницы `Synth` для меньшего пустого пространства.
 - (2026-02-11) Dense UI Fit Fixes: устранён клиппинг контролов/лейблов в `Destroy/Filter`, увеличены текст-боксы значений и вертикальные интервалы.
 - (2026-02-11) Fast Destroy Reset: double-click по заголовку `Destroy` сбрасывает параметры блока к дефолту.
@@ -28,6 +32,60 @@
 - (2026-02-10) Modulation v1: 2x LFO (free/sync) + 2x Macros + 8-slot Mod Matrix + drag‑and‑drop назначение на ручки.
 
 ## V2 Milestones (после v1.0)
+
+### Приоритетный трек после v1.0 (execution order)
+
+### V2.3 — FX Expansion Pack (10 популярных FX в компактном UI)
+- Добавить отдельный расширенный FX-блок (`Xtra`) и компактный режим панели (больше параметров на экран).
+- Включить 10 дополнительных эффектов с базовыми параметрами:
+  - Flanger
+  - Tremolo
+  - AutoPan
+  - Saturator
+  - Clipper
+  - Stereo Width
+  - Tilt EQ
+  - Gate
+  - LoFi (bit/sample degrade)
+  - Doubler
+- Для каждого: `enable + amount` минимум, плюс общий `mix`/smoothing.
+- Добавить APVTS-группу `fx.xtra.*`, state-recall и безопасные ограничения параметров.
+
+**Критерий:** все 10 FX доступны из одной компактной панели, без перегруза layout и без щелчков при автомейшне.
+
+### V2.4 — FX Routing Pro
+- Drag reorder порядка FX-блоков в цепи.
+- Режимы маршрутизации:
+  - serial
+  - parallel (минимум 2 ветки с blend)
+- Переключение pre/post для ключевых блоков (минимум Destroy/Shaper/Tone/FX).
+- Визуализация маршрута (простая схема в UI) + безопасный fallback к fixed order.
+
+**Критерий:** пользователь может быстро менять topology FX/Destroy без потери управляемости и без нестабильности.
+
+### V2.5 — Modulation 2.0 (FX-aware)
+- Добавить мод-назначения для новых FX параметров.
+- Быстрый assign `Last touched` -> `source` без открытия полной матрицы.
+- Улучшить визуал глубины модуляции в dense режимах UI.
+- Ввести лимиты/клампы для “опасных” направлений (delay time, drive, feedback).
+
+**Критерий:** маршрутизация модуляции для FX делается за 1-2 действия, звук остаётся стабильным при stress automation.
+
+### V2.6 — Oscillator Draw/Wavetable v2
+- Полноценный Draw-режим осциллятора (рисование формы вручную).
+- Добавить минимум 10 шаблонов волн/таблиц как быстрые стартовые точки.
+- Morph между шаблонами + быстрый reset/normalize.
+- Подготовить почву под дальнейший wavetable import.
+
+**Критерий:** пользователь может за минуты сделать уникальный осц-тембр без внешних инструментов.
+
+### V2.7 — Preset Browser v2
+- Теги, избранное, фильтры по категории (`Bass/Lead/Drone/...`).
+- Quick preview и быстрый A/B.
+- Smart Random внутри ограничений категории.
+- Миграции пресетов между версиями параметров.
+
+**Критерий:** пресетный workflow становится продуктовым и быстрым, без “потерянных” патчей после обновлений.
 
 ## Serum Gap: что ещё критично, чтобы приблизиться по уровню
 1. **Macro workflow как в Serum**
@@ -105,6 +163,24 @@
 
 **Критерий:** пресеты становятся “контентом”, а не демо‑набором.
 
+## Что ещё можно сделать после V2.3–V2.7 (следующий слой)
+1. **Scene Morph A/B**
+- Два состояния патча (`A/B`) + morph ручка между ними (в т.ч. автоматизация).
+2. **Multi-band Destroy**
+- Разделение на 2-3 полосы с независимыми destroy-алгоритмами и mix.
+3. **Perceptual Loudness Guard**
+- Match gain + loudness compensation по блокам, чтобы честно сравнивать тембр.
+4. **CPU Governor**
+- Профили качества `Eco/Hi/Ultra` + авто-деградация тяжёлых модулей при перегрузе CPU.
+5. **Macro Snapshots / Performance mode**
+- Быстрые performance-сцены для живой игры (industrial transitions/risers).
+6. **Advanced Lab Tools**
+- Scale/chord helpers + генератор индустриальных ритм-паттернов для теста патчей.
+7. **Auto Assist (intent-aware)**
+- Рекомендации по ручкам и safe-range в зависимости от цели (`Bass/Lead/Drone`).
+8. **Export utilities**
+- Render one-shot, note-layers и wavetable snapshots прямо из плагина.
+
 ## Инженерные правила (обязательные для V2)
 - Stable Parameter IDs навсегда после релиза.
 - Никаких аллокаций/локов в аудио‑потоке.
@@ -113,6 +189,20 @@
 - Билингвальность RU/EN: все строки через единый i18n слой; подписи должны помещаться.
 
 ## Changelog (work-in-progress)
+### 2026-02-28
+- Добавлен приоритетный execution-трек `V2.3 -> V2.7`:
+  - FX Expansion (10 FX),
+  - FX Routing Pro,
+  - Modulation 2.0 (FX-aware),
+  - Oscillator Draw/Wavetable v2,
+  - Preset Browser v2.
+- Добавлен блок идей “после V2.3–V2.7” для следующего слоя развития.
+- Реализован `FX Xtra`-блок (10 дополнительных FX) в APVTS + DSP + UI.
+- Реализован `FX Route` (`Serial/Parallel`) в `fx.global.*` с обработкой в движке.
+- Добавлены destinations Mod Matrix для `fx.xtra.*` + применение модуляции в аудио-движке.
+- Добавлены factory-default reset значения для новых FX параметров.
+- Обновлены tooltip-подсказки и визуальные mod-rings для FX/Xtra ручек.
+
 ### 2026-02-12
 - Добавлен каркас `FXChain` (Chorus / Delay / Reverb / Distortion / Phaser / Octaver) с per-block mix + global FX mix.
 - Добавлены параметры APVTS:
