@@ -96,3 +96,15 @@
 | 48 kHz | 1024 | Быстрый пресет-свитч + play/stop transport | Нет утечек UI, восстановление state стабильное |
 | 96 kHz | 64 | Экстремальный Destroy + Pitch Lock | Нота читается, CPU поведение предсказуемо |
 | 96 kHz | 256 | Переключение OS Off/2x/4x на лету | Без крэшей/взрывных выбросов уровня |
+
+## 9) Release evidence (v1.0 freeze)
+Дата: `2026-02-28`
+
+- Configure: `cmake -S . -B build-linux-v1a -G Ninja -DIES_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release`
+- Build: `cmake --build build-linux-v1a -j 8`
+- Tests: `ctest --test-dir build-linux-v1a --output-on-failure`
+
+Результат:
+- Сборка успешна.
+- `ctest`: `1/1 passed` (`ies_tests`).
+- Ручной DAW smoke/checklist из разделов 0..8 используется как финальный хостовый gate перед публикацией бинаря.

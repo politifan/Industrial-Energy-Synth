@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(IndustrialEnergySynth VERSION 0.1.8 LANGUAGES CXX)
+project(IndustrialEnergySynth VERSION 1.0.0 LANGUAGES CXX)
 
 option(IES_COPY_PLUGIN_AFTER_BUILD "Copy built plugin to the default VST3 folder after build" OFF)
 option(IES_BUILD_TESTS "Build lightweight unit tests (non-plugin)" OFF)
