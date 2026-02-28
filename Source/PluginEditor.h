@@ -306,6 +306,17 @@ private:
     juce::GroupComponent toneGroup;
     juce::ToggleButton toneEnable;
     std::unique_ptr<APVTS::ButtonAttachment> toneEnableAttachment;
+    ies::ui::ComboWithLabel toneLowCutSlope;
+    std::unique_ptr<APVTS::ComboBoxAttachment> toneLowCutSlopeAttachment;
+    ies::ui::ComboWithLabel toneHighCutSlope;
+    std::unique_ptr<APVTS::ComboBoxAttachment> toneHighCutSlopeAttachment;
+    ies::ui::ComboWithLabel toneDynBand;
+    juce::ToggleButton toneDynEnable;
+    std::unique_ptr<APVTS::ButtonAttachment> toneDynEnableAttachment;
+    ies::ui::KnobWithLabel toneDynRange;
+    std::unique_ptr<APVTS::SliderAttachment> toneDynRangeAttachment;
+    ies::ui::KnobWithLabel toneDynThreshold;
+    std::unique_ptr<APVTS::SliderAttachment> toneDynThresholdAttachment;
     ies::ui::ComboWithLabel spectrumSource;
     std::unique_ptr<APVTS::ComboBoxAttachment> spectrumSourceAttachment;
     ies::ui::ComboWithLabel spectrumAveraging;

@@ -25,46 +25,72 @@ public:
                const char* enableParamId,
                const char* lowCutParamId,
                const char* highCutParamId,
+               const char* lowCutSlopeParamId,
+               const char* highCutSlopeParamId,
                const char* peak1EnableParamId,
                const char* peak1TypeParamId,
                const char* peak1FreqParamId,
                const char* peak1GainParamId,
                const char* peak1QParamId,
+               const char* peak1DynEnableParamId,
+               const char* peak1DynRangeParamId,
+               const char* peak1DynThresholdParamId,
                const char* peak2EnableParamId,
                const char* peak2TypeParamId,
                const char* peak2FreqParamId,
                const char* peak2GainParamId,
                const char* peak2QParamId,
+               const char* peak2DynEnableParamId,
+               const char* peak2DynRangeParamId,
+               const char* peak2DynThresholdParamId,
                const char* peak3EnableParamId,
                const char* peak3TypeParamId,
                const char* peak3FreqParamId,
                const char* peak3GainParamId,
                const char* peak3QParamId,
+               const char* peak3DynEnableParamId,
+               const char* peak3DynRangeParamId,
+               const char* peak3DynThresholdParamId,
                const char* peak4EnableParamId,
                const char* peak4TypeParamId,
                const char* peak4FreqParamId,
                const char* peak4GainParamId,
                const char* peak4QParamId,
+               const char* peak4DynEnableParamId,
+               const char* peak4DynRangeParamId,
+               const char* peak4DynThresholdParamId,
                const char* peak5EnableParamId,
                const char* peak5TypeParamId,
                const char* peak5FreqParamId,
                const char* peak5GainParamId,
                const char* peak5QParamId,
+               const char* peak5DynEnableParamId,
+               const char* peak5DynRangeParamId,
+               const char* peak5DynThresholdParamId,
                const char* peak6EnableParamId,
                const char* peak6TypeParamId,
                const char* peak6FreqParamId,
                const char* peak6GainParamId,
                const char* peak6QParamId,
+               const char* peak6DynEnableParamId,
+               const char* peak6DynRangeParamId,
+               const char* peak6DynThresholdParamId,
                const char* peak7EnableParamId,
                const char* peak7TypeParamId,
                const char* peak7FreqParamId,
                const char* peak7GainParamId,
                const char* peak7QParamId,
+               const char* peak7DynEnableParamId,
+               const char* peak7DynRangeParamId,
+               const char* peak7DynThresholdParamId,
                const char* peak8EnableParamId,
                const char* peak8TypeParamId,
                const char* peak8FreqParamId,
                const char* peak8GainParamId,
-               const char* peak8QParamId);
+               const char* peak8QParamId,
+               const char* peak8DynEnableParamId,
+               const char* peak8DynRangeParamId,
+               const char* peak8DynThresholdParamId);
 
     void setAudioFrame (const float* samples, int numSamples, double sampleRate);
 
@@ -93,91 +119,143 @@ private:
         juce::RangedAudioParameter* enable = nullptr;
         juce::RangedAudioParameter* lowCut = nullptr;
         juce::RangedAudioParameter* highCut = nullptr;
+        juce::RangedAudioParameter* lowCutSlope = nullptr;
+        juce::RangedAudioParameter* highCutSlope = nullptr;
         juce::RangedAudioParameter* peak1Enable = nullptr;
         juce::RangedAudioParameter* peak1Type = nullptr;
         juce::RangedAudioParameter* peak1Freq = nullptr;
         juce::RangedAudioParameter* peak1Gain = nullptr;
         juce::RangedAudioParameter* peak1Q = nullptr;
+        juce::RangedAudioParameter* peak1DynEnable = nullptr;
+        juce::RangedAudioParameter* peak1DynRange = nullptr;
+        juce::RangedAudioParameter* peak1DynThreshold = nullptr;
         juce::RangedAudioParameter* peak2Enable = nullptr;
         juce::RangedAudioParameter* peak2Type = nullptr;
         juce::RangedAudioParameter* peak2Freq = nullptr;
         juce::RangedAudioParameter* peak2Gain = nullptr;
         juce::RangedAudioParameter* peak2Q = nullptr;
+        juce::RangedAudioParameter* peak2DynEnable = nullptr;
+        juce::RangedAudioParameter* peak2DynRange = nullptr;
+        juce::RangedAudioParameter* peak2DynThreshold = nullptr;
         juce::RangedAudioParameter* peak3Enable = nullptr;
         juce::RangedAudioParameter* peak3Type = nullptr;
         juce::RangedAudioParameter* peak3Freq = nullptr;
         juce::RangedAudioParameter* peak3Gain = nullptr;
         juce::RangedAudioParameter* peak3Q = nullptr;
+        juce::RangedAudioParameter* peak3DynEnable = nullptr;
+        juce::RangedAudioParameter* peak3DynRange = nullptr;
+        juce::RangedAudioParameter* peak3DynThreshold = nullptr;
         juce::RangedAudioParameter* peak4Enable = nullptr;
         juce::RangedAudioParameter* peak4Type = nullptr;
         juce::RangedAudioParameter* peak4Freq = nullptr;
         juce::RangedAudioParameter* peak4Gain = nullptr;
         juce::RangedAudioParameter* peak4Q = nullptr;
+        juce::RangedAudioParameter* peak4DynEnable = nullptr;
+        juce::RangedAudioParameter* peak4DynRange = nullptr;
+        juce::RangedAudioParameter* peak4DynThreshold = nullptr;
         juce::RangedAudioParameter* peak5Enable = nullptr;
         juce::RangedAudioParameter* peak5Type = nullptr;
         juce::RangedAudioParameter* peak5Freq = nullptr;
         juce::RangedAudioParameter* peak5Gain = nullptr;
         juce::RangedAudioParameter* peak5Q = nullptr;
+        juce::RangedAudioParameter* peak5DynEnable = nullptr;
+        juce::RangedAudioParameter* peak5DynRange = nullptr;
+        juce::RangedAudioParameter* peak5DynThreshold = nullptr;
         juce::RangedAudioParameter* peak6Enable = nullptr;
         juce::RangedAudioParameter* peak6Type = nullptr;
         juce::RangedAudioParameter* peak6Freq = nullptr;
         juce::RangedAudioParameter* peak6Gain = nullptr;
         juce::RangedAudioParameter* peak6Q = nullptr;
+        juce::RangedAudioParameter* peak6DynEnable = nullptr;
+        juce::RangedAudioParameter* peak6DynRange = nullptr;
+        juce::RangedAudioParameter* peak6DynThreshold = nullptr;
         juce::RangedAudioParameter* peak7Enable = nullptr;
         juce::RangedAudioParameter* peak7Type = nullptr;
         juce::RangedAudioParameter* peak7Freq = nullptr;
         juce::RangedAudioParameter* peak7Gain = nullptr;
         juce::RangedAudioParameter* peak7Q = nullptr;
+        juce::RangedAudioParameter* peak7DynEnable = nullptr;
+        juce::RangedAudioParameter* peak7DynRange = nullptr;
+        juce::RangedAudioParameter* peak7DynThreshold = nullptr;
         juce::RangedAudioParameter* peak8Enable = nullptr;
         juce::RangedAudioParameter* peak8Type = nullptr;
         juce::RangedAudioParameter* peak8Freq = nullptr;
         juce::RangedAudioParameter* peak8Gain = nullptr;
         juce::RangedAudioParameter* peak8Q = nullptr;
+        juce::RangedAudioParameter* peak8DynEnable = nullptr;
+        juce::RangedAudioParameter* peak8DynRange = nullptr;
+        juce::RangedAudioParameter* peak8DynThreshold = nullptr;
 
         std::atomic<float>* toneEnableRaw = nullptr;
         std::atomic<float>* enableRaw = nullptr;
         std::atomic<float>* lowCutRaw = nullptr;
         std::atomic<float>* highCutRaw = nullptr;
+        std::atomic<float>* lowCutSlopeRaw = nullptr;
+        std::atomic<float>* highCutSlopeRaw = nullptr;
         std::atomic<float>* peak1EnableRaw = nullptr;
         std::atomic<float>* peak1TypeRaw = nullptr;
         std::atomic<float>* peak1FreqRaw = nullptr;
         std::atomic<float>* peak1GainRaw = nullptr;
         std::atomic<float>* peak1QRaw = nullptr;
+        std::atomic<float>* peak1DynEnableRaw = nullptr;
+        std::atomic<float>* peak1DynRangeRaw = nullptr;
+        std::atomic<float>* peak1DynThresholdRaw = nullptr;
         std::atomic<float>* peak2EnableRaw = nullptr;
         std::atomic<float>* peak2TypeRaw = nullptr;
         std::atomic<float>* peak2FreqRaw = nullptr;
         std::atomic<float>* peak2GainRaw = nullptr;
         std::atomic<float>* peak2QRaw = nullptr;
+        std::atomic<float>* peak2DynEnableRaw = nullptr;
+        std::atomic<float>* peak2DynRangeRaw = nullptr;
+        std::atomic<float>* peak2DynThresholdRaw = nullptr;
         std::atomic<float>* peak3EnableRaw = nullptr;
         std::atomic<float>* peak3TypeRaw = nullptr;
         std::atomic<float>* peak3FreqRaw = nullptr;
         std::atomic<float>* peak3GainRaw = nullptr;
         std::atomic<float>* peak3QRaw = nullptr;
+        std::atomic<float>* peak3DynEnableRaw = nullptr;
+        std::atomic<float>* peak3DynRangeRaw = nullptr;
+        std::atomic<float>* peak3DynThresholdRaw = nullptr;
         std::atomic<float>* peak4EnableRaw = nullptr;
         std::atomic<float>* peak4TypeRaw = nullptr;
         std::atomic<float>* peak4FreqRaw = nullptr;
         std::atomic<float>* peak4GainRaw = nullptr;
         std::atomic<float>* peak4QRaw = nullptr;
+        std::atomic<float>* peak4DynEnableRaw = nullptr;
+        std::atomic<float>* peak4DynRangeRaw = nullptr;
+        std::atomic<float>* peak4DynThresholdRaw = nullptr;
         std::atomic<float>* peak5EnableRaw = nullptr;
         std::atomic<float>* peak5TypeRaw = nullptr;
         std::atomic<float>* peak5FreqRaw = nullptr;
         std::atomic<float>* peak5GainRaw = nullptr;
         std::atomic<float>* peak5QRaw = nullptr;
+        std::atomic<float>* peak5DynEnableRaw = nullptr;
+        std::atomic<float>* peak5DynRangeRaw = nullptr;
+        std::atomic<float>* peak5DynThresholdRaw = nullptr;
         std::atomic<float>* peak6EnableRaw = nullptr;
         std::atomic<float>* peak6TypeRaw = nullptr;
         std::atomic<float>* peak6FreqRaw = nullptr;
         std::atomic<float>* peak6GainRaw = nullptr;
         std::atomic<float>* peak6QRaw = nullptr;
+        std::atomic<float>* peak6DynEnableRaw = nullptr;
+        std::atomic<float>* peak6DynRangeRaw = nullptr;
+        std::atomic<float>* peak6DynThresholdRaw = nullptr;
         std::atomic<float>* peak7EnableRaw = nullptr;
         std::atomic<float>* peak7TypeRaw = nullptr;
         std::atomic<float>* peak7FreqRaw = nullptr;
         std::atomic<float>* peak7GainRaw = nullptr;
         std::atomic<float>* peak7QRaw = nullptr;
+        std::atomic<float>* peak7DynEnableRaw = nullptr;
+        std::atomic<float>* peak7DynRangeRaw = nullptr;
+        std::atomic<float>* peak7DynThresholdRaw = nullptr;
         std::atomic<float>* peak8EnableRaw = nullptr;
         std::atomic<float>* peak8TypeRaw = nullptr;
         std::atomic<float>* peak8FreqRaw = nullptr;
         std::atomic<float>* peak8GainRaw = nullptr;
         std::atomic<float>* peak8QRaw = nullptr;
+        std::atomic<float>* peak8DynEnableRaw = nullptr;
+        std::atomic<float>* peak8DynRangeRaw = nullptr;
+        std::atomic<float>* peak8DynThresholdRaw = nullptr;
     };
 
     float getParamValueActual (juce::RangedAudioParameter* p, std::atomic<float>* raw, float fallback) const noexcept;

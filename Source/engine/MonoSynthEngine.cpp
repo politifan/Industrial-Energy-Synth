@@ -137,6 +137,8 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     toneLowCutHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->toneLowCutHz : nullptr, 20.0f));
     toneHighCutHzSm.reset (sampleRateHz, smoothSeconds);
     toneHighCutHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->toneHighCutHz : nullptr, 20000.0f));
+    toneLowCutSlope = (params != nullptr && params->toneLowCutSlope != nullptr) ? (int) std::lround (params->toneLowCutSlope->load()) : (int) params::tone::slope24;
+    toneHighCutSlope = (params != nullptr && params->toneHighCutSlope != nullptr) ? (int) std::lround (params->toneHighCutSlope->load()) : (int) params::tone::slope24;
 
     tonePeak1On = (params != nullptr && params->tonePeak1Enable != nullptr) ? (params->tonePeak1Enable->load() >= 0.5f) : true;
     tonePeak1Type = (params != nullptr && params->tonePeak1Type != nullptr) ? (int) std::lround (params->tonePeak1Type->load()) : (int) params::tone::peakBell;
@@ -146,6 +148,11 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     tonePeak1GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1GainDb : nullptr, 0.0f));
     tonePeak1QSm.reset (sampleRateHz, smoothSeconds);
     tonePeak1QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1Q : nullptr, 0.90f));
+    tonePeak1DynOn = (params != nullptr && params->tonePeak1DynEnable != nullptr) ? (params->tonePeak1DynEnable->load() >= 0.5f) : false;
+    tonePeak1DynRangeDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak1DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1DynRangeDb : nullptr, 0.0f));
+    tonePeak1DynThresholdDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak1DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1DynThresholdDb : nullptr, -18.0f));
 
     tonePeak2On = (params != nullptr && params->tonePeak2Enable != nullptr) ? (params->tonePeak2Enable->load() >= 0.5f) : true;
     tonePeak2Type = (params != nullptr && params->tonePeak2Type != nullptr) ? (int) std::lround (params->tonePeak2Type->load()) : (int) params::tone::peakBell;
@@ -155,6 +162,11 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     tonePeak2GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2GainDb : nullptr, 0.0f));
     tonePeak2QSm.reset (sampleRateHz, smoothSeconds);
     tonePeak2QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2Q : nullptr, 0.7071f));
+    tonePeak2DynOn = (params != nullptr && params->tonePeak2DynEnable != nullptr) ? (params->tonePeak2DynEnable->load() >= 0.5f) : false;
+    tonePeak2DynRangeDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak2DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2DynRangeDb : nullptr, 0.0f));
+    tonePeak2DynThresholdDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak2DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2DynThresholdDb : nullptr, -18.0f));
 
     tonePeak3On = (params != nullptr && params->tonePeak3Enable != nullptr) ? (params->tonePeak3Enable->load() >= 0.5f) : true;
     tonePeak3Type = (params != nullptr && params->tonePeak3Type != nullptr) ? (int) std::lround (params->tonePeak3Type->load()) : (int) params::tone::peakBell;
@@ -164,6 +176,11 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     tonePeak3GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3GainDb : nullptr, 0.0f));
     tonePeak3QSm.reset (sampleRateHz, smoothSeconds);
     tonePeak3QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3Q : nullptr, 0.90f));
+    tonePeak3DynOn = (params != nullptr && params->tonePeak3DynEnable != nullptr) ? (params->tonePeak3DynEnable->load() >= 0.5f) : false;
+    tonePeak3DynRangeDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak3DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3DynRangeDb : nullptr, 0.0f));
+    tonePeak3DynThresholdDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak3DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3DynThresholdDb : nullptr, -18.0f));
 
     tonePeak4On = (params != nullptr && params->tonePeak4Enable != nullptr) ? (params->tonePeak4Enable->load() >= 0.5f) : false;
     tonePeak4Type = (params != nullptr && params->tonePeak4Type != nullptr) ? (int) std::lround (params->tonePeak4Type->load()) : (int) params::tone::peakBell;
@@ -173,6 +190,11 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     tonePeak4GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak4GainDb : nullptr, 0.0f));
     tonePeak4QSm.reset (sampleRateHz, smoothSeconds);
     tonePeak4QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak4Q : nullptr, 0.90f));
+    tonePeak4DynOn = (params != nullptr && params->tonePeak4DynEnable != nullptr) ? (params->tonePeak4DynEnable->load() >= 0.5f) : false;
+    tonePeak4DynRangeDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak4DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak4DynRangeDb : nullptr, 0.0f));
+    tonePeak4DynThresholdDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak4DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak4DynThresholdDb : nullptr, -18.0f));
 
     tonePeak5On = (params != nullptr && params->tonePeak5Enable != nullptr) ? (params->tonePeak5Enable->load() >= 0.5f) : false;
     tonePeak5Type = (params != nullptr && params->tonePeak5Type != nullptr) ? (int) std::lround (params->tonePeak5Type->load()) : (int) params::tone::peakBell;
@@ -182,6 +204,11 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     tonePeak5GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak5GainDb : nullptr, 0.0f));
     tonePeak5QSm.reset (sampleRateHz, smoothSeconds);
     tonePeak5QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak5Q : nullptr, 0.90f));
+    tonePeak5DynOn = (params != nullptr && params->tonePeak5DynEnable != nullptr) ? (params->tonePeak5DynEnable->load() >= 0.5f) : false;
+    tonePeak5DynRangeDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak5DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak5DynRangeDb : nullptr, 0.0f));
+    tonePeak5DynThresholdDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak5DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak5DynThresholdDb : nullptr, -18.0f));
 
     tonePeak6On = (params != nullptr && params->tonePeak6Enable != nullptr) ? (params->tonePeak6Enable->load() >= 0.5f) : false;
     tonePeak6Type = (params != nullptr && params->tonePeak6Type != nullptr) ? (int) std::lround (params->tonePeak6Type->load()) : (int) params::tone::peakBell;
@@ -191,6 +218,11 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     tonePeak6GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak6GainDb : nullptr, 0.0f));
     tonePeak6QSm.reset (sampleRateHz, smoothSeconds);
     tonePeak6QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak6Q : nullptr, 0.90f));
+    tonePeak6DynOn = (params != nullptr && params->tonePeak6DynEnable != nullptr) ? (params->tonePeak6DynEnable->load() >= 0.5f) : false;
+    tonePeak6DynRangeDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak6DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak6DynRangeDb : nullptr, 0.0f));
+    tonePeak6DynThresholdDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak6DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak6DynThresholdDb : nullptr, -18.0f));
 
     tonePeak7On = (params != nullptr && params->tonePeak7Enable != nullptr) ? (params->tonePeak7Enable->load() >= 0.5f) : false;
     tonePeak7Type = (params != nullptr && params->tonePeak7Type != nullptr) ? (int) std::lround (params->tonePeak7Type->load()) : (int) params::tone::peakBell;
@@ -200,6 +232,11 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     tonePeak7GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak7GainDb : nullptr, 0.0f));
     tonePeak7QSm.reset (sampleRateHz, smoothSeconds);
     tonePeak7QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak7Q : nullptr, 0.90f));
+    tonePeak7DynOn = (params != nullptr && params->tonePeak7DynEnable != nullptr) ? (params->tonePeak7DynEnable->load() >= 0.5f) : false;
+    tonePeak7DynRangeDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak7DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak7DynRangeDb : nullptr, 0.0f));
+    tonePeak7DynThresholdDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak7DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak7DynThresholdDb : nullptr, -18.0f));
 
     tonePeak8On = (params != nullptr && params->tonePeak8Enable != nullptr) ? (params->tonePeak8Enable->load() >= 0.5f) : false;
     tonePeak8Type = (params != nullptr && params->tonePeak8Type != nullptr) ? (int) std::lround (params->tonePeak8Type->load()) : (int) params::tone::peakBell;
@@ -209,6 +246,11 @@ void MonoSynthEngine::prepare (double sr, int maxBlockSize)
     tonePeak8GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak8GainDb : nullptr, 0.0f));
     tonePeak8QSm.reset (sampleRateHz, smoothSeconds);
     tonePeak8QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak8Q : nullptr, 0.90f));
+    tonePeak8DynOn = (params != nullptr && params->tonePeak8DynEnable != nullptr) ? (params->tonePeak8DynEnable->load() >= 0.5f) : false;
+    tonePeak8DynRangeDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak8DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak8DynRangeDb : nullptr, 0.0f));
+    tonePeak8DynThresholdDbSm.reset (sampleRateHz, smoothSeconds);
+    tonePeak8DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak8DynThresholdDb : nullptr, -18.0f));
 
     reset();
 }
@@ -269,54 +311,80 @@ void MonoSynthEngine::reset()
 
     toneLowCutHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->toneLowCutHz : nullptr, 20.0f));
     toneHighCutHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->toneHighCutHz : nullptr, 20000.0f));
+    toneLowCutSlope = (params != nullptr && params->toneLowCutSlope != nullptr) ? (int) std::lround (params->toneLowCutSlope->load()) : (int) params::tone::slope24;
+    toneHighCutSlope = (params != nullptr && params->toneHighCutSlope != nullptr) ? (int) std::lround (params->toneHighCutSlope->load()) : (int) params::tone::slope24;
 
     tonePeak1On = (params != nullptr && params->tonePeak1Enable != nullptr) ? (params->tonePeak1Enable->load() >= 0.5f) : true;
     tonePeak1Type = (params != nullptr && params->tonePeak1Type != nullptr) ? (int) std::lround (params->tonePeak1Type->load()) : (int) params::tone::peakBell;
     tonePeak1FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1FreqHz : nullptr, 220.0f));
     tonePeak1GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1GainDb : nullptr, 0.0f));
     tonePeak1QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1Q : nullptr, 0.90f));
+    tonePeak1DynOn = (params != nullptr && params->tonePeak1DynEnable != nullptr) ? (params->tonePeak1DynEnable->load() >= 0.5f) : false;
+    tonePeak1DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1DynRangeDb : nullptr, 0.0f));
+    tonePeak1DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak1DynThresholdDb : nullptr, -18.0f));
 
     tonePeak2On = (params != nullptr && params->tonePeak2Enable != nullptr) ? (params->tonePeak2Enable->load() >= 0.5f) : true;
     tonePeak2Type = (params != nullptr && params->tonePeak2Type != nullptr) ? (int) std::lround (params->tonePeak2Type->load()) : (int) params::tone::peakBell;
     tonePeak2FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2FreqHz : nullptr, 1000.0f));
     tonePeak2GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2GainDb : nullptr, 0.0f));
     tonePeak2QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2Q : nullptr, 0.7071f));
+    tonePeak2DynOn = (params != nullptr && params->tonePeak2DynEnable != nullptr) ? (params->tonePeak2DynEnable->load() >= 0.5f) : false;
+    tonePeak2DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2DynRangeDb : nullptr, 0.0f));
+    tonePeak2DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak2DynThresholdDb : nullptr, -18.0f));
 
     tonePeak3On = (params != nullptr && params->tonePeak3Enable != nullptr) ? (params->tonePeak3Enable->load() >= 0.5f) : true;
     tonePeak3Type = (params != nullptr && params->tonePeak3Type != nullptr) ? (int) std::lround (params->tonePeak3Type->load()) : (int) params::tone::peakBell;
     tonePeak3FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3FreqHz : nullptr, 4200.0f));
     tonePeak3GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3GainDb : nullptr, 0.0f));
     tonePeak3QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3Q : nullptr, 0.90f));
+    tonePeak3DynOn = (params != nullptr && params->tonePeak3DynEnable != nullptr) ? (params->tonePeak3DynEnable->load() >= 0.5f) : false;
+    tonePeak3DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3DynRangeDb : nullptr, 0.0f));
+    tonePeak3DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak3DynThresholdDb : nullptr, -18.0f));
 
     tonePeak4On = (params != nullptr && params->tonePeak4Enable != nullptr) ? (params->tonePeak4Enable->load() >= 0.5f) : false;
     tonePeak4Type = (params != nullptr && params->tonePeak4Type != nullptr) ? (int) std::lround (params->tonePeak4Type->load()) : (int) params::tone::peakBell;
     tonePeak4FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak4FreqHz : nullptr, 700.0f));
     tonePeak4GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak4GainDb : nullptr, 0.0f));
     tonePeak4QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak4Q : nullptr, 0.90f));
+    tonePeak4DynOn = (params != nullptr && params->tonePeak4DynEnable != nullptr) ? (params->tonePeak4DynEnable->load() >= 0.5f) : false;
+    tonePeak4DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak4DynRangeDb : nullptr, 0.0f));
+    tonePeak4DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak4DynThresholdDb : nullptr, -18.0f));
 
     tonePeak5On = (params != nullptr && params->tonePeak5Enable != nullptr) ? (params->tonePeak5Enable->load() >= 0.5f) : false;
     tonePeak5Type = (params != nullptr && params->tonePeak5Type != nullptr) ? (int) std::lround (params->tonePeak5Type->load()) : (int) params::tone::peakBell;
     tonePeak5FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak5FreqHz : nullptr, 1800.0f));
     tonePeak5GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak5GainDb : nullptr, 0.0f));
     tonePeak5QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak5Q : nullptr, 0.90f));
+    tonePeak5DynOn = (params != nullptr && params->tonePeak5DynEnable != nullptr) ? (params->tonePeak5DynEnable->load() >= 0.5f) : false;
+    tonePeak5DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak5DynRangeDb : nullptr, 0.0f));
+    tonePeak5DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak5DynThresholdDb : nullptr, -18.0f));
 
     tonePeak6On = (params != nullptr && params->tonePeak6Enable != nullptr) ? (params->tonePeak6Enable->load() >= 0.5f) : false;
     tonePeak6Type = (params != nullptr && params->tonePeak6Type != nullptr) ? (int) std::lround (params->tonePeak6Type->load()) : (int) params::tone::peakBell;
     tonePeak6FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak6FreqHz : nullptr, 5200.0f));
     tonePeak6GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak6GainDb : nullptr, 0.0f));
     tonePeak6QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak6Q : nullptr, 0.90f));
+    tonePeak6DynOn = (params != nullptr && params->tonePeak6DynEnable != nullptr) ? (params->tonePeak6DynEnable->load() >= 0.5f) : false;
+    tonePeak6DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak6DynRangeDb : nullptr, 0.0f));
+    tonePeak6DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak6DynThresholdDb : nullptr, -18.0f));
 
     tonePeak7On = (params != nullptr && params->tonePeak7Enable != nullptr) ? (params->tonePeak7Enable->load() >= 0.5f) : false;
     tonePeak7Type = (params != nullptr && params->tonePeak7Type != nullptr) ? (int) std::lround (params->tonePeak7Type->load()) : (int) params::tone::peakBell;
     tonePeak7FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak7FreqHz : nullptr, 250.0f));
     tonePeak7GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak7GainDb : nullptr, 0.0f));
     tonePeak7QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak7Q : nullptr, 0.90f));
+    tonePeak7DynOn = (params != nullptr && params->tonePeak7DynEnable != nullptr) ? (params->tonePeak7DynEnable->load() >= 0.5f) : false;
+    tonePeak7DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak7DynRangeDb : nullptr, 0.0f));
+    tonePeak7DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak7DynThresholdDb : nullptr, -18.0f));
 
     tonePeak8On = (params != nullptr && params->tonePeak8Enable != nullptr) ? (params->tonePeak8Enable->load() >= 0.5f) : false;
     tonePeak8Type = (params != nullptr && params->tonePeak8Type != nullptr) ? (int) std::lround (params->tonePeak8Type->load()) : (int) params::tone::peakBell;
     tonePeak8FreqHzSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak8FreqHz : nullptr, 9500.0f));
     tonePeak8GainDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak8GainDb : nullptr, 0.0f));
     tonePeak8QSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak8Q : nullptr, 0.90f));
+    tonePeak8DynOn = (params != nullptr && params->tonePeak8DynEnable != nullptr) ? (params->tonePeak8DynEnable->load() >= 0.5f) : false;
+    tonePeak8DynRangeDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak8DynRangeDb : nullptr, 0.0f));
+    tonePeak8DynThresholdDbSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->tonePeak8DynThresholdDb : nullptr, -18.0f));
 
     noiseLevelSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->noiseLevel : nullptr, 0.0f));
     noiseColorSm.setCurrentAndTargetValue (loadParam (params != nullptr ? params->noiseColor : nullptr, 0.75f));
@@ -592,54 +660,80 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
 
     setTargetIfChanged (toneLowCutHzSm,  params->toneLowCutHz  != nullptr ? params->toneLowCutHz->load()  : 20.0f);
     setTargetIfChanged (toneHighCutHzSm, params->toneHighCutHz != nullptr ? params->toneHighCutHz->load() : 20000.0f);
+    toneLowCutSlope = params->toneLowCutSlope != nullptr ? (int) std::lround (params->toneLowCutSlope->load()) : (int) params::tone::slope24;
+    toneHighCutSlope = params->toneHighCutSlope != nullptr ? (int) std::lround (params->toneHighCutSlope->load()) : (int) params::tone::slope24;
 
     tonePeak1On = params->tonePeak1Enable != nullptr ? (params->tonePeak1Enable->load() >= 0.5f) : true;
     tonePeak1Type = params->tonePeak1Type != nullptr ? (int) std::lround (params->tonePeak1Type->load()) : (int) params::tone::peakBell;
+    tonePeak1DynOn = params->tonePeak1DynEnable != nullptr ? (params->tonePeak1DynEnable->load() >= 0.5f) : false;
     setTargetIfChanged (tonePeak1FreqHzSm, params->tonePeak1FreqHz != nullptr ? params->tonePeak1FreqHz->load() : 220.0f);
     setTargetIfChanged (tonePeak1GainDbSm, params->tonePeak1GainDb != nullptr ? params->tonePeak1GainDb->load() : 0.0f);
     setTargetIfChanged (tonePeak1QSm,      params->tonePeak1Q      != nullptr ? params->tonePeak1Q->load()      : 0.90f);
+    setTargetIfChanged (tonePeak1DynRangeDbSm, params->tonePeak1DynRangeDb != nullptr ? params->tonePeak1DynRangeDb->load() : 0.0f);
+    setTargetIfChanged (tonePeak1DynThresholdDbSm, params->tonePeak1DynThresholdDb != nullptr ? params->tonePeak1DynThresholdDb->load() : -18.0f);
 
     tonePeak2On = params->tonePeak2Enable != nullptr ? (params->tonePeak2Enable->load() >= 0.5f) : true;
     tonePeak2Type = params->tonePeak2Type != nullptr ? (int) std::lround (params->tonePeak2Type->load()) : (int) params::tone::peakBell;
+    tonePeak2DynOn = params->tonePeak2DynEnable != nullptr ? (params->tonePeak2DynEnable->load() >= 0.5f) : false;
     setTargetIfChanged (tonePeak2FreqHzSm, params->tonePeak2FreqHz != nullptr ? params->tonePeak2FreqHz->load() : 1000.0f);
     setTargetIfChanged (tonePeak2GainDbSm, params->tonePeak2GainDb != nullptr ? params->tonePeak2GainDb->load() : 0.0f);
     setTargetIfChanged (tonePeak2QSm,      params->tonePeak2Q      != nullptr ? params->tonePeak2Q->load()      : 0.7071f);
+    setTargetIfChanged (tonePeak2DynRangeDbSm, params->tonePeak2DynRangeDb != nullptr ? params->tonePeak2DynRangeDb->load() : 0.0f);
+    setTargetIfChanged (tonePeak2DynThresholdDbSm, params->tonePeak2DynThresholdDb != nullptr ? params->tonePeak2DynThresholdDb->load() : -18.0f);
 
     tonePeak3On = params->tonePeak3Enable != nullptr ? (params->tonePeak3Enable->load() >= 0.5f) : true;
     tonePeak3Type = params->tonePeak3Type != nullptr ? (int) std::lround (params->tonePeak3Type->load()) : (int) params::tone::peakBell;
+    tonePeak3DynOn = params->tonePeak3DynEnable != nullptr ? (params->tonePeak3DynEnable->load() >= 0.5f) : false;
     setTargetIfChanged (tonePeak3FreqHzSm, params->tonePeak3FreqHz != nullptr ? params->tonePeak3FreqHz->load() : 4200.0f);
     setTargetIfChanged (tonePeak3GainDbSm, params->tonePeak3GainDb != nullptr ? params->tonePeak3GainDb->load() : 0.0f);
     setTargetIfChanged (tonePeak3QSm,      params->tonePeak3Q      != nullptr ? params->tonePeak3Q->load()      : 0.90f);
+    setTargetIfChanged (tonePeak3DynRangeDbSm, params->tonePeak3DynRangeDb != nullptr ? params->tonePeak3DynRangeDb->load() : 0.0f);
+    setTargetIfChanged (tonePeak3DynThresholdDbSm, params->tonePeak3DynThresholdDb != nullptr ? params->tonePeak3DynThresholdDb->load() : -18.0f);
 
     tonePeak4On = params->tonePeak4Enable != nullptr ? (params->tonePeak4Enable->load() >= 0.5f) : false;
     tonePeak4Type = params->tonePeak4Type != nullptr ? (int) std::lround (params->tonePeak4Type->load()) : (int) params::tone::peakBell;
+    tonePeak4DynOn = params->tonePeak4DynEnable != nullptr ? (params->tonePeak4DynEnable->load() >= 0.5f) : false;
     setTargetIfChanged (tonePeak4FreqHzSm, params->tonePeak4FreqHz != nullptr ? params->tonePeak4FreqHz->load() : 700.0f);
     setTargetIfChanged (tonePeak4GainDbSm, params->tonePeak4GainDb != nullptr ? params->tonePeak4GainDb->load() : 0.0f);
     setTargetIfChanged (tonePeak4QSm,      params->tonePeak4Q      != nullptr ? params->tonePeak4Q->load()      : 0.90f);
+    setTargetIfChanged (tonePeak4DynRangeDbSm, params->tonePeak4DynRangeDb != nullptr ? params->tonePeak4DynRangeDb->load() : 0.0f);
+    setTargetIfChanged (tonePeak4DynThresholdDbSm, params->tonePeak4DynThresholdDb != nullptr ? params->tonePeak4DynThresholdDb->load() : -18.0f);
 
     tonePeak5On = params->tonePeak5Enable != nullptr ? (params->tonePeak5Enable->load() >= 0.5f) : false;
     tonePeak5Type = params->tonePeak5Type != nullptr ? (int) std::lround (params->tonePeak5Type->load()) : (int) params::tone::peakBell;
+    tonePeak5DynOn = params->tonePeak5DynEnable != nullptr ? (params->tonePeak5DynEnable->load() >= 0.5f) : false;
     setTargetIfChanged (tonePeak5FreqHzSm, params->tonePeak5FreqHz != nullptr ? params->tonePeak5FreqHz->load() : 1800.0f);
     setTargetIfChanged (tonePeak5GainDbSm, params->tonePeak5GainDb != nullptr ? params->tonePeak5GainDb->load() : 0.0f);
     setTargetIfChanged (tonePeak5QSm,      params->tonePeak5Q      != nullptr ? params->tonePeak5Q->load()      : 0.90f);
+    setTargetIfChanged (tonePeak5DynRangeDbSm, params->tonePeak5DynRangeDb != nullptr ? params->tonePeak5DynRangeDb->load() : 0.0f);
+    setTargetIfChanged (tonePeak5DynThresholdDbSm, params->tonePeak5DynThresholdDb != nullptr ? params->tonePeak5DynThresholdDb->load() : -18.0f);
 
     tonePeak6On = params->tonePeak6Enable != nullptr ? (params->tonePeak6Enable->load() >= 0.5f) : false;
     tonePeak6Type = params->tonePeak6Type != nullptr ? (int) std::lround (params->tonePeak6Type->load()) : (int) params::tone::peakBell;
+    tonePeak6DynOn = params->tonePeak6DynEnable != nullptr ? (params->tonePeak6DynEnable->load() >= 0.5f) : false;
     setTargetIfChanged (tonePeak6FreqHzSm, params->tonePeak6FreqHz != nullptr ? params->tonePeak6FreqHz->load() : 5200.0f);
     setTargetIfChanged (tonePeak6GainDbSm, params->tonePeak6GainDb != nullptr ? params->tonePeak6GainDb->load() : 0.0f);
     setTargetIfChanged (tonePeak6QSm,      params->tonePeak6Q      != nullptr ? params->tonePeak6Q->load()      : 0.90f);
+    setTargetIfChanged (tonePeak6DynRangeDbSm, params->tonePeak6DynRangeDb != nullptr ? params->tonePeak6DynRangeDb->load() : 0.0f);
+    setTargetIfChanged (tonePeak6DynThresholdDbSm, params->tonePeak6DynThresholdDb != nullptr ? params->tonePeak6DynThresholdDb->load() : -18.0f);
 
     tonePeak7On = params->tonePeak7Enable != nullptr ? (params->tonePeak7Enable->load() >= 0.5f) : false;
     tonePeak7Type = params->tonePeak7Type != nullptr ? (int) std::lround (params->tonePeak7Type->load()) : (int) params::tone::peakBell;
+    tonePeak7DynOn = params->tonePeak7DynEnable != nullptr ? (params->tonePeak7DynEnable->load() >= 0.5f) : false;
     setTargetIfChanged (tonePeak7FreqHzSm, params->tonePeak7FreqHz != nullptr ? params->tonePeak7FreqHz->load() : 250.0f);
     setTargetIfChanged (tonePeak7GainDbSm, params->tonePeak7GainDb != nullptr ? params->tonePeak7GainDb->load() : 0.0f);
     setTargetIfChanged (tonePeak7QSm,      params->tonePeak7Q      != nullptr ? params->tonePeak7Q->load()      : 0.90f);
+    setTargetIfChanged (tonePeak7DynRangeDbSm, params->tonePeak7DynRangeDb != nullptr ? params->tonePeak7DynRangeDb->load() : 0.0f);
+    setTargetIfChanged (tonePeak7DynThresholdDbSm, params->tonePeak7DynThresholdDb != nullptr ? params->tonePeak7DynThresholdDb->load() : -18.0f);
 
     tonePeak8On = params->tonePeak8Enable != nullptr ? (params->tonePeak8Enable->load() >= 0.5f) : false;
     tonePeak8Type = params->tonePeak8Type != nullptr ? (int) std::lround (params->tonePeak8Type->load()) : (int) params::tone::peakBell;
+    tonePeak8DynOn = params->tonePeak8DynEnable != nullptr ? (params->tonePeak8DynEnable->load() >= 0.5f) : false;
     setTargetIfChanged (tonePeak8FreqHzSm, params->tonePeak8FreqHz != nullptr ? params->tonePeak8FreqHz->load() : 9500.0f);
     setTargetIfChanged (tonePeak8GainDbSm, params->tonePeak8GainDb != nullptr ? params->tonePeak8GainDb->load() : 0.0f);
     setTargetIfChanged (tonePeak8QSm,      params->tonePeak8Q      != nullptr ? params->tonePeak8Q->load()      : 0.90f);
+    setTargetIfChanged (tonePeak8DynRangeDbSm, params->tonePeak8DynRangeDb != nullptr ? params->tonePeak8DynRangeDb->load() : 0.0f);
+    setTargetIfChanged (tonePeak8DynThresholdDbSm, params->tonePeak8DynThresholdDb != nullptr ? params->tonePeak8DynThresholdDb->load() : -18.0f);
 
     // Drift cutoff ~ 1 Hz (very slow).
     const auto alpha = (float) (2.0 * juce::MathConstants<double>::pi * 1.0 / sampleRateHz);
@@ -1277,49 +1371,65 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
             const auto p1f = tonePeak1FreqHzSm.getNextValue();
             const auto p1g = tonePeak1GainDbSm.getNextValue();
             const auto p1q = tonePeak1QSm.getNextValue();
+            const auto p1dr = tonePeak1DynRangeDbSm.getNextValue();
+            const auto p1dt = tonePeak1DynThresholdDbSm.getNextValue();
 
             const auto p2f = tonePeak2FreqHzSm.getNextValue();
             const auto p2g = tonePeak2GainDbSm.getNextValue();
             const auto p2q = tonePeak2QSm.getNextValue();
+            const auto p2dr = tonePeak2DynRangeDbSm.getNextValue();
+            const auto p2dt = tonePeak2DynThresholdDbSm.getNextValue();
 
             const auto p3f = tonePeak3FreqHzSm.getNextValue();
             const auto p3g = tonePeak3GainDbSm.getNextValue();
             const auto p3q = tonePeak3QSm.getNextValue();
+            const auto p3dr = tonePeak3DynRangeDbSm.getNextValue();
+            const auto p3dt = tonePeak3DynThresholdDbSm.getNextValue();
 
             const auto p4f = tonePeak4FreqHzSm.getNextValue();
             const auto p4g = tonePeak4GainDbSm.getNextValue();
             const auto p4q = tonePeak4QSm.getNextValue();
+            const auto p4dr = tonePeak4DynRangeDbSm.getNextValue();
+            const auto p4dt = tonePeak4DynThresholdDbSm.getNextValue();
 
             const auto p5f = tonePeak5FreqHzSm.getNextValue();
             const auto p5g = tonePeak5GainDbSm.getNextValue();
             const auto p5q = tonePeak5QSm.getNextValue();
+            const auto p5dr = tonePeak5DynRangeDbSm.getNextValue();
+            const auto p5dt = tonePeak5DynThresholdDbSm.getNextValue();
 
             const auto p6f = tonePeak6FreqHzSm.getNextValue();
             const auto p6g = tonePeak6GainDbSm.getNextValue();
             const auto p6q = tonePeak6QSm.getNextValue();
+            const auto p6dr = tonePeak6DynRangeDbSm.getNextValue();
+            const auto p6dt = tonePeak6DynThresholdDbSm.getNextValue();
 
             const auto p7f = tonePeak7FreqHzSm.getNextValue();
             const auto p7g = tonePeak7GainDbSm.getNextValue();
             const auto p7q = tonePeak7QSm.getNextValue();
+            const auto p7dr = tonePeak7DynRangeDbSm.getNextValue();
+            const auto p7dt = tonePeak7DynThresholdDbSm.getNextValue();
 
             const auto p8f = tonePeak8FreqHzSm.getNextValue();
             const auto p8g = tonePeak8GainDbSm.getNextValue();
             const auto p8q = tonePeak8QSm.getNextValue();
+            const auto p8dr = tonePeak8DynRangeDbSm.getNextValue();
+            const auto p8dt = tonePeak8DynThresholdDbSm.getNextValue();
 
             if (toneOn)
             {
                 if (toneCoeffCountdown-- <= 0)
                 {
                     toneCoeffCountdown = 16;
-                    toneEq.setParams (lowCut, highCut,
-                                      tonePeak1On, tonePeak1Type, p1f, p1g, p1q,
-                                      tonePeak2On, tonePeak2Type, p2f, p2g, p2q,
-                                      tonePeak3On, tonePeak3Type, p3f, p3g, p3q,
-                                      tonePeak4On, tonePeak4Type, p4f, p4g, p4q,
-                                      tonePeak5On, tonePeak5Type, p5f, p5g, p5q,
-                                      tonePeak6On, tonePeak6Type, p6f, p6g, p6q,
-                                      tonePeak7On, tonePeak7Type, p7f, p7g, p7q,
-                                      tonePeak8On, tonePeak8Type, p8f, p8g, p8q);
+                    toneEq.setParams (lowCut, highCut, toneLowCutSlope, toneHighCutSlope,
+                                      tonePeak1On, tonePeak1Type, p1f, p1g, p1q, tonePeak1DynOn, p1dr, p1dt,
+                                      tonePeak2On, tonePeak2Type, p2f, p2g, p2q, tonePeak2DynOn, p2dr, p2dt,
+                                      tonePeak3On, tonePeak3Type, p3f, p3g, p3q, tonePeak3DynOn, p3dr, p3dt,
+                                      tonePeak4On, tonePeak4Type, p4f, p4g, p4q, tonePeak4DynOn, p4dr, p4dt,
+                                      tonePeak5On, tonePeak5Type, p5f, p5g, p5q, tonePeak5DynOn, p5dr, p5dt,
+                                      tonePeak6On, tonePeak6Type, p6f, p6g, p6q, tonePeak6DynOn, p6dr, p6dt,
+                                      tonePeak7On, tonePeak7Type, p7f, p7g, p7q, tonePeak7DynOn, p7dr, p7dt,
+                                      tonePeak8On, tonePeak8Type, p8f, p8g, p8q, tonePeak8DynOn, p8dr, p8dt);
                     toneEq.updateCoeffs();
                 }
 

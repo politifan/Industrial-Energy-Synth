@@ -30,6 +30,21 @@ static constexpr const char* kModSlotDepthIds[params::mod::numSlots] =
 };
 static constexpr const char* kUiMacro1NameId = "ui.macro1Name";
 static constexpr const char* kUiMacro2NameId = "ui.macro2Name";
+static constexpr const char* kToneDynEnableIds[8] =
+{
+    params::tone::peak1DynEnable, params::tone::peak2DynEnable, params::tone::peak3DynEnable, params::tone::peak4DynEnable,
+    params::tone::peak5DynEnable, params::tone::peak6DynEnable, params::tone::peak7DynEnable, params::tone::peak8DynEnable
+};
+static constexpr const char* kToneDynRangeIds[8] =
+{
+    params::tone::peak1DynRangeDb, params::tone::peak2DynRangeDb, params::tone::peak3DynRangeDb, params::tone::peak4DynRangeDb,
+    params::tone::peak5DynRangeDb, params::tone::peak6DynRangeDb, params::tone::peak7DynRangeDb, params::tone::peak8DynRangeDb
+};
+static constexpr const char* kToneDynThresholdIds[8] =
+{
+    params::tone::peak1DynThresholdDb, params::tone::peak2DynThresholdDb, params::tone::peak3DynThresholdDb, params::tone::peak4DynThresholdDb,
+    params::tone::peak5DynThresholdDb, params::tone::peak6DynThresholdDb, params::tone::peak7DynThresholdDb, params::tone::peak8DynThresholdDb
+};
 
 static juce::String midiNoteName (int midiNote)
 {
@@ -1184,6 +1199,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                       u8"• LFO Sync: если ВКЛ, используется Div, а Rate (Гц) отключается.\n"
                                       u8"• Note Sync: Mod Freq отключается.\n"
                                       u8"• Тон EQ: маркеры на спектре (Shift: Q, double-click: сброс). Double-click пусто: добавить пик. ПКМ по пику: удалить.\n"
+                                      u8"• Tone EQ окно: добавлены Low/High Cut Slope и Dynamic Band (On/Range/Threshold) для быстрой проверки Phase 2.\n"
                                       u8"• Анализатор Tone: Source PRE/POST, Freeze и Averaging для точной визуальной настройки.\n"
                                       u8"• Shaper: перетаскивай точки кривой мышью, double-click по точке = сброс.\n"
                                       u8"• Pitch Lock: удерживает читаемость ноты даже при экстремальном Destroy.\n"
@@ -1200,6 +1216,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                             "• LFO Sync: when ON, Div is used and Rate (Hz) is disabled.\n"
                             "• Note Sync: disables Mod Freq.\n"
                             "• Tone EQ: drag handles in the spectrum (Shift: Q, double-click: reset). Double-click empty: add peak. Right-click peak: remove.\n"
+                            "• Tone EQ window now has Low/High Cut Slope and Dynamic Band (On/Range/Threshold) controls for direct Phase 2 testing.\n"
                             "• Tone analyzer: Source PRE/POST, Freeze and Averaging for precise visual shaping.\n"
                             "• Shaper: drag curve points with mouse, double-click point to reset.\n"
                             "• Pitch Lock: keeps note readability under extreme Destroy.\n"
@@ -3018,6 +3035,81 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     toneEqWindowContent.addAndMakeVisible (toneEnable);
     toneEnableAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(), params::tone::enable, toneEnable);
 
+    toneEqWindowContent.addAndMakeVisible (toneLowCutSlope);
+    toneLowCutSlope.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    toneLowCutSlope.getCombo().addItem ("12 dB/oct", 1);
+    toneLowCutSlope.getCombo().addItem ("24 dB/oct", 2);
+    toneLowCutSlope.getCombo().addItem ("36 dB/oct", 3);
+    toneLowCutSlope.getCombo().addItem ("48 dB/oct", 4);
+    toneLowCutSlopeAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(),
+                                                                              params::tone::lowCutSlope,
+                                                                              toneLowCutSlope.getCombo());
+
+    toneEqWindowContent.addAndMakeVisible (toneHighCutSlope);
+    toneHighCutSlope.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    toneHighCutSlope.getCombo().addItem ("12 dB/oct", 1);
+    toneHighCutSlope.getCombo().addItem ("24 dB/oct", 2);
+    toneHighCutSlope.getCombo().addItem ("36 dB/oct", 3);
+    toneHighCutSlope.getCombo().addItem ("48 dB/oct", 4);
+    toneHighCutSlopeAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(),
+                                                                               params::tone::highCutSlope,
+                                                                               toneHighCutSlope.getCombo());
+
+    toneEqWindowContent.addAndMakeVisible (toneDynBand);
+    toneDynBand.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    for (int i = 0; i < 8; ++i)
+        toneDynBand.getCombo().addItem ("Peak " + juce::String (i + 1), i + 1);
+
+    toneDynEnable.setButtonText ("Dynamic");
+    toneEqWindowContent.addAndMakeVisible (toneDynEnable);
+    toneDynEnable.onClick = [this] { updateEnabledStates(); };
+
+    toneEqWindowContent.addAndMakeVisible (toneDynRange);
+    toneDynRange.getSlider().setNumDecimalPlacesToDisplay (1);
+    toneDynRange.getSlider().setTextValueSuffix (" dB");
+    toneDynRange.getSlider().textFromValueFunction = [] (double v)
+    {
+        const auto absv = std::abs (v) < 0.05 ? 0.0 : v;
+        return juce::String (absv, 1) + " dB";
+    };
+    toneDynRange.getSlider().valueFromTextFunction = [] (const juce::String& t)
+    {
+        return t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
+    };
+    toneDynRange.getSlider().setDoubleClickReturnValue (true, 0.0);
+
+    toneEqWindowContent.addAndMakeVisible (toneDynThreshold);
+    toneDynThreshold.getSlider().setNumDecimalPlacesToDisplay (1);
+    toneDynThreshold.getSlider().setTextValueSuffix (" dB");
+    toneDynThreshold.getSlider().textFromValueFunction = [] (double v) { return juce::String (v, 1) + " dB"; };
+    toneDynThreshold.getSlider().valueFromTextFunction = toneDynRange.getSlider().valueFromTextFunction;
+    toneDynThreshold.getSlider().setDoubleClickReturnValue (true, -18.0);
+
+    auto bindToneDynEditors = [this] (int peakIndex)
+    {
+        const auto idx = juce::jlimit (0, 7, peakIndex);
+        toneDynEnableAttachment.reset();
+        toneDynRangeAttachment.reset();
+        toneDynThresholdAttachment.reset();
+
+        toneDynEnableAttachment = std::make_unique<APVTS::ButtonAttachment> (audioProcessor.getAPVTS(),
+                                                                              kToneDynEnableIds[idx],
+                                                                              toneDynEnable);
+        toneDynRangeAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(),
+                                                                             kToneDynRangeIds[idx],
+                                                                             toneDynRange.getSlider());
+        toneDynThresholdAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(),
+                                                                                 kToneDynThresholdIds[idx],
+                                                                                 toneDynThreshold.getSlider());
+        updateEnabledStates();
+    };
+    toneDynBand.getCombo().onChange = [this, bindToneDynEditors]
+    {
+        bindToneDynEditors (toneDynBand.getCombo().getSelectedItemIndex());
+    };
+    toneDynBand.getCombo().setSelectedId (1, juce::dontSendNotification);
+    bindToneDynEditors (0);
+
     toneEqWindowContent.addAndMakeVisible (spectrumSource);
     spectrumSource.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
     spectrumSource.getCombo().addItem ("Post", 1);
@@ -3073,46 +3165,72 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                          params::tone::enable,
                          params::tone::lowCutHz,
                          params::tone::highCutHz,
+                         params::tone::lowCutSlope,
+                         params::tone::highCutSlope,
                          params::tone::peak1Enable,
                          params::tone::peak1Type,
                          params::tone::peak1FreqHz,
                          params::tone::peak1GainDb,
                          params::tone::peak1Q,
+                         params::tone::peak1DynEnable,
+                         params::tone::peak1DynRangeDb,
+                         params::tone::peak1DynThresholdDb,
                          params::tone::peak2Enable,
                          params::tone::peak2Type,
                          params::tone::peak2FreqHz,
                          params::tone::peak2GainDb,
                          params::tone::peak2Q,
+                         params::tone::peak2DynEnable,
+                         params::tone::peak2DynRangeDb,
+                         params::tone::peak2DynThresholdDb,
                          params::tone::peak3Enable,
                          params::tone::peak3Type,
                          params::tone::peak3FreqHz,
                          params::tone::peak3GainDb,
                          params::tone::peak3Q,
+                         params::tone::peak3DynEnable,
+                         params::tone::peak3DynRangeDb,
+                         params::tone::peak3DynThresholdDb,
                          params::tone::peak4Enable,
                          params::tone::peak4Type,
                          params::tone::peak4FreqHz,
                          params::tone::peak4GainDb,
                          params::tone::peak4Q,
+                         params::tone::peak4DynEnable,
+                         params::tone::peak4DynRangeDb,
+                         params::tone::peak4DynThresholdDb,
                          params::tone::peak5Enable,
                          params::tone::peak5Type,
                          params::tone::peak5FreqHz,
                          params::tone::peak5GainDb,
                          params::tone::peak5Q,
+                         params::tone::peak5DynEnable,
+                         params::tone::peak5DynRangeDb,
+                         params::tone::peak5DynThresholdDb,
                          params::tone::peak6Enable,
                          params::tone::peak6Type,
                          params::tone::peak6FreqHz,
                          params::tone::peak6GainDb,
                          params::tone::peak6Q,
+                         params::tone::peak6DynEnable,
+                         params::tone::peak6DynRangeDb,
+                         params::tone::peak6DynThresholdDb,
                          params::tone::peak7Enable,
                          params::tone::peak7Type,
                          params::tone::peak7FreqHz,
                          params::tone::peak7GainDb,
                          params::tone::peak7Q,
+                         params::tone::peak7DynEnable,
+                         params::tone::peak7DynRangeDb,
+                         params::tone::peak7DynThresholdDb,
                          params::tone::peak8Enable,
                          params::tone::peak8Type,
                          params::tone::peak8FreqHz,
                          params::tone::peak8GainDb,
-                         params::tone::peak8Q);
+                         params::tone::peak8Q,
+                         params::tone::peak8DynEnable,
+                         params::tone::peak8DynRangeDb,
+                         params::tone::peak8DynThresholdDb);
     if (spectrumSource.getCombo().onChange != nullptr)
         spectrumSource.getCombo().onChange();
     spectrumEditor.setFrozen (spectrumFreeze.getToggleState());
@@ -3191,6 +3309,12 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     ampGroup.getProperties().set ("tintAct", 0.0);
     setGroupAccent (toneGroup, cTone);
     setGroupAccent (toneEnable, cTone);
+    setGroupAccent (toneLowCutSlope, cTone);
+    setGroupAccent (toneHighCutSlope, cTone);
+    setGroupAccent (toneDynBand, cTone);
+    setGroupAccent (toneDynEnable, cTone);
+    setGroupAccent (toneDynRange, cTone);
+    setGroupAccent (toneDynThreshold, cTone);
     setGroupAccent (spectrumSource, cTone);
     setGroupAccent (spectrumAveraging, cTone);
     setGroupAccent (spectrumFreeze, cTone);
@@ -4483,30 +4607,30 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
             const int gapC = 8;
             const int gapR = 8;
-            int cols = juce::jlimit (2, 5, area.getWidth() / 190);
-            cols = juce::jmin (cols, count);
-            int rows = (count + cols - 1) / cols;
+            int gridCols = juce::jlimit (2, 5, area.getWidth() / 190);
+            gridCols = juce::jmin (gridCols, count);
+            int gridRows = (count + gridCols - 1) / gridCols;
 
             // Keep controls readable: if cells get too short, reduce columns.
             for (;;)
             {
-                const int cellH = juce::jmax (1, (area.getHeight() - gapR * (rows - 1)) / rows);
-                if (cellH >= 74 || cols <= 1)
+                const int cellH = juce::jmax (1, (area.getHeight() - gapR * (gridRows - 1)) / gridRows);
+                if (cellH >= 74 || gridCols <= 1)
                     break;
-                --cols;
-                rows = (count + cols - 1) / cols;
+                --gridCols;
+                gridRows = (count + gridCols - 1) / gridCols;
             }
 
-            const int cellW = juce::jmax (1, (area.getWidth() - gapC * (cols - 1)) / cols);
-            const int cellH = juce::jmax (1, (area.getHeight() - gapR * (rows - 1)) / rows);
+            const int cellW = juce::jmax (1, (area.getWidth() - gapC * (gridCols - 1)) / gridCols);
+            const int cellH = juce::jmax (1, (area.getHeight() - gapR * (gridRows - 1)) / gridRows);
 
             int idx = 0;
             for (auto* c : comps)
             {
-                const int col = idx % cols;
-                const int row = idx / cols;
-                c->setBounds (area.getX() + col * (cellW + gapC),
-                              area.getY() + row * (cellH + gapR),
+                const int colIdx = idx % gridCols;
+                const int rowIdx = idx / gridCols;
+                c->setBounds (area.getX() + colIdx * (cellW + gapC),
+                              area.getY() + rowIdx * (cellH + gapR),
                               cellW,
                               cellH);
                 ++idx;
@@ -4667,18 +4791,40 @@ void IndustrialEnergySynthAudioProcessorEditor::layoutToneEqIn (juce::Rectangle<
     toneGroup.setBounds (r);
 
     auto gr = toneGroup.getBounds().reduced (8, 22);
-    auto row1 = gr.removeFromTop (24);
-    const int toggleW = juce::jmin (160, juce::jmax (110, row1.getWidth() / 3));
+    auto row1 = gr.removeFromTop (26);
+    const int toggleW = juce::jmin (150, juce::jmax (102, row1.getWidth() / 5));
     toneEnable.setBounds (row1.removeFromLeft (toggleW));
     row1.removeFromLeft (8);
-    spectrumFreeze.setBounds (row1.removeFromLeft (juce::jmin (170, juce::jmax (110, row1.getWidth() / 2))).reduced (0, 2));
+    toneDynEnable.setBounds (row1.removeFromLeft (toggleW));
+    row1.removeFromLeft (8);
+    spectrumFreeze.setBounds (row1.removeFromLeft (juce::jmin (170, juce::jmax (118, row1.getWidth() / 3))).reduced (0, 2));
 
     gr.removeFromTop (6);
     auto row2 = gr.removeFromTop (44);
-    const int leftW = juce::jmax (200, row2.getWidth() / 2 - 4);
-    spectrumSource.setBounds (row2.removeFromLeft (leftW));
-    row2.removeFromLeft (8);
-    spectrumAveraging.setBounds (row2);
+    const int row2Gap = 8;
+    const int row2ColW = juce::jmax (80, (row2.getWidth() - row2Gap * 2) / 3);
+    spectrumSource.setBounds (row2.removeFromLeft (row2ColW));
+    row2.removeFromLeft (row2Gap);
+    spectrumAveraging.setBounds (row2.removeFromLeft (row2ColW));
+    row2.removeFromLeft (row2Gap);
+    toneDynBand.setBounds (row2);
+
+    gr.removeFromTop (6);
+    auto row3 = gr.removeFromTop (44);
+    const int row3Gap = 8;
+    const int row3ColW = juce::jmax (100, (row3.getWidth() - row3Gap) / 2);
+    toneLowCutSlope.setBounds (row3.removeFromLeft (row3ColW));
+    row3.removeFromLeft (row3Gap);
+    toneHighCutSlope.setBounds (row3);
+
+    gr.removeFromTop (6);
+    const int dynRowH = juce::jmin (104, juce::jmax (78, gr.getHeight() / 4));
+    auto row4 = gr.removeFromTop (dynRowH);
+    const int row4Gap = 10;
+    const int row4ColW = juce::jmax (110, (row4.getWidth() - row4Gap) / 2);
+    toneDynRange.setBounds (row4.removeFromLeft (row4ColW));
+    row4.removeFromLeft (row4Gap);
+    toneDynThreshold.setBounds (row4);
 
     gr.removeFromTop (6);
     spectrumEditor.setBounds (gr);
@@ -4710,7 +4856,7 @@ void IndustrialEnergySynthAudioProcessorEditor::openToneEqWindow()
         toneEqWindow->setLookAndFeel (&lnf);
         toneEqWindow->setResizable (true, true);
         toneEqWindow->setContentNonOwned (&toneEqWindowContent, false);
-        toneEqWindow->centreWithSize (980, 520);
+        toneEqWindow->centreWithSize (1060, 640);
     }
     else
     {
@@ -5571,6 +5717,25 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
 
     toneGroup.setText (ies::ui::tr (ies::ui::Key::tone, langIdx));
     toneEnable.setButtonText (ies::ui::tr (ies::ui::Key::toneEnable, langIdx));
+    toneLowCutSlope.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Крутизна НЧ") : juce::String ("Low Cut Slope"));
+    toneHighCutSlope.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Крутизна ВЧ") : juce::String ("High Cut Slope"));
+    toneLowCutSlope.getCombo().changeItemText (1, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"12 дБ/окт") : juce::String ("12 dB/oct"));
+    toneLowCutSlope.getCombo().changeItemText (2, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"24 дБ/окт") : juce::String ("24 dB/oct"));
+    toneLowCutSlope.getCombo().changeItemText (3, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"36 дБ/окт") : juce::String ("36 dB/oct"));
+    toneLowCutSlope.getCombo().changeItemText (4, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"48 дБ/окт") : juce::String ("48 dB/oct"));
+    toneHighCutSlope.getCombo().changeItemText (1, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"12 дБ/окт") : juce::String ("12 dB/oct"));
+    toneHighCutSlope.getCombo().changeItemText (2, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"24 дБ/окт") : juce::String ("24 dB/oct"));
+    toneHighCutSlope.getCombo().changeItemText (3, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"36 дБ/окт") : juce::String ("36 dB/oct"));
+    toneHighCutSlope.getCombo().changeItemText (4, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"48 дБ/окт") : juce::String ("48 dB/oct"));
+    toneDynBand.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Dyn пик") : juce::String ("Dyn Band"));
+    for (int i = 0; i < 8; ++i)
+        toneDynBand.getCombo().changeItemText (i + 1,
+                                               (langIdx == (int) params::ui::ru)
+                                                   ? (juce::String::fromUTF8 (u8"Пик ") + juce::String (i + 1))
+                                                   : (juce::String ("Peak ") + juce::String (i + 1)));
+    toneDynEnable.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Dyn вкл") : juce::String ("Dyn On"));
+    toneDynRange.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Dyn диапазон") : juce::String ("Dyn Range"));
+    toneDynThreshold.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Dyn порог") : juce::String ("Dyn Threshold"));
     spectrumSource.setLabelText (ies::ui::tr (ies::ui::Key::toneAnalyzerSource, langIdx));
     spectrumSource.getCombo().changeItemText (1, ies::ui::tr (ies::ui::Key::toneAnalyzerPost, langIdx));
     spectrumSource.getCombo().changeItemText (2, ies::ui::tr (ies::ui::Key::toneAnalyzerPre, langIdx));
@@ -5884,6 +6049,29 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
 
     toneEnable.setTooltip (T ("Enable the post EQ (Tone).",
                               u8"Включить пост-эквалайзер (Тон)."));
+    toneLowCutSlope.getCombo().setTooltip (T ("Low-cut slope. Higher slope cuts lows more aggressively.",
+                                              u8"Крутизна НЧ-среза. Чем выше, тем агрессивнее срез низов."));
+    toneLowCutSlope.getLabel().setTooltip (toneLowCutSlope.getCombo().getTooltip());
+    toneHighCutSlope.getCombo().setTooltip (T ("High-cut slope. Higher slope cuts highs more aggressively.",
+                                               u8"Крутизна ВЧ-среза. Чем выше, тем агрессивнее срез верхов."));
+    toneHighCutSlope.getLabel().setTooltip (toneHighCutSlope.getCombo().getTooltip());
+    toneDynBand.getCombo().setTooltip (T ("Select which EQ peak's dynamic controls are shown below.",
+                                          u8"Выбери пик эквалайзера, чьи динамические параметры показаны ниже."));
+    toneDynBand.getLabel().setTooltip (toneDynBand.getCombo().getTooltip());
+    toneDynEnable.setTooltip (T ("Enable dynamic EQ for the selected peak.",
+                                 u8"Включить динамический EQ для выбранного пика."));
+    {
+        const auto tip = T ("Dynamic range for selected peak. Negative = dynamic cut, positive = dynamic boost.",
+                            u8"Динамический диапазон для выбранного пика. Минус = динамический срез, плюс = динамический буст.");
+        toneDynRange.getSlider().setTooltip (tip);
+        toneDynRange.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Dynamic threshold for selected peak. Signal relative to this level activates dynamic action.",
+                            u8"Порог динамики для выбранного пика. Сигнал относительно этого уровня запускает динамическое действие.");
+        toneDynThreshold.getSlider().setTooltip (tip);
+        toneDynThreshold.getLabel().setTooltip (tip);
+    }
     spectrumSource.getCombo().setTooltip (T ("Analyzer tap: POST = final output, PRE = before Destroy.",
                                              u8"Точка анализатора: POST = финальный выход, PRE = до блока Destroy."));
     spectrumSource.getLabel().setTooltip (spectrumSource.getCombo().getTooltip());
@@ -5941,6 +6129,12 @@ void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
 
     const auto pitchLockOn = destroyPitchLockEnable.getToggleState();
     juce::ignoreUnused (pitchLockOn);
+
+    const auto toneDynOn = toneDynEnable.getToggleState();
+    if (toneDynRange.isEnabled() != toneDynOn)
+        toneDynRange.setEnabled (toneDynOn);
+    if (toneDynThreshold.isEnabled() != toneDynOn)
+        toneDynThreshold.setEnabled (toneDynOn);
 
     // Serum-ish UX: even when a block is bypassed, keep its controls editable (so users can "pre-dial" values).
     // The enable toggles still control audio processing in the engine.

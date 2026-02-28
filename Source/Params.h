@@ -451,6 +451,23 @@ inline constexpr const char* blend       = "fx.octaver.blend";
 inline constexpr const char* sensitivity = "fx.octaver.sensitivity";
 inline constexpr const char* tone        = "fx.octaver.tone";
 }
+
+namespace xtra
+{
+inline constexpr const char* enable = "fx.xtra.enable";
+inline constexpr const char* mix = "fx.xtra.mix";
+
+inline constexpr const char* flangerAmount = "fx.xtra.flanger.amount";
+inline constexpr const char* tremoloAmount = "fx.xtra.tremolo.amount";
+inline constexpr const char* autopanAmount = "fx.xtra.autopan.amount";
+inline constexpr const char* saturatorAmount = "fx.xtra.saturator.amount";
+inline constexpr const char* clipperAmount = "fx.xtra.clipper.amount";
+inline constexpr const char* widthAmount = "fx.xtra.width.amount";
+inline constexpr const char* tiltAmount = "fx.xtra.tilt.amount";
+inline constexpr const char* gateAmount = "fx.xtra.gate.amount";
+inline constexpr const char* lofiAmount = "fx.xtra.lofi.amount";
+inline constexpr const char* doublerAmount = "fx.xtra.doubler.amount";
+}
 } // namespace fx
 
 namespace filter
@@ -474,6 +491,8 @@ namespace tone
 inline constexpr const char* enable      = "tone.enable";      // bool
 inline constexpr const char* lowCutHz    = "tone.lowCutHz";    // float Hz
 inline constexpr const char* highCutHz   = "tone.highCutHz";   // float Hz
+inline constexpr const char* lowCutSlope = "tone.lowCutSlope"; // choice: 12/24/36/48 dB/oct
+inline constexpr const char* highCutSlope = "tone.highCutSlope";
 
 enum PeakType
 {
@@ -482,6 +501,14 @@ enum PeakType
     peakLowShelf = 2,
     peakHighShelf = 3,
     peakBandPass = 4
+};
+
+enum CutSlope
+{
+    slope12 = 0,
+    slope24 = 1,
+    slope36 = 2,
+    slope48 = 3
 };
 
 // Multiple peak nodes (Serum-like EQ editing). Keep IDs stable once shipped.
@@ -493,48 +520,72 @@ inline constexpr const char* peak1Type    = "tone.peak1Type";
 inline constexpr const char* peak1FreqHz  = "tone.peak1FreqHz";
 inline constexpr const char* peak1GainDb  = "tone.peak1GainDb";
 inline constexpr const char* peak1Q       = "tone.peak1Q";
+inline constexpr const char* peak1DynEnable = "tone.peak1DynEnable";
+inline constexpr const char* peak1DynRangeDb = "tone.peak1DynRangeDb";
+inline constexpr const char* peak1DynThresholdDb = "tone.peak1DynThresholdDb";
 
 inline constexpr const char* peak2Enable  = "tone.peak2Enable";
 inline constexpr const char* peak2Type    = "tone.peak2Type";
 inline constexpr const char* peak2FreqHz  = "tone.peak2FreqHz";
 inline constexpr const char* peak2GainDb  = "tone.peak2GainDb";
 inline constexpr const char* peak2Q       = "tone.peak2Q";
+inline constexpr const char* peak2DynEnable = "tone.peak2DynEnable";
+inline constexpr const char* peak2DynRangeDb = "tone.peak2DynRangeDb";
+inline constexpr const char* peak2DynThresholdDb = "tone.peak2DynThresholdDb";
 
 inline constexpr const char* peak3Enable  = "tone.peak3Enable";
 inline constexpr const char* peak3Type    = "tone.peak3Type";
 inline constexpr const char* peak3FreqHz  = "tone.peak3FreqHz";
 inline constexpr const char* peak3GainDb  = "tone.peak3GainDb";
 inline constexpr const char* peak3Q       = "tone.peak3Q";
+inline constexpr const char* peak3DynEnable = "tone.peak3DynEnable";
+inline constexpr const char* peak3DynRangeDb = "tone.peak3DynRangeDb";
+inline constexpr const char* peak3DynThresholdDb = "tone.peak3DynThresholdDb";
 
 inline constexpr const char* peak4Enable  = "tone.peak4Enable";
 inline constexpr const char* peak4Type    = "tone.peak4Type";
 inline constexpr const char* peak4FreqHz  = "tone.peak4FreqHz";
 inline constexpr const char* peak4GainDb  = "tone.peak4GainDb";
 inline constexpr const char* peak4Q       = "tone.peak4Q";
+inline constexpr const char* peak4DynEnable = "tone.peak4DynEnable";
+inline constexpr const char* peak4DynRangeDb = "tone.peak4DynRangeDb";
+inline constexpr const char* peak4DynThresholdDb = "tone.peak4DynThresholdDb";
 
 inline constexpr const char* peak5Enable  = "tone.peak5Enable";
 inline constexpr const char* peak5Type    = "tone.peak5Type";
 inline constexpr const char* peak5FreqHz  = "tone.peak5FreqHz";
 inline constexpr const char* peak5GainDb  = "tone.peak5GainDb";
 inline constexpr const char* peak5Q       = "tone.peak5Q";
+inline constexpr const char* peak5DynEnable = "tone.peak5DynEnable";
+inline constexpr const char* peak5DynRangeDb = "tone.peak5DynRangeDb";
+inline constexpr const char* peak5DynThresholdDb = "tone.peak5DynThresholdDb";
 
 inline constexpr const char* peak6Enable  = "tone.peak6Enable";
 inline constexpr const char* peak6Type    = "tone.peak6Type";
 inline constexpr const char* peak6FreqHz  = "tone.peak6FreqHz";
 inline constexpr const char* peak6GainDb  = "tone.peak6GainDb";
 inline constexpr const char* peak6Q       = "tone.peak6Q";
+inline constexpr const char* peak6DynEnable = "tone.peak6DynEnable";
+inline constexpr const char* peak6DynRangeDb = "tone.peak6DynRangeDb";
+inline constexpr const char* peak6DynThresholdDb = "tone.peak6DynThresholdDb";
 
 inline constexpr const char* peak7Enable  = "tone.peak7Enable";
 inline constexpr const char* peak7Type    = "tone.peak7Type";
 inline constexpr const char* peak7FreqHz  = "tone.peak7FreqHz";
 inline constexpr const char* peak7GainDb  = "tone.peak7GainDb";
 inline constexpr const char* peak7Q       = "tone.peak7Q";
+inline constexpr const char* peak7DynEnable = "tone.peak7DynEnable";
+inline constexpr const char* peak7DynRangeDb = "tone.peak7DynRangeDb";
+inline constexpr const char* peak7DynThresholdDb = "tone.peak7DynThresholdDb";
 
 inline constexpr const char* peak8Enable  = "tone.peak8Enable";
 inline constexpr const char* peak8Type    = "tone.peak8Type";
 inline constexpr const char* peak8FreqHz  = "tone.peak8FreqHz";
 inline constexpr const char* peak8GainDb  = "tone.peak8GainDb";
 inline constexpr const char* peak8Q       = "tone.peak8Q";
+inline constexpr const char* peak8DynEnable = "tone.peak8DynEnable";
+inline constexpr const char* peak8DynRangeDb = "tone.peak8DynRangeDb";
+inline constexpr const char* peak8DynThresholdDb = "tone.peak8DynThresholdDb";
 
 // Legacy (kept for state migration). Not exposed as parameters anymore.
 inline constexpr const char* legacyPeakFreqHz = "tone.peakFreqHz";

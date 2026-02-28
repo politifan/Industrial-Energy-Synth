@@ -832,54 +832,80 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
     paramPointers.toneEnable     = apvts.getRawParameterValue (params::tone::enable);
     paramPointers.toneLowCutHz   = apvts.getRawParameterValue (params::tone::lowCutHz);
     paramPointers.toneHighCutHz  = apvts.getRawParameterValue (params::tone::highCutHz);
+    paramPointers.toneLowCutSlope = apvts.getRawParameterValue (params::tone::lowCutSlope);
+    paramPointers.toneHighCutSlope = apvts.getRawParameterValue (params::tone::highCutSlope);
 
     paramPointers.tonePeak1Enable = apvts.getRawParameterValue (params::tone::peak1Enable);
     paramPointers.tonePeak1Type   = apvts.getRawParameterValue (params::tone::peak1Type);
     paramPointers.tonePeak1FreqHz = apvts.getRawParameterValue (params::tone::peak1FreqHz);
     paramPointers.tonePeak1GainDb = apvts.getRawParameterValue (params::tone::peak1GainDb);
     paramPointers.tonePeak1Q      = apvts.getRawParameterValue (params::tone::peak1Q);
+    paramPointers.tonePeak1DynEnable = apvts.getRawParameterValue (params::tone::peak1DynEnable);
+    paramPointers.tonePeak1DynRangeDb = apvts.getRawParameterValue (params::tone::peak1DynRangeDb);
+    paramPointers.tonePeak1DynThresholdDb = apvts.getRawParameterValue (params::tone::peak1DynThresholdDb);
 
     paramPointers.tonePeak2Enable = apvts.getRawParameterValue (params::tone::peak2Enable);
     paramPointers.tonePeak2Type   = apvts.getRawParameterValue (params::tone::peak2Type);
     paramPointers.tonePeak2FreqHz = apvts.getRawParameterValue (params::tone::peak2FreqHz);
     paramPointers.tonePeak2GainDb = apvts.getRawParameterValue (params::tone::peak2GainDb);
     paramPointers.tonePeak2Q      = apvts.getRawParameterValue (params::tone::peak2Q);
+    paramPointers.tonePeak2DynEnable = apvts.getRawParameterValue (params::tone::peak2DynEnable);
+    paramPointers.tonePeak2DynRangeDb = apvts.getRawParameterValue (params::tone::peak2DynRangeDb);
+    paramPointers.tonePeak2DynThresholdDb = apvts.getRawParameterValue (params::tone::peak2DynThresholdDb);
 
     paramPointers.tonePeak3Enable = apvts.getRawParameterValue (params::tone::peak3Enable);
     paramPointers.tonePeak3Type   = apvts.getRawParameterValue (params::tone::peak3Type);
     paramPointers.tonePeak3FreqHz = apvts.getRawParameterValue (params::tone::peak3FreqHz);
     paramPointers.tonePeak3GainDb = apvts.getRawParameterValue (params::tone::peak3GainDb);
     paramPointers.tonePeak3Q      = apvts.getRawParameterValue (params::tone::peak3Q);
+    paramPointers.tonePeak3DynEnable = apvts.getRawParameterValue (params::tone::peak3DynEnable);
+    paramPointers.tonePeak3DynRangeDb = apvts.getRawParameterValue (params::tone::peak3DynRangeDb);
+    paramPointers.tonePeak3DynThresholdDb = apvts.getRawParameterValue (params::tone::peak3DynThresholdDb);
 
     paramPointers.tonePeak4Enable = apvts.getRawParameterValue (params::tone::peak4Enable);
     paramPointers.tonePeak4Type   = apvts.getRawParameterValue (params::tone::peak4Type);
     paramPointers.tonePeak4FreqHz = apvts.getRawParameterValue (params::tone::peak4FreqHz);
     paramPointers.tonePeak4GainDb = apvts.getRawParameterValue (params::tone::peak4GainDb);
     paramPointers.tonePeak4Q      = apvts.getRawParameterValue (params::tone::peak4Q);
+    paramPointers.tonePeak4DynEnable = apvts.getRawParameterValue (params::tone::peak4DynEnable);
+    paramPointers.tonePeak4DynRangeDb = apvts.getRawParameterValue (params::tone::peak4DynRangeDb);
+    paramPointers.tonePeak4DynThresholdDb = apvts.getRawParameterValue (params::tone::peak4DynThresholdDb);
 
     paramPointers.tonePeak5Enable = apvts.getRawParameterValue (params::tone::peak5Enable);
     paramPointers.tonePeak5Type   = apvts.getRawParameterValue (params::tone::peak5Type);
     paramPointers.tonePeak5FreqHz = apvts.getRawParameterValue (params::tone::peak5FreqHz);
     paramPointers.tonePeak5GainDb = apvts.getRawParameterValue (params::tone::peak5GainDb);
     paramPointers.tonePeak5Q      = apvts.getRawParameterValue (params::tone::peak5Q);
+    paramPointers.tonePeak5DynEnable = apvts.getRawParameterValue (params::tone::peak5DynEnable);
+    paramPointers.tonePeak5DynRangeDb = apvts.getRawParameterValue (params::tone::peak5DynRangeDb);
+    paramPointers.tonePeak5DynThresholdDb = apvts.getRawParameterValue (params::tone::peak5DynThresholdDb);
 
     paramPointers.tonePeak6Enable = apvts.getRawParameterValue (params::tone::peak6Enable);
     paramPointers.tonePeak6Type   = apvts.getRawParameterValue (params::tone::peak6Type);
     paramPointers.tonePeak6FreqHz = apvts.getRawParameterValue (params::tone::peak6FreqHz);
     paramPointers.tonePeak6GainDb = apvts.getRawParameterValue (params::tone::peak6GainDb);
     paramPointers.tonePeak6Q      = apvts.getRawParameterValue (params::tone::peak6Q);
+    paramPointers.tonePeak6DynEnable = apvts.getRawParameterValue (params::tone::peak6DynEnable);
+    paramPointers.tonePeak6DynRangeDb = apvts.getRawParameterValue (params::tone::peak6DynRangeDb);
+    paramPointers.tonePeak6DynThresholdDb = apvts.getRawParameterValue (params::tone::peak6DynThresholdDb);
 
     paramPointers.tonePeak7Enable = apvts.getRawParameterValue (params::tone::peak7Enable);
     paramPointers.tonePeak7Type   = apvts.getRawParameterValue (params::tone::peak7Type);
     paramPointers.tonePeak7FreqHz = apvts.getRawParameterValue (params::tone::peak7FreqHz);
     paramPointers.tonePeak7GainDb = apvts.getRawParameterValue (params::tone::peak7GainDb);
     paramPointers.tonePeak7Q      = apvts.getRawParameterValue (params::tone::peak7Q);
+    paramPointers.tonePeak7DynEnable = apvts.getRawParameterValue (params::tone::peak7DynEnable);
+    paramPointers.tonePeak7DynRangeDb = apvts.getRawParameterValue (params::tone::peak7DynRangeDb);
+    paramPointers.tonePeak7DynThresholdDb = apvts.getRawParameterValue (params::tone::peak7DynThresholdDb);
 
     paramPointers.tonePeak8Enable = apvts.getRawParameterValue (params::tone::peak8Enable);
     paramPointers.tonePeak8Type   = apvts.getRawParameterValue (params::tone::peak8Type);
     paramPointers.tonePeak8FreqHz = apvts.getRawParameterValue (params::tone::peak8FreqHz);
     paramPointers.tonePeak8GainDb = apvts.getRawParameterValue (params::tone::peak8GainDb);
     paramPointers.tonePeak8Q      = apvts.getRawParameterValue (params::tone::peak8Q);
+    paramPointers.tonePeak8DynEnable = apvts.getRawParameterValue (params::tone::peak8DynEnable);
+    paramPointers.tonePeak8DynRangeDb = apvts.getRawParameterValue (params::tone::peak8DynRangeDb);
+    paramPointers.tonePeak8DynThresholdDb = apvts.getRawParameterValue (params::tone::peak8DynThresholdDb);
 
     // --- Modulation (V1.2): 2x LFO + 2x Macros + Mod Matrix ---
     paramPointers.lfo1Wave    = apvts.getRawParameterValue (params::lfo1::wave);
@@ -1892,10 +1918,19 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
         toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::tone::highCutHz), "High Cut",
                                                                           range, 20000.0f, "Hz"));
     }
+    toneGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::tone::lowCutSlope),
+                                                                       "Low Cut Slope",
+                                                                       juce::StringArray { "12 dB/oct", "24 dB/oct", "36 dB/oct", "48 dB/oct" },
+                                                                       (int) params::tone::slope24));
+    toneGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::tone::highCutSlope),
+                                                                       "High Cut Slope",
+                                                                       juce::StringArray { "12 dB/oct", "24 dB/oct", "36 dB/oct", "48 dB/oct" },
+                                                                       (int) params::tone::slope24));
 
     const auto peakTypeChoices = juce::StringArray { "Bell", "Notch", "Low Shelf", "High Shelf", "Band Pass" };
     auto addPeak = [&] (const char* idEnable, const char* idType,
                         const char* idFreq, const char* idGain, const char* idQ,
+                        const char* idDynEnable, const char* idDynRangeDb, const char* idDynThresholdDb,
                         const char* namePrefix,
                         bool defEnabled,
                         float defFreq,
@@ -1925,17 +1960,38 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
                                                                               juce::String (namePrefix) + " Q",
                                                                               range, defQ));
         }
+        toneGroup->addChild (std::make_unique<juce::AudioParameterBool> (params::makeID (idDynEnable),
+                                                                         juce::String (namePrefix) + " Dyn Enable",
+                                                                         false));
+        toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (idDynRangeDb),
+                                                                          juce::String (namePrefix) + " Dyn Range",
+                                                                          juce::NormalisableRange<float> (-24.0f, 24.0f),
+                                                                          0.0f,
+                                                                          "dB"));
+        toneGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (idDynThresholdDb),
+                                                                          juce::String (namePrefix) + " Dyn Threshold",
+                                                                          juce::NormalisableRange<float> (-60.0f, 0.0f),
+                                                                          -18.0f,
+                                                                          "dB"));
     };
 
-    addPeak (params::tone::peak1Enable, params::tone::peak1Type, params::tone::peak1FreqHz, params::tone::peak1GainDb, params::tone::peak1Q, "Peak 1", true, 220.0f, 0.90f);
-    addPeak (params::tone::peak2Enable, params::tone::peak2Type, params::tone::peak2FreqHz, params::tone::peak2GainDb, params::tone::peak2Q, "Peak 2", true, 1000.0f, 0.7071f);
-    addPeak (params::tone::peak3Enable, params::tone::peak3Type, params::tone::peak3FreqHz, params::tone::peak3GainDb, params::tone::peak3Q, "Peak 3", true, 4200.0f, 0.90f);
+    addPeak (params::tone::peak1Enable, params::tone::peak1Type, params::tone::peak1FreqHz, params::tone::peak1GainDb, params::tone::peak1Q,
+             params::tone::peak1DynEnable, params::tone::peak1DynRangeDb, params::tone::peak1DynThresholdDb, "Peak 1", true, 220.0f, 0.90f);
+    addPeak (params::tone::peak2Enable, params::tone::peak2Type, params::tone::peak2FreqHz, params::tone::peak2GainDb, params::tone::peak2Q,
+             params::tone::peak2DynEnable, params::tone::peak2DynRangeDb, params::tone::peak2DynThresholdDb, "Peak 2", true, 1000.0f, 0.7071f);
+    addPeak (params::tone::peak3Enable, params::tone::peak3Type, params::tone::peak3FreqHz, params::tone::peak3GainDb, params::tone::peak3Q,
+             params::tone::peak3DynEnable, params::tone::peak3DynRangeDb, params::tone::peak3DynThresholdDb, "Peak 3", true, 4200.0f, 0.90f);
 
-    addPeak (params::tone::peak4Enable, params::tone::peak4Type, params::tone::peak4FreqHz, params::tone::peak4GainDb, params::tone::peak4Q, "Peak 4", false, 700.0f, 0.90f);
-    addPeak (params::tone::peak5Enable, params::tone::peak5Type, params::tone::peak5FreqHz, params::tone::peak5GainDb, params::tone::peak5Q, "Peak 5", false, 1800.0f, 0.90f);
-    addPeak (params::tone::peak6Enable, params::tone::peak6Type, params::tone::peak6FreqHz, params::tone::peak6GainDb, params::tone::peak6Q, "Peak 6", false, 5200.0f, 0.90f);
-    addPeak (params::tone::peak7Enable, params::tone::peak7Type, params::tone::peak7FreqHz, params::tone::peak7GainDb, params::tone::peak7Q, "Peak 7", false, 250.0f, 0.90f);
-    addPeak (params::tone::peak8Enable, params::tone::peak8Type, params::tone::peak8FreqHz, params::tone::peak8GainDb, params::tone::peak8Q, "Peak 8", false, 9500.0f, 0.90f);
+    addPeak (params::tone::peak4Enable, params::tone::peak4Type, params::tone::peak4FreqHz, params::tone::peak4GainDb, params::tone::peak4Q,
+             params::tone::peak4DynEnable, params::tone::peak4DynRangeDb, params::tone::peak4DynThresholdDb, "Peak 4", false, 700.0f, 0.90f);
+    addPeak (params::tone::peak5Enable, params::tone::peak5Type, params::tone::peak5FreqHz, params::tone::peak5GainDb, params::tone::peak5Q,
+             params::tone::peak5DynEnable, params::tone::peak5DynRangeDb, params::tone::peak5DynThresholdDb, "Peak 5", false, 1800.0f, 0.90f);
+    addPeak (params::tone::peak6Enable, params::tone::peak6Type, params::tone::peak6FreqHz, params::tone::peak6GainDb, params::tone::peak6Q,
+             params::tone::peak6DynEnable, params::tone::peak6DynRangeDb, params::tone::peak6DynThresholdDb, "Peak 6", false, 5200.0f, 0.90f);
+    addPeak (params::tone::peak7Enable, params::tone::peak7Type, params::tone::peak7FreqHz, params::tone::peak7GainDb, params::tone::peak7Q,
+             params::tone::peak7DynEnable, params::tone::peak7DynRangeDb, params::tone::peak7DynThresholdDb, "Peak 7", false, 250.0f, 0.90f);
+    addPeak (params::tone::peak8Enable, params::tone::peak8Type, params::tone::peak8FreqHz, params::tone::peak8GainDb, params::tone::peak8Q,
+             params::tone::peak8DynEnable, params::tone::peak8DynRangeDb, params::tone::peak8DynThresholdDb, "Peak 8", false, 9500.0f, 0.90f);
 
     layout.add (std::move (toneGroup));
 
