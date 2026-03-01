@@ -203,6 +203,8 @@ public:
         std::atomic<float>* fxGlobalRoute = nullptr;
         std::atomic<float>* fxGlobalOversample = nullptr;
         std::atomic<float>* fxGlobalMorph = nullptr;
+        std::atomic<float>* fxGlobalDestroyPlacement = nullptr;
+        std::atomic<float>* fxGlobalTonePlacement = nullptr;
 
         // FX Chorus
         std::atomic<float>* fxChorusEnable = nullptr;

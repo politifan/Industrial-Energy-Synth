@@ -1028,6 +1028,14 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         ? (int) std::lround (params->shaperPlacement->load())
         : (int) params::shaper::preDestroy;
     const auto shaperPre = (shaperPlacement == (int) params::shaper::preDestroy);
+    const auto destroyPlacement = params->fxGlobalDestroyPlacement != nullptr
+        ? (int) std::lround (params->fxGlobalDestroyPlacement->load())
+        : (int) params::fx::global::preFilter;
+    const auto destroyPostFilter = (destroyPlacement == (int) params::fx::global::postFilter);
+    const auto tonePlacement = params->fxGlobalTonePlacement != nullptr
+        ? (int) std::lround (params->fxGlobalTonePlacement->load())
+        : (int) params::fx::global::postFilter;
+    const auto tonePreFilter = (tonePlacement == (int) params::fx::global::preFilter);
 
     const auto typeIdx  = params->filterType != nullptr ? (int) std::lround (params->filterType->load()) : (int) params::filter::lp;
     const auto keyTrack = params->filterKeyTrack != nullptr && (params->filterKeyTrack->load() >= 0.5f);
@@ -1218,6 +1226,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
     float fxModXtraLofiSum = 0.0f;
     float fxModXtraDoublerSum = 0.0f;
     float fxModXtraMixSum = 0.0f;
+    float fxModGlobalMorphSum = 0.0f;
     for (int i = 0; i < numSamples; ++i)
     {
         const auto midiNote = noteGlide.getNext();
@@ -1279,6 +1288,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         float modFxXtraLofiAdd = 0.0f;
         float modFxXtraDoublerAdd = 0.0f;
         float modFxXtraMixAdd = 0.0f;
+        float modFxGlobalMorphAdd = 0.0f;
 
         // Slot depths are in [-1..1]. Dest scaling is per-destination.
         constexpr float cutoffMaxSemis = 48.0f;
@@ -1349,6 +1359,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
                 case params::mod::dstFxXtraLofiAmount: modFxXtraLofiAdd += amt; break;
                 case params::mod::dstFxXtraDoublerAmount: modFxXtraDoublerAdd += amt; break;
                 case params::mod::dstFxXtraMix: modFxXtraMixAdd += amt; break;
+                case params::mod::dstFxGlobalMorph: modFxGlobalMorphAdd += amt; break;
             }
         }
 
@@ -1381,6 +1392,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         fxModXtraLofiSum += modFxXtraLofiAdd;
         fxModXtraDoublerSum += modFxXtraDoublerAdd;
         fxModXtraMixSum += modFxXtraMixAdd;
+        fxModGlobalMorphSum += modFxGlobalMorphAdd;
 
         filterModCutoffSemis[(size_t) i] = juce::jlimit (-96.0f, 96.0f, modCutSemis);
         filterModResAdd[(size_t) i] = modResAdd;
@@ -1489,273 +1501,304 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         shaperMix[(size_t) i]          = juce::jlimit (0.0f, 1.0f, shaperMixSm.getNextValue() + modShaperMixAdd);
     }
 
-    // 2) Optional Shaper before Destroy.
-    if (shaperEnabled && shaperPre)
+    auto applyDestroyAndPitch = [&]()
     {
-        shaper.setEnabled (true);
-        for (int i = 0; i < numSamples; ++i)
+        // 2) Optional Shaper before Destroy.
+        if (shaperEnabled && shaperPre)
         {
-            shaper.setDriveDb (shaperDriveDb[(size_t) i]);
-            shaper.setMix (shaperMix[(size_t) i]);
-            sigBuf[i] = shaper.processSample (sigBuf[i]);
-        }
-    }
-    else
-    {
-        shaper.setEnabled (false);
-    }
-
-    // 3) Destroy chain (fold -> clip -> ringmod/FM), optionally oversampled.
-    if (osFactor == 1)
-    {
-        for (int i = 0; i < numSamples; ++i)
-        {
-            sigBuf[i] = destroyBase.processSamplePreCrush (sigBuf[i],
-                                                           destroyNoteHz[(size_t) i],
-                                                           destroyFoldDriveDb[(size_t) i], destroyFoldAmount[(size_t) i], destroyFoldMix[(size_t) i],
-                                                           destroyClipDriveDb[(size_t) i], destroyClipAmount[(size_t) i], destroyClipMix[(size_t) i],
-                                                           modMode, destroyModAmount[(size_t) i], destroyModMix[(size_t) i], modNoteSync, destroyModFreqHz[(size_t) i]);
-        }
-    }
-    else
-    {
-        auto& os = (osFactor == 2) ? destroyOversampling2x : destroyOversampling4x;
-        auto& dc = (osFactor == 2) ? destroyOs2 : destroyOs4;
-
-        juce::dsp::AudioBlock<float> block (destroyBuffer);
-        auto baseBlock = block.getSubBlock (0, (size_t) numSamples);
-        juce::dsp::AudioBlock<const float> constBase (baseBlock);
-
-        auto upBlock = os.processSamplesUp (constBase);
-        auto* up = upBlock.getChannelPointer (0);
-        const int upN = (int) upBlock.getNumSamples();
-        const int fac = (int) os.getOversamplingFactor(); // 2 or 4
-
-        for (int j = 0; j < upN; ++j)
-        {
-            const int i = j / fac;
-            up[j] = dc.processSamplePreCrush (up[j],
-                                              destroyNoteHz[(size_t) i],
-                                              destroyFoldDriveDb[(size_t) i], destroyFoldAmount[(size_t) i], destroyFoldMix[(size_t) i],
-                                              destroyClipDriveDb[(size_t) i], destroyClipAmount[(size_t) i], destroyClipMix[(size_t) i],
-                                              modMode, destroyModAmount[(size_t) i], destroyModMix[(size_t) i], modNoteSync, destroyModFreqHz[(size_t) i]);
-        }
-
-        os.processSamplesDown (baseBlock);
-    }
-
-    // 4) Crush always at base sample rate (keeps SRR behaviour stable).
-    for (int i = 0; i < numSamples; ++i)
-        sigBuf[i] = destroyBase.processSampleCrush (sigBuf[i], crushBits, crushDownsample, destroyCrushMix[(size_t) i]);
-
-    // 5) Optional Shaper after Destroy.
-    if (shaperEnabled && ! shaperPre)
-    {
-        shaper.setEnabled (true);
-        for (int i = 0; i < numSamples; ++i)
-        {
-            shaper.setDriveDb (shaperDriveDb[(size_t) i]);
-            shaper.setMix (shaperMix[(size_t) i]);
-            sigBuf[i] = shaper.processSample (sigBuf[i]);
-        }
-    }
-
-    // 6) Pitch lock: note-locked helper signal with selectable mode.
-    const auto pitchLockAmountTarget = pitchLockEnabled ? juce::jlimit (0.0f, 1.0f, pitchLockAmountSm.getTargetValue()) : 0.0f;
-    if (pitchLockAmountTarget > 1.0e-5f)
-    {
-        constexpr float followerAttack = 0.14f;
-        constexpr float followerRelease = 0.02f;
-        constexpr float brightnessFollow = 0.07f;
-        constexpr float lockGain = 0.50f;
-        const auto brightnessCut = juce::jlimit (0.001f, 0.25f, (float) (2.0 * juce::MathConstants<double>::pi * 1200.0 / sampleRateHz));
-
-        for (int i = 0; i < numSamples; ++i)
-        {
-            const auto in = sigBuf[i];
-            const auto envIn = std::abs (in);
-            const auto coeff = envIn > pitchLockFollower ? followerAttack : followerRelease;
-            pitchLockFollower += coeff * (envIn - pitchLockFollower);
-
-            // Brightness proxy from simple low/high split, used to steer harmonic weights.
-            pitchLockLowpass += brightnessCut * (in - pitchLockLowpass);
-            const auto hi = in - pitchLockLowpass;
-            const auto den = std::abs (pitchLockLowpass) + std::abs (hi) + 1.0e-5f;
-            const auto brightnessNow = juce::jlimit (0.0f, 1.0f, std::abs (hi) / den);
-            pitchLockBrightness += brightnessFollow * (brightnessNow - pitchLockBrightness);
-
-            const auto noteHz = destroyNoteHz[(size_t) i];
-            const auto phaseInc = juce::jlimit (0.0f, 0.5f, noteHz / (float) sampleRateHz);
-            pitchLockPhase += phaseInc;
-            if (pitchLockPhase >= 1.0f)
-                pitchLockPhase -= 1.0f;
-
-            const auto p = juce::MathConstants<float>::twoPi * pitchLockPhase;
-            const auto h1 = std::sin (p);
-            const auto h2 = std::sin (2.0f * p);
-            const auto h3 = std::sin (3.0f * p);
-            const auto h4 = std::sin (4.0f * p);
-            const auto h5 = std::sin (5.0f * p);
-
-            const auto nyqSafe = (float) (0.48 * sampleRateHz);
-            auto harmonicMask = [=] (float harmonicMul) noexcept
+            shaper.setEnabled (true);
+            for (int i = 0; i < numSamples; ++i)
             {
-                const auto rel = (harmonicMul * noteHz) / juce::jmax (10.0f, nyqSafe);
-                if (rel >= 1.0f)
-                    return 0.0f;
-                const auto m = 1.0f - rel * rel;
-                return juce::jlimit (0.0f, 1.0f, m);
-            };
+                shaper.setDriveDb (shaperDriveDb[(size_t) i]);
+                shaper.setMix (shaperMix[(size_t) i]);
+                sigBuf[i] = shaper.processSample (sigBuf[i]);
+            }
+        }
+        else
+        {
+            shaper.setEnabled (false);
+        }
 
-            const auto bright = juce::jlimit (0.0f, 1.0f, pitchLockBrightness);
-            float w1 = 1.00f;
-            float w2 = (0.22f + 0.28f * bright) * harmonicMask (2.0f);
-            float w3 = (0.12f + 0.26f * bright) * harmonicMask (3.0f);
-            float w4 = (0.05f + 0.20f * bright) * harmonicMask (4.0f);
-            float w5 = (0.02f + 0.12f * bright * bright) * harmonicMask (5.0f);
-
-            const auto norm = juce::jmax (1.0e-4f, w1 + w2 + w3 + w4 + w5);
-            const auto harmonicTone = (w1 * h1 + w2 * h2 + w3 * h3 + w4 * h4 + w5 * h5) / norm;
-            const auto fundamentalTone = h1;
-
-            float lockTone = harmonicTone;
-            float modeGain = 1.0f;
-            switch ((params::destroy::PitchLockMode) pitchLockMode)
+        // 3) Destroy chain (fold -> clip -> ringmod/FM), optionally oversampled.
+        if (osFactor == 1)
+        {
+            for (int i = 0; i < numSamples; ++i)
             {
-                case params::destroy::pitchModeFundamental:
-                    lockTone = fundamentalTone;
-                    modeGain = 0.95f;
-                    break;
-                case params::destroy::pitchModeHarmonic:
-                    lockTone = harmonicTone;
-                    modeGain = 1.00f;
-                    break;
-                case params::destroy::pitchModeHybrid:
-                default:
-                {
-                    const auto harmonicBlend = juce::jlimit (0.0f, 1.0f, 0.35f + 0.55f * bright);
-                    lockTone = juce::jmap (harmonicBlend, fundamentalTone, harmonicTone);
-                    modeGain = 1.07f;
-                    break;
-                }
+                sigBuf[i] = destroyBase.processSamplePreCrush (sigBuf[i],
+                                                               destroyNoteHz[(size_t) i],
+                                                               destroyFoldDriveDb[(size_t) i], destroyFoldAmount[(size_t) i], destroyFoldMix[(size_t) i],
+                                                               destroyClipDriveDb[(size_t) i], destroyClipAmount[(size_t) i], destroyClipMix[(size_t) i],
+                                                               modMode, destroyModAmount[(size_t) i], destroyModMix[(size_t) i], modNoteSync, destroyModFreqHz[(size_t) i]);
+            }
+        }
+        else
+        {
+            auto& os = (osFactor == 2) ? destroyOversampling2x : destroyOversampling4x;
+            auto& dc = (osFactor == 2) ? destroyOs2 : destroyOs4;
+
+            juce::dsp::AudioBlock<float> block (destroyBuffer);
+            auto baseBlock = block.getSubBlock (0, (size_t) numSamples);
+            juce::dsp::AudioBlock<const float> constBase (baseBlock);
+
+            auto upBlock = os.processSamplesUp (constBase);
+            auto* up = upBlock.getChannelPointer (0);
+            const int upN = (int) upBlock.getNumSamples();
+            const int fac = (int) os.getOversamplingFactor(); // 2 or 4
+
+            for (int j = 0; j < upN; ++j)
+            {
+                const int i = j / fac;
+                up[j] = dc.processSamplePreCrush (up[j],
+                                                  destroyNoteHz[(size_t) i],
+                                                  destroyFoldDriveDb[(size_t) i], destroyFoldAmount[(size_t) i], destroyFoldMix[(size_t) i],
+                                                  destroyClipDriveDb[(size_t) i], destroyClipAmount[(size_t) i], destroyClipMix[(size_t) i],
+                                                  modMode, destroyModAmount[(size_t) i], destroyModMix[(size_t) i], modNoteSync, destroyModFreqHz[(size_t) i]);
             }
 
-            const auto amount = juce::jlimit (0.0f, 1.0f, pitchLockAmountSm.getNextValue());
-            const auto gain = lockGain * (0.75f + 0.35f * (1.0f - bright));
-            sigBuf[i] = in + (lockTone * pitchLockFollower * amount * gain * modeGain);
+            os.processSamplesDown (baseBlock);
         }
+
+        // 4) Crush always at base sample rate (keeps SRR behaviour stable).
+        for (int i = 0; i < numSamples; ++i)
+            sigBuf[i] = destroyBase.processSampleCrush (sigBuf[i], crushBits, crushDownsample, destroyCrushMix[(size_t) i]);
+
+        // 5) Optional Shaper after Destroy.
+        if (shaperEnabled && ! shaperPre)
+        {
+            shaper.setEnabled (true);
+            for (int i = 0; i < numSamples; ++i)
+            {
+                shaper.setDriveDb (shaperDriveDb[(size_t) i]);
+                shaper.setMix (shaperMix[(size_t) i]);
+                sigBuf[i] = shaper.processSample (sigBuf[i]);
+            }
+        }
+
+        // 6) Pitch lock: note-locked helper signal with selectable mode.
+        const auto pitchLockAmountTarget = pitchLockEnabled ? juce::jlimit (0.0f, 1.0f, pitchLockAmountSm.getTargetValue()) : 0.0f;
+        if (pitchLockAmountTarget > 1.0e-5f)
+        {
+            constexpr float followerAttack = 0.14f;
+            constexpr float followerRelease = 0.02f;
+            constexpr float brightnessFollow = 0.07f;
+            constexpr float lockGain = 0.50f;
+            const auto brightnessCut = juce::jlimit (0.001f, 0.25f, (float) (2.0 * juce::MathConstants<double>::pi * 1200.0 / sampleRateHz));
+
+            for (int i = 0; i < numSamples; ++i)
+            {
+                const auto in = sigBuf[i];
+                const auto envIn = std::abs (in);
+                const auto coeff = envIn > pitchLockFollower ? followerAttack : followerRelease;
+                pitchLockFollower += coeff * (envIn - pitchLockFollower);
+
+                // Brightness proxy from simple low/high split, used to steer harmonic weights.
+                pitchLockLowpass += brightnessCut * (in - pitchLockLowpass);
+                const auto hi = in - pitchLockLowpass;
+                const auto den = std::abs (pitchLockLowpass) + std::abs (hi) + 1.0e-5f;
+                const auto brightnessNow = juce::jlimit (0.0f, 1.0f, std::abs (hi) / den);
+                pitchLockBrightness += brightnessFollow * (brightnessNow - pitchLockBrightness);
+
+                const auto noteHz = destroyNoteHz[(size_t) i];
+                const auto phaseInc = juce::jlimit (0.0f, 0.5f, noteHz / (float) sampleRateHz);
+                pitchLockPhase += phaseInc;
+                if (pitchLockPhase >= 1.0f)
+                    pitchLockPhase -= 1.0f;
+
+                const auto p = juce::MathConstants<float>::twoPi * pitchLockPhase;
+                const auto h1 = std::sin (p);
+                const auto h2 = std::sin (2.0f * p);
+                const auto h3 = std::sin (3.0f * p);
+                const auto h4 = std::sin (4.0f * p);
+                const auto h5 = std::sin (5.0f * p);
+
+                const auto nyqSafe = (float) (0.48 * sampleRateHz);
+                auto harmonicMask = [=] (float harmonicMul) noexcept
+                {
+                    const auto rel = (harmonicMul * noteHz) / juce::jmax (10.0f, nyqSafe);
+                    if (rel >= 1.0f)
+                        return 0.0f;
+                    const auto m = 1.0f - rel * rel;
+                    return juce::jlimit (0.0f, 1.0f, m);
+                };
+
+                const auto bright = juce::jlimit (0.0f, 1.0f, pitchLockBrightness);
+                float w1 = 1.00f;
+                float w2 = (0.22f + 0.28f * bright) * harmonicMask (2.0f);
+                float w3 = (0.12f + 0.26f * bright) * harmonicMask (3.0f);
+                float w4 = (0.05f + 0.20f * bright) * harmonicMask (4.0f);
+                float w5 = (0.02f + 0.12f * bright * bright) * harmonicMask (5.0f);
+
+                const auto norm = juce::jmax (1.0e-4f, w1 + w2 + w3 + w4 + w5);
+                const auto harmonicTone = (w1 * h1 + w2 * h2 + w3 * h3 + w4 * h4 + w5 * h5) / norm;
+                const auto fundamentalTone = h1;
+
+                float lockTone = harmonicTone;
+                float modeGain = 1.0f;
+                switch ((params::destroy::PitchLockMode) pitchLockMode)
+                {
+                    case params::destroy::pitchModeFundamental:
+                        lockTone = fundamentalTone;
+                        modeGain = 0.95f;
+                        break;
+                    case params::destroy::pitchModeHarmonic:
+                        lockTone = harmonicTone;
+                        modeGain = 1.00f;
+                        break;
+                    case params::destroy::pitchModeHybrid:
+                    default:
+                    {
+                        const auto harmonicBlend = juce::jlimit (0.0f, 1.0f, 0.35f + 0.55f * bright);
+                        lockTone = juce::jmap (harmonicBlend, fundamentalTone, harmonicTone);
+                        modeGain = 1.07f;
+                        break;
+                    }
+                }
+
+                const auto amount = juce::jlimit (0.0f, 1.0f, pitchLockAmountSm.getNextValue());
+                const auto gain = lockGain * (0.75f + 0.35f * (1.0f - bright));
+                sigBuf[i] = in + (lockTone * pitchLockFollower * amount * gain * modeGain);
+            }
+        }
+        else
+        {
+            // Keep smoothing in sync even when lock is disabled.
+            pitchLockAmountSm.skip (numSamples);
+        }
+    };
+
+    auto applyFilterSample = [&] (float& sig, float noteHz, int i)
+    {
+        const auto baseCutoff = filterCutoffHzSm.getNextValue();
+        auto resKnob          = filterResKnobSm.getNextValue();
+        const auto envSemis   = filterEnvAmountSm.getNextValue();
+        const auto envVal = filterEnvBuf[(size_t) i];
+
+        auto cutoff = baseCutoff;
+        if (keyTrack)
+            cutoff *= (noteHz / 440.0f);
+
+        cutoff *= std::exp2 ((envSemis * envVal) * (1.0f / 12.0f));
+        cutoff *= std::exp2 (filterModCutoffSemis[(size_t) i] * (1.0f / 12.0f));
+
+        resKnob = juce::jlimit (0.0f, 1.0f, resKnob + filterModResAdd[(size_t) i]);
+
+        // Map resonance knob [0..1] to [min..max] exponentially.
+        constexpr float minRes = 0.2f;
+        constexpr float maxRes = 20.0f;
+        const auto t = juce::jlimit (0.0f, 1.0f, resKnob);
+        const auto res = minRes * std::exp (std::log (maxRes / minRes) * t);
+
+        sig = filter.processSample (sig, cutoff, res);
+    };
+
+    auto applyToneSample = [&] (float& sig)
+    {
+        const auto lowCut = toneLowCutHzSm.getNextValue();
+        const auto highCut = toneHighCutHzSm.getNextValue();
+
+        const auto p1f = tonePeak1FreqHzSm.getNextValue();
+        const auto p1g = tonePeak1GainDbSm.getNextValue();
+        const auto p1q = tonePeak1QSm.getNextValue();
+        const auto p1dr = tonePeak1DynRangeDbSm.getNextValue();
+        const auto p1dt = tonePeak1DynThresholdDbSm.getNextValue();
+
+        const auto p2f = tonePeak2FreqHzSm.getNextValue();
+        const auto p2g = tonePeak2GainDbSm.getNextValue();
+        const auto p2q = tonePeak2QSm.getNextValue();
+        const auto p2dr = tonePeak2DynRangeDbSm.getNextValue();
+        const auto p2dt = tonePeak2DynThresholdDbSm.getNextValue();
+
+        const auto p3f = tonePeak3FreqHzSm.getNextValue();
+        const auto p3g = tonePeak3GainDbSm.getNextValue();
+        const auto p3q = tonePeak3QSm.getNextValue();
+        const auto p3dr = tonePeak3DynRangeDbSm.getNextValue();
+        const auto p3dt = tonePeak3DynThresholdDbSm.getNextValue();
+
+        const auto p4f = tonePeak4FreqHzSm.getNextValue();
+        const auto p4g = tonePeak4GainDbSm.getNextValue();
+        const auto p4q = tonePeak4QSm.getNextValue();
+        const auto p4dr = tonePeak4DynRangeDbSm.getNextValue();
+        const auto p4dt = tonePeak4DynThresholdDbSm.getNextValue();
+
+        const auto p5f = tonePeak5FreqHzSm.getNextValue();
+        const auto p5g = tonePeak5GainDbSm.getNextValue();
+        const auto p5q = tonePeak5QSm.getNextValue();
+        const auto p5dr = tonePeak5DynRangeDbSm.getNextValue();
+        const auto p5dt = tonePeak5DynThresholdDbSm.getNextValue();
+
+        const auto p6f = tonePeak6FreqHzSm.getNextValue();
+        const auto p6g = tonePeak6GainDbSm.getNextValue();
+        const auto p6q = tonePeak6QSm.getNextValue();
+        const auto p6dr = tonePeak6DynRangeDbSm.getNextValue();
+        const auto p6dt = tonePeak6DynThresholdDbSm.getNextValue();
+
+        const auto p7f = tonePeak7FreqHzSm.getNextValue();
+        const auto p7g = tonePeak7GainDbSm.getNextValue();
+        const auto p7q = tonePeak7QSm.getNextValue();
+        const auto p7dr = tonePeak7DynRangeDbSm.getNextValue();
+        const auto p7dt = tonePeak7DynThresholdDbSm.getNextValue();
+
+        const auto p8f = tonePeak8FreqHzSm.getNextValue();
+        const auto p8g = tonePeak8GainDbSm.getNextValue();
+        const auto p8q = tonePeak8QSm.getNextValue();
+        const auto p8dr = tonePeak8DynRangeDbSm.getNextValue();
+        const auto p8dt = tonePeak8DynThresholdDbSm.getNextValue();
+
+        if (toneOn)
+        {
+            if (toneCoeffCountdown-- <= 0)
+            {
+                toneCoeffCountdown = 16;
+                toneEq.setParams (lowCut, highCut, toneLowCutSlope, toneHighCutSlope,
+                                  tonePeak1On, tonePeak1Type, p1f, p1g, p1q, tonePeak1DynOn, p1dr, p1dt,
+                                  tonePeak2On, tonePeak2Type, p2f, p2g, p2q, tonePeak2DynOn, p2dr, p2dt,
+                                  tonePeak3On, tonePeak3Type, p3f, p3g, p3q, tonePeak3DynOn, p3dr, p3dt,
+                                  tonePeak4On, tonePeak4Type, p4f, p4g, p4q, tonePeak4DynOn, p4dr, p4dt,
+                                  tonePeak5On, tonePeak5Type, p5f, p5g, p5q, tonePeak5DynOn, p5dr, p5dt,
+                                  tonePeak6On, tonePeak6Type, p6f, p6g, p6q, tonePeak6DynOn, p6dr, p6dt,
+                                  tonePeak7On, tonePeak7Type, p7f, p7g, p7q, tonePeak7DynOn, p7dr, p7dt,
+                                  tonePeak8On, tonePeak8Type, p8f, p8g, p8q, tonePeak8DynOn, p8dr, p8dt);
+                toneEq.updateCoeffs();
+            }
+
+            sig = toneEq.processSample (sig);
+        }
+    };
+
+    auto applyFilterTone = [&]()
+    {
+        for (int i = 0; i < numSamples; ++i)
+        {
+            auto sig = sigBuf[i];
+            const auto noteHz = destroyNoteHz[(size_t) i];
+
+            if (tonePreFilter)
+                applyToneSample (sig);
+
+            applyFilterSample (sig, noteHz, i);
+
+            if (! tonePreFilter)
+                applyToneSample (sig);
+
+            sigBuf[i] = sig;
+        }
+    };
+
+    if (! destroyPostFilter)
+    {
+        applyDestroyAndPitch();
+        applyFilterTone();
     }
     else
     {
-        // Keep smoothing in sync even when lock is disabled.
-        pitchLockAmountSm.skip (numSamples);
+        applyFilterTone();
+        applyDestroyAndPitch();
     }
 
-    // 7) Post (filter -> tone -> amp -> out) and write to all channels.
+    // 7) Amp/Output and write to all channels.
     for (int i = 0; i < numSamples; ++i)
     {
         auto sig = sigBuf[i];
-        const auto noteHz = destroyNoteHz[(size_t) i];
-
-        // --- Filter (after distortions) ---
-        {
-            const auto baseCutoff = filterCutoffHzSm.getNextValue();
-            auto resKnob          = filterResKnobSm.getNextValue();
-            const auto envSemis   = filterEnvAmountSm.getNextValue();
-            const auto envVal = filterEnvBuf[(size_t) i];
-
-            auto cutoff = baseCutoff;
-            if (keyTrack)
-                cutoff *= (noteHz / 440.0f);
-
-            cutoff *= std::exp2 ((envSemis * envVal) * (1.0f / 12.0f));
-            cutoff *= std::exp2 (filterModCutoffSemis[(size_t) i] * (1.0f / 12.0f));
-
-            resKnob = juce::jlimit (0.0f, 1.0f, resKnob + filterModResAdd[(size_t) i]);
-
-            // Map resonance knob [0..1] to [min..max] exponentially.
-            constexpr float minRes = 0.2f;
-            constexpr float maxRes = 20.0f;
-            const auto t = juce::jlimit (0.0f, 1.0f, resKnob);
-            const auto res = minRes * std::exp (std::log (maxRes / minRes) * t);
-
-            sig = filter.processSample (sig, cutoff, res);
-        }
-
-        // --- Tone EQ (post-filter, Serum-like utility EQ) ---
-        {
-            const auto lowCut = toneLowCutHzSm.getNextValue();
-            const auto highCut = toneHighCutHzSm.getNextValue();
-
-            const auto p1f = tonePeak1FreqHzSm.getNextValue();
-            const auto p1g = tonePeak1GainDbSm.getNextValue();
-            const auto p1q = tonePeak1QSm.getNextValue();
-            const auto p1dr = tonePeak1DynRangeDbSm.getNextValue();
-            const auto p1dt = tonePeak1DynThresholdDbSm.getNextValue();
-
-            const auto p2f = tonePeak2FreqHzSm.getNextValue();
-            const auto p2g = tonePeak2GainDbSm.getNextValue();
-            const auto p2q = tonePeak2QSm.getNextValue();
-            const auto p2dr = tonePeak2DynRangeDbSm.getNextValue();
-            const auto p2dt = tonePeak2DynThresholdDbSm.getNextValue();
-
-            const auto p3f = tonePeak3FreqHzSm.getNextValue();
-            const auto p3g = tonePeak3GainDbSm.getNextValue();
-            const auto p3q = tonePeak3QSm.getNextValue();
-            const auto p3dr = tonePeak3DynRangeDbSm.getNextValue();
-            const auto p3dt = tonePeak3DynThresholdDbSm.getNextValue();
-
-            const auto p4f = tonePeak4FreqHzSm.getNextValue();
-            const auto p4g = tonePeak4GainDbSm.getNextValue();
-            const auto p4q = tonePeak4QSm.getNextValue();
-            const auto p4dr = tonePeak4DynRangeDbSm.getNextValue();
-            const auto p4dt = tonePeak4DynThresholdDbSm.getNextValue();
-
-            const auto p5f = tonePeak5FreqHzSm.getNextValue();
-            const auto p5g = tonePeak5GainDbSm.getNextValue();
-            const auto p5q = tonePeak5QSm.getNextValue();
-            const auto p5dr = tonePeak5DynRangeDbSm.getNextValue();
-            const auto p5dt = tonePeak5DynThresholdDbSm.getNextValue();
-
-            const auto p6f = tonePeak6FreqHzSm.getNextValue();
-            const auto p6g = tonePeak6GainDbSm.getNextValue();
-            const auto p6q = tonePeak6QSm.getNextValue();
-            const auto p6dr = tonePeak6DynRangeDbSm.getNextValue();
-            const auto p6dt = tonePeak6DynThresholdDbSm.getNextValue();
-
-            const auto p7f = tonePeak7FreqHzSm.getNextValue();
-            const auto p7g = tonePeak7GainDbSm.getNextValue();
-            const auto p7q = tonePeak7QSm.getNextValue();
-            const auto p7dr = tonePeak7DynRangeDbSm.getNextValue();
-            const auto p7dt = tonePeak7DynThresholdDbSm.getNextValue();
-
-            const auto p8f = tonePeak8FreqHzSm.getNextValue();
-            const auto p8g = tonePeak8GainDbSm.getNextValue();
-            const auto p8q = tonePeak8QSm.getNextValue();
-            const auto p8dr = tonePeak8DynRangeDbSm.getNextValue();
-            const auto p8dt = tonePeak8DynThresholdDbSm.getNextValue();
-
-            if (toneOn)
-            {
-                if (toneCoeffCountdown-- <= 0)
-                {
-                    toneCoeffCountdown = 16;
-                    toneEq.setParams (lowCut, highCut, toneLowCutSlope, toneHighCutSlope,
-                                      tonePeak1On, tonePeak1Type, p1f, p1g, p1q, tonePeak1DynOn, p1dr, p1dt,
-                                      tonePeak2On, tonePeak2Type, p2f, p2g, p2q, tonePeak2DynOn, p2dr, p2dt,
-                                      tonePeak3On, tonePeak3Type, p3f, p3g, p3q, tonePeak3DynOn, p3dr, p3dt,
-                                      tonePeak4On, tonePeak4Type, p4f, p4g, p4q, tonePeak4DynOn, p4dr, p4dt,
-                                      tonePeak5On, tonePeak5Type, p5f, p5g, p5q, tonePeak5DynOn, p5dr, p5dt,
-                                      tonePeak6On, tonePeak6Type, p6f, p6g, p6q, tonePeak6DynOn, p6dr, p6dt,
-                                      tonePeak7On, tonePeak7Type, p7f, p7g, p7q, tonePeak7DynOn, p7dr, p7dt,
-                                      tonePeak8On, tonePeak8Type, p8f, p8g, p8q, tonePeak8DynOn, p8dr, p8dt);
-                    toneEq.updateCoeffs();
-                }
-
-                sig = toneEq.processSample (sig);
-            }
-        }
-
         sig *= ampEnvBuf[(size_t) i];
         sig *= velocityGain;
         sig *= outGain.getNextValue();
@@ -1775,7 +1818,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
 
         ies::dsp::FxChain::RuntimeParams fxp;
         fxp.globalMix01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxGlobalMix, 0.0f));
-        const float fxMorph = juce::jlimit (0.0f, 1.0f, loadf (params->fxGlobalMorph, 0.0f));
+        const float fxMorph = juce::jlimit (0.0f, 1.0f, loadf (params->fxGlobalMorph, 0.0f) + avg (fxModGlobalMorphSum) * 0.45f);
 
         fxp.chorusEnable = loadb (params->fxChorusEnable, false);
         fxp.chorusMix01 = juce::jlimit (0.0f, 1.0f, loadf (params->fxChorusMix, 0.0f) + avg (fxModChorusMixSum));

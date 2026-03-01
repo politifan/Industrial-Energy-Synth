@@ -346,8 +346,9 @@ enum Dest
     dstFxXtraLofiAmount = 38,
     dstFxXtraDoublerAmount = 39,
     dstFxXtraMix = 40,
+    dstFxGlobalMorph = 41,
 
-    dstLast = dstFxXtraMix
+    dstLast = dstFxGlobalMorph
 };
 }
 
@@ -363,6 +364,8 @@ inline constexpr const char* order      = "fx.global.order";      // choice
 inline constexpr const char* route      = "fx.global.route";      // choice serial/parallel
 inline constexpr const char* oversample = "fx.global.oversample"; // choice Off/2x/4x
 inline constexpr const char* morph      = "fx.global.morph";      // 0..1 FX macro morph
+inline constexpr const char* destroyPlacement = "fx.global.destroyPlacement"; // choice pre/post filter
+inline constexpr const char* tonePlacement    = "fx.global.tonePlacement";    // choice pre/post filter
 
 enum Order
 {
@@ -382,6 +385,12 @@ enum Route
 {
     routeSerial = 0,
     routeParallel = 1
+};
+
+enum Placement
+{
+    preFilter = 0,
+    postFilter = 1
 };
 }
 

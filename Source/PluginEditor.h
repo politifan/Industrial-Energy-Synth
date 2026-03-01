@@ -15,6 +15,8 @@
 #include "presets/PresetManager.h"
 
 #include <array>
+#include <deque>
+#include <vector>
 
 class IndustrialEnergySynthAudioProcessor;
 
@@ -41,13 +43,28 @@ private:
     int getLanguageIndex() const;
     void refreshLabels();
     void refreshTooltips();
+    void refreshFxRouteMap();
     void updateEnabledStates();
     void updateStatusFromComponent (juce::Component*);
     void loadFxCustomOrderFromProcessor();
     void storeFxCustomOrderToState();
     void moveSelectedFxBlockInCustomOrder (int delta);
+    void moveEngineBlockToCustomOrderPosition (int engineBlock, int targetPos);
     int getEngineBlockForFxUiBlock (int b) const noexcept;
+    int getEngineBlockForRackComponent (const juce::Component* c) const noexcept;
     int getCustomOrderPositionForEngineBlock (int engineBlock) const noexcept;
+    float getParamActualValue (const char* paramId) const;
+    void appendCurrentFxBlockSnapshot (std::vector<std::pair<const char*, float>>& snapshot) const;
+    void startFxQuickGlowForCurrentBlock();
+    void pushFxQuickUndoSnapshot();
+    void undoFxQuickAction();
+    void applyFxQuickRandomSafe();
+    void storeFxQuickAbSnapshot (bool slotA);
+    void recallFxQuickAbSnapshot (bool slotA);
+    void applyFxQuickMorph (float morph01);
+    void applyFxQuickMorphInternal (float morph01, bool pushUndo, bool announceStatus);
+    void swapFxQuickAbSnapshots();
+    void applyFxQuickAction (int variant);
     void resetAllParamsKeepLanguage();
     void rebuildPresetMenu();
     void loadPresetByComboSelection();
@@ -72,6 +89,9 @@ private:
     void handleNoteOn (juce::MidiKeyboardState* source, int midiChannel, int midiNoteNumber, float velocity) override;
     void handleNoteOff (juce::MidiKeyboardState* source, int midiChannel, int midiNoteNumber, float velocity) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
     void mouseEnter (const juce::MouseEvent&) override;
     void mouseExit (const juce::MouseEvent&) override;
     bool keyPressed (const juce::KeyPress& key) override;
@@ -436,18 +456,40 @@ private:
     juce::Label fxOutLabel;
 
     ies::ui::KnobWithLabel fxGlobalMix;
+    ies::ui::KnobWithLabel fxGlobalMorph;
     ies::ui::ComboWithLabel fxGlobalOrder;
     ies::ui::ComboWithLabel fxGlobalRoute;
     ies::ui::ComboWithLabel fxGlobalOversample;
+    ies::ui::ComboWithLabel fxGlobalDestroyPlacement;
+    ies::ui::ComboWithLabel fxGlobalTonePlacement;
+    juce::Label fxRouteMapTitle;
+    juce::Label fxRouteMapBody;
     juce::TextButton fxDetailBasicButton;
     juce::TextButton fxDetailAdvancedButton;
     juce::TextButton fxOrderUpButton;
     juce::TextButton fxOrderDownButton;
     juce::TextButton fxOrderResetButton;
+    juce::TextButton fxQuickSubtleButton;
+    juce::TextButton fxQuickWideButton;
+    juce::TextButton fxQuickHardButton;
+    juce::TextButton fxQuickRandomButton;
+    juce::TextButton fxQuickUndoButton;
+    juce::TextButton fxQuickStoreAButton;
+    juce::TextButton fxQuickStoreBButton;
+    juce::TextButton fxQuickRecallAButton;
+    juce::TextButton fxQuickRecallBButton;
+    juce::Label fxQuickMorphLabel;
+    juce::Slider fxQuickMorphSlider;
+    juce::ToggleButton fxQuickMorphAuto;
+    juce::TextButton fxQuickMorphApplyButton;
+    juce::TextButton fxQuickSwapButton;
     std::unique_ptr<APVTS::SliderAttachment> fxGlobalMixAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> fxGlobalMorphAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> fxGlobalOrderAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> fxGlobalRouteAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> fxGlobalOversampleAttachment;
+    std::unique_ptr<APVTS::ComboBoxAttachment> fxGlobalDestroyPlacementAttachment;
+    std::unique_ptr<APVTS::ComboBoxAttachment> fxGlobalTonePlacementAttachment;
 
     ies::ui::KnobWithLabel fxChorusMix;
     ies::ui::KnobWithLabel fxChorusRate;
@@ -592,7 +634,12 @@ private:
     };
     FxBlockIndex selectedFxBlock = fxChorus;
     FxDetailMode selectedFxDetailMode = fxBasic;
-    std::array<int, (size_t) ies::dsp::FxChain::numBlocks> fxCustomOrderUi { { 0, 1, 2, 3, 4, 5 } };
+    static constexpr size_t fxCustomOrderCount = 6;
+    std::array<int, fxCustomOrderCount> fxCustomOrderUi { { 0, 1, 2, 3, 4, 5 } };
+    bool fxRackDragActive = false;
+    int fxRackDragEngineBlock = -1;
+    int fxRackDragSourcePos = -1;
+    int fxRackDragTargetPos = -1;
 
     // Sequencer / Arp page (fourth page): performance helpers (Serum-ish ARP).
     juce::GroupComponent seqGroup;
@@ -678,6 +725,17 @@ private:
         intentDrone = 2
     };
     IntentModeIndex currentIntent = intentBass;
+    using FxQuickSnapshot = std::vector<std::pair<const char*, float>>;
+    std::deque<FxQuickSnapshot> fxQuickUndoHistory;
+    static constexpr int fxQuickUndoLimit = 5;
+    std::array<FxQuickSnapshot, 7> fxQuickSnapshotAByBlock;
+    std::array<FxQuickSnapshot, 7> fxQuickSnapshotBByBlock;
+    std::array<bool, 7> fxQuickSnapshotAValid {};
+    std::array<bool, 7> fxQuickSnapshotBValid {};
+    std::array<juce::Slider*, 16> fxQuickGlowTargets {};
+    int fxQuickGlowCount = 0;
+    float fxQuickGlowAmount = 0.0f;
+    bool fxQuickMorphDragPreviewActive = false;
     juce::String macroName1;
     juce::String macroName2;
 

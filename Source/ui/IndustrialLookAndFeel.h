@@ -48,6 +48,7 @@ public:
                                     juce::GroupComponent&) override;
 
     juce::Font getLabelFont (juce::Label&) override;
+    juce::PopupMenu::Options getOptionsForComboBoxPopupMenu (juce::ComboBox&, juce::Label&) override;
 
 private:
     juce::Colour bg0;

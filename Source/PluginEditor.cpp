@@ -55,6 +55,11 @@ static juce::String midiNoteName (int midiNote)
     return juce::String (names[note % 12]) + juce::String (octave);
 }
 
+static std::array<int, 6> makeDefaultFxOrderUi() noexcept
+{
+    return { { 0, 1, 2, 3, 4, 5 } };
+}
+
 // Keep this list stable once you ship factory content (names can change, ordering/IDs should not).
 static const FactoryPreset kFactoryPresets[] =
 {
@@ -1299,7 +1304,15 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
             m.addItem (6002, "M2");
             m.addItem (6003, "LFO 1");
             m.addItem (6004, "LFO 2");
-            m.addItem (6005, T ("Clear Target Mods", u8"Очистить модуляции цели"));
+            m.addItem (6005, "MW");
+            m.addItem (6006, "AT");
+            m.addItem (6007, "VEL");
+            m.addItem (6008, "NOTE");
+            m.addItem (6009, "FENV");
+            m.addItem (6010, "AENV");
+            m.addItem (6011, "RND");
+            m.addSeparator();
+            m.addItem (6012, T ("Clear Target Mods", u8"Очистить модуляции цели"));
         }
 
         juce::Component::SafePointer<IndustrialEnergySynthAudioProcessorEditor> safeThis (this);
@@ -1336,7 +1349,14 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                  case 6002: safeThis->assignModulation (params::mod::srcMacro2, safeThis->lastTouchedModDest); break;
                                  case 6003: safeThis->assignModulation (params::mod::srcLfo1, safeThis->lastTouchedModDest); break;
                                  case 6004: safeThis->assignModulation (params::mod::srcLfo2, safeThis->lastTouchedModDest); break;
-                                 case 6005: safeThis->clearAllModForDest (safeThis->lastTouchedModDest); break;
+                                 case 6005: safeThis->assignModulation (params::mod::srcModWheel, safeThis->lastTouchedModDest); break;
+                                 case 6006: safeThis->assignModulation (params::mod::srcAftertouch, safeThis->lastTouchedModDest); break;
+                                 case 6007: safeThis->assignModulation (params::mod::srcVelocity, safeThis->lastTouchedModDest); break;
+                                 case 6008: safeThis->assignModulation (params::mod::srcNote, safeThis->lastTouchedModDest); break;
+                                 case 6009: safeThis->assignModulation (params::mod::srcFilterEnv, safeThis->lastTouchedModDest); break;
+                                 case 6010: safeThis->assignModulation (params::mod::srcAmpEnv, safeThis->lastTouchedModDest); break;
+                                 case 6011: safeThis->assignModulation (params::mod::srcRandom, safeThis->lastTouchedModDest); break;
+                                 case 6012: safeThis->clearAllModForDest (safeThis->lastTouchedModDest); break;
                                  default: break;
                              }
                          });
@@ -2223,6 +2243,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         dst.addItem ("FX Xtra LoFi", 39);
         dst.addItem ("FX Xtra Doubler", 40);
         dst.addItem ("FX Xtra Mix", 41);
+        dst.addItem ("FX Global Morph", 42);
         addAndMakeVisible (dst);
         modSlotDstAttachment[(size_t) i] = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), kModSlotDstIds[i], dst);
 
@@ -2364,6 +2385,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     bindTarget (fxXtraLofi, params::mod::dstFxXtraLofiAmount);
     bindTarget (fxXtraDoubler, params::mod::dstFxXtraDoublerAmount);
     bindTarget (fxXtraMix, params::mod::dstFxXtraMix);
+    bindTarget (fxGlobalMorph, params::mod::dstFxGlobalMorph);
 
     modInsightsPanel.setText ("Mod Insights");
     addAndMakeVisible (modInsightsPanel);
@@ -2787,6 +2809,11 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     fxGlobalMix.setLabelText ("FX Mix");
     setupSliderDoubleClickDefault (fxGlobalMix.getSlider(), params::fx::global::mix);
 
+    addAndMakeVisible (fxGlobalMorph);
+    fxGlobalMorphAttachment = std::make_unique<APVTS::SliderAttachment> (audioProcessor.getAPVTS(), params::fx::global::morph, fxGlobalMorph.getSlider());
+    fxGlobalMorph.setLabelText ("Morph");
+    setupSliderDoubleClickDefault (fxGlobalMorph.getSlider(), params::fx::global::morph);
+
     addAndMakeVisible (fxGlobalOrder);
     fxGlobalOrder.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
     fxGlobalOrder.getCombo().addItem ("Order A", 1);
@@ -2805,6 +2832,11 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     fxGlobalRoute.getCombo().addItem ("Serial", 1);
     fxGlobalRoute.getCombo().addItem ("Parallel", 2);
     fxGlobalRouteAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::global::route, fxGlobalRoute.getCombo());
+    fxGlobalRoute.getCombo().onChange = [this]
+    {
+        refreshFxRouteMap();
+        resized();
+    };
 
     addAndMakeVisible (fxGlobalOversample);
     fxGlobalOversample.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
@@ -2812,6 +2844,40 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     fxGlobalOversample.getCombo().addItem ("2x", 2);
     fxGlobalOversample.getCombo().addItem ("4x", 3);
     fxGlobalOversampleAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), params::fx::global::oversample, fxGlobalOversample.getCombo());
+
+    addAndMakeVisible (fxGlobalDestroyPlacement);
+    fxGlobalDestroyPlacement.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    fxGlobalDestroyPlacement.getCombo().addItem ("Pre Filter", 1);
+    fxGlobalDestroyPlacement.getCombo().addItem ("Post Filter", 2);
+    fxGlobalDestroyPlacementAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(),
+                                                                                        params::fx::global::destroyPlacement,
+                                                                                        fxGlobalDestroyPlacement.getCombo());
+    fxGlobalDestroyPlacement.getCombo().onChange = [this]
+    {
+        refreshFxRouteMap();
+    };
+
+    addAndMakeVisible (fxGlobalTonePlacement);
+    fxGlobalTonePlacement.setLayout (ies::ui::ComboWithLabel::Layout::labelTop);
+    fxGlobalTonePlacement.getCombo().addItem ("Pre Filter", 1);
+    fxGlobalTonePlacement.getCombo().addItem ("Post Filter", 2);
+    fxGlobalTonePlacementAttachment = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(),
+                                                                                    params::fx::global::tonePlacement,
+                                                                                    fxGlobalTonePlacement.getCombo());
+    fxGlobalTonePlacement.getCombo().onChange = [this]
+    {
+        refreshFxRouteMap();
+    };
+
+    addAndMakeVisible (fxRouteMapTitle);
+    fxRouteMapTitle.setJustificationType (juce::Justification::centredLeft);
+    fxRouteMapTitle.setMinimumHorizontalScale (0.8f);
+    fxRouteMapTitle.setColour (juce::Label::textColourId, juce::Colour (0xffe8ebf1).withAlpha (0.87f));
+
+    addAndMakeVisible (fxRouteMapBody);
+    fxRouteMapBody.setJustificationType (juce::Justification::centredLeft);
+    fxRouteMapBody.setMinimumHorizontalScale (0.72f);
+    fxRouteMapBody.setColour (juce::Label::textColourId, juce::Colour (0xffc7d5ea).withAlpha (0.88f));
 
     addAndMakeVisible (fxDetailBasicButton);
     fxDetailBasicButton.setButtonText ("Basic");
@@ -2847,12 +2913,121 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     fxOrderResetButton.setButtonText ("Reset");
     fxOrderResetButton.onClick = [this]
     {
-        fxCustomOrderUi = { { 0, 1, 2, 3, 4, 5 } };
+        fxCustomOrderUi = makeDefaultFxOrderUi();
         storeFxCustomOrderToState();
         refreshLabels();
         updateEnabledStates();
         resized();
     };
+
+    addAndMakeVisible (fxQuickSubtleButton);
+    fxQuickSubtleButton.setButtonText ("Subtle");
+    fxQuickSubtleButton.onClick = [this] { applyFxQuickAction (0); };
+
+    addAndMakeVisible (fxQuickWideButton);
+    fxQuickWideButton.setButtonText ("Wide");
+    fxQuickWideButton.onClick = [this] { applyFxQuickAction (1); };
+
+    addAndMakeVisible (fxQuickHardButton);
+    fxQuickHardButton.setButtonText ("Hard");
+    fxQuickHardButton.onClick = [this] { applyFxQuickAction (2); };
+
+    addAndMakeVisible (fxQuickRandomButton);
+    fxQuickRandomButton.setButtonText ("Rand Safe");
+    fxQuickRandomButton.onClick = [this] { applyFxQuickRandomSafe(); };
+
+    addAndMakeVisible (fxQuickUndoButton);
+    fxQuickUndoButton.setButtonText ("Undo");
+    fxQuickUndoButton.onClick = [this] { undoFxQuickAction(); };
+
+    addAndMakeVisible (fxQuickStoreAButton);
+    fxQuickStoreAButton.setButtonText ("Store A");
+    fxQuickStoreAButton.onClick = [this] { storeFxQuickAbSnapshot (true); };
+
+    addAndMakeVisible (fxQuickStoreBButton);
+    fxQuickStoreBButton.setButtonText ("Store B");
+    fxQuickStoreBButton.onClick = [this] { storeFxQuickAbSnapshot (false); };
+
+    addAndMakeVisible (fxQuickRecallAButton);
+    fxQuickRecallAButton.setButtonText ("Recall A");
+    fxQuickRecallAButton.onClick = [this] { recallFxQuickAbSnapshot (true); };
+
+    addAndMakeVisible (fxQuickRecallBButton);
+    fxQuickRecallBButton.setButtonText ("Recall B");
+    fxQuickRecallBButton.onClick = [this] { recallFxQuickAbSnapshot (false); };
+
+    addAndMakeVisible (fxQuickMorphLabel);
+    fxQuickMorphLabel.setJustificationType (juce::Justification::centredLeft);
+    fxQuickMorphLabel.setText ("A/B", juce::dontSendNotification);
+
+    addAndMakeVisible (fxQuickMorphSlider);
+    fxQuickMorphSlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    fxQuickMorphSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 54, 16);
+    fxQuickMorphSlider.setRange (0.0, 1.0, 0.001);
+    fxQuickMorphSlider.setSkewFactor (1.0);
+    fxQuickMorphSlider.setDoubleClickReturnValue (true, 0.5);
+    fxQuickMorphSlider.setValue (0.5, juce::dontSendNotification);
+    fxQuickMorphSlider.textFromValueFunction = [] (double v)
+    {
+        return juce::String ((int) std::lround (juce::jlimit (0.0, 1.0, v) * 100.0)) + " %";
+    };
+    fxQuickMorphSlider.valueFromTextFunction = [] (const juce::String& text)
+    {
+        const auto n = text.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
+        return juce::jlimit (0.0, 1.0, (std::abs (n) > 1.0) ? (n / 100.0) : n);
+    };
+    fxQuickMorphSlider.onDragStart = [this]
+    {
+        if (! fxQuickMorphAuto.getToggleState())
+            return;
+
+        const auto fxIdx = (size_t) juce::jlimit (0, 6, (int) selectedFxBlock);
+        if (fxQuickSnapshotAValid[fxIdx] && fxQuickSnapshotBValid[fxIdx])
+        {
+            pushFxQuickUndoSnapshot();
+            fxQuickMorphDragPreviewActive = true;
+        }
+    };
+    fxQuickMorphSlider.onDragEnd = [this]
+    {
+        fxQuickMorphDragPreviewActive = false;
+
+        if (! fxQuickMorphAuto.getToggleState())
+            return;
+
+        const auto percent = (int) std::lround (juce::jlimit (0.0, 1.0, fxQuickMorphSlider.getValue()) * 100.0);
+        statusLabel.setText (isRussian()
+                                 ? juce::String::fromUTF8 (u8"FX: авто A/B морф ") + juce::String (percent) + "%."
+                                 : juce::String ("FX: auto A/B morph ") + juce::String (percent) + "%.",
+                             juce::dontSendNotification);
+    };
+    fxQuickMorphSlider.onValueChange = [this]
+    {
+        if (! fxQuickMorphAuto.getToggleState())
+            return;
+
+        applyFxQuickMorphInternal ((float) fxQuickMorphSlider.getValue(),
+                                   ! fxQuickMorphDragPreviewActive,
+                                   false);
+    };
+
+    addAndMakeVisible (fxQuickMorphAuto);
+    fxQuickMorphAuto.setButtonText ("Auto");
+    fxQuickMorphAuto.onClick = [this]
+    {
+        if (fxQuickMorphAuto.getToggleState())
+            applyFxQuickMorphInternal ((float) fxQuickMorphSlider.getValue(), true, false);
+        updateEnabledStates();
+    };
+
+    fxQuickMorphDragPreviewActive = false;
+    addAndMakeVisible (fxQuickMorphApplyButton);
+    fxQuickMorphApplyButton.setButtonText ("Apply");
+    fxQuickMorphApplyButton.onClick = [this] { applyFxQuickMorph ((float) fxQuickMorphSlider.getValue()); };
+
+    addAndMakeVisible (fxQuickSwapButton);
+    fxQuickSwapButton.setButtonText ("Swap");
+    fxQuickSwapButton.onClick = [this] { swapFxQuickAbSnapshots(); };
 
     auto initFxKnob = [this] (ies::ui::KnobWithLabel& k, const char* label, const char* paramId, std::unique_ptr<APVTS::SliderAttachment>& a)
     {
@@ -2873,6 +3048,8 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
             return t.trim().replaceCharacter (',', '.').retainCharacters ("0123456789.-").getDoubleValue();
         };
     };
+    setCompactText (fxGlobalMix.getSlider(), 2);
+    setCompactText (fxGlobalMorph.getSlider(), 2);
 
     initFxKnob (fxChorusMix, "Mix", params::fx::chorus::mix, fxChorusMixAttachment);
     setCompactText (fxChorusMix.getSlider(), 2);
@@ -3494,14 +3671,34 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (fxXtraEnable, cOut);
     setGroupAccent (fxDelaySync, cOut);
     setGroupAccent (fxDelayPingPong, cOut);
+    setGroupAccent (fxGlobalMix, cOut);
+    setGroupAccent (fxGlobalMorph, cOut);
     setGroupAccent (fxGlobalOrder, cOut);
     setGroupAccent (fxGlobalRoute, cOut);
     setGroupAccent (fxGlobalOversample, cOut);
+    setGroupAccent (fxGlobalDestroyPlacement, cOut);
+    setGroupAccent (fxGlobalTonePlacement, cOut);
+    setGroupAccent (fxRouteMapTitle, cOut);
+    setGroupAccent (fxRouteMapBody, cOut);
     setGroupAccent (fxDetailBasicButton, cOut);
     setGroupAccent (fxDetailAdvancedButton, cOut);
     setGroupAccent (fxOrderUpButton, cOut);
     setGroupAccent (fxOrderDownButton, cOut);
     setGroupAccent (fxOrderResetButton, cOut);
+    setGroupAccent (fxQuickSubtleButton, cOut);
+    setGroupAccent (fxQuickWideButton, cOut);
+    setGroupAccent (fxQuickHardButton, cOut);
+    setGroupAccent (fxQuickRandomButton, cOut);
+    setGroupAccent (fxQuickUndoButton, cOut);
+    setGroupAccent (fxQuickStoreAButton, cOut);
+    setGroupAccent (fxQuickStoreBButton, cOut);
+    setGroupAccent (fxQuickRecallAButton, cOut);
+    setGroupAccent (fxQuickRecallBButton, cOut);
+    setGroupAccent (fxQuickMorphLabel, cOut);
+    setGroupAccent (fxQuickMorphSlider, cOut);
+    setGroupAccent (fxQuickMorphAuto, cOut);
+    setGroupAccent (fxQuickMorphApplyButton, cOut);
+    setGroupAccent (fxQuickSwapButton, cOut);
     setGroupAccent (fxDelayDivL, cOut);
     setGroupAccent (fxDelayDivR, cOut);
     setGroupAccent (fxDistType, cOut);
@@ -3589,7 +3786,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     for (auto* s : { &arpRate.getSlider(), &arpGate.getSlider(), &arpOctaves.getSlider(), &arpSwing.getSlider() })
         setSliderAccent (*s, cOut);
-    for (auto* s : { &fxGlobalMix.getSlider(),
+    for (auto* s : { &fxGlobalMix.getSlider(), &fxGlobalMorph.getSlider(),
                      &fxChorusMix.getSlider(), &fxChorusRate.getSlider(), &fxChorusDepth.getSlider(), &fxChorusDelay.getSlider(),
                      &fxChorusFeedback.getSlider(), &fxChorusStereo.getSlider(), &fxChorusHp.getSlider(),
                      &fxDelayMix.getSlider(), &fxDelayTime.getSlider(), &fxDelayFeedback.getSlider(),
@@ -3676,7 +3873,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                      &labVelocity.getSlider(), &labKeyWidth.getSlider(),
                      &labPitchBend.getSlider(), &labModWheel.getSlider(), &labAftertouch.getSlider() })
         refreshSliderText (*s);
-    for (auto* s : { &fxGlobalMix.getSlider(),
+    for (auto* s : { &fxGlobalMix.getSlider(), &fxGlobalMorph.getSlider(),
                      &fxChorusMix.getSlider(), &fxChorusRate.getSlider(), &fxChorusDepth.getSlider(), &fxChorusDelay.getSlider(),
                      &fxChorusFeedback.getSlider(), &fxChorusStereo.getSlider(), &fxChorusHp.getSlider(),
                      &fxDelayMix.getSlider(), &fxDelayTime.getSlider(), &fxDelayFeedback.getSlider(),
@@ -4758,9 +4955,11 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         fxOutMeter.setBounds (rk.removeFromTop (16).reduced (0, 1));
 
         auto dt = detail.reduced (8, 22);
-        auto globalRow = dt.removeFromTop (72);
-        const int gw = juce::jmax (88, (globalRow.getWidth() - gap2 * 3) / 4);
+        auto globalRow = dt.removeFromTop (64);
+        const int gw = juce::jmax (74, (globalRow.getWidth() - gap2 * 4) / 5);
         fxGlobalMix.setBounds (globalRow.removeFromLeft (gw));
+        globalRow.removeFromLeft (gap2);
+        fxGlobalMorph.setBounds (globalRow.removeFromLeft (gw));
         globalRow.removeFromLeft (gap2);
         fxGlobalOrder.setBounds (globalRow.removeFromLeft (gw));
         globalRow.removeFromLeft (gap2);
@@ -4768,7 +4967,13 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         globalRow.removeFromLeft (gap2);
         fxGlobalOversample.setBounds (globalRow.removeFromLeft (gw));
         dt.removeFromTop (4);
-        auto modeRow = dt.removeFromTop (26);
+        auto placementRow = dt.removeFromTop (44);
+        const int pw = juce::jmax (120, (placementRow.getWidth() - gap2) / 2);
+        fxGlobalDestroyPlacement.setBounds (placementRow.removeFromLeft (pw));
+        placementRow.removeFromLeft (gap2);
+        fxGlobalTonePlacement.setBounds (placementRow.removeFromLeft (pw));
+        dt.removeFromTop (4);
+        auto modeRow = dt.removeFromTop (24);
         const int modeGap = 6;
         const int modeW = juce::jmax (92, juce::jmin (138, (modeRow.getWidth() - modeGap) / 2));
         fxDetailBasicButton.setBounds (modeRow.removeFromLeft (modeW));
@@ -4776,7 +4981,7 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         fxDetailAdvancedButton.setBounds (modeRow.removeFromLeft (modeW));
         dt.removeFromTop (5);
 
-        auto orderRow = dt.removeFromTop (26);
+        auto orderRow = dt.removeFromTop (24);
         const int orderGap = 6;
         const int orderW = juce::jmax (70, juce::jmin (120, (orderRow.getWidth() - orderGap * 2) / 3));
         fxOrderUpButton.setBounds (orderRow.removeFromLeft (orderW));
@@ -4784,6 +4989,57 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         fxOrderDownButton.setBounds (orderRow.removeFromLeft (orderW));
         orderRow.removeFromLeft (orderGap);
         fxOrderResetButton.setBounds (orderRow.removeFromLeft (orderW));
+        dt.removeFromTop (5);
+
+        auto quickRow = dt.removeFromTop (24);
+        const int quickGap = 6;
+        const int quickW = juce::jmax (82, juce::jmin (130, (quickRow.getWidth() - quickGap * 2) / 3));
+        fxQuickSubtleButton.setBounds (quickRow.removeFromLeft (quickW));
+        quickRow.removeFromLeft (quickGap);
+        fxQuickWideButton.setBounds (quickRow.removeFromLeft (quickW));
+        quickRow.removeFromLeft (quickGap);
+        fxQuickHardButton.setBounds (quickRow.removeFromLeft (quickW));
+        dt.removeFromTop (5);
+
+        auto quickRow2 = dt.removeFromTop (24);
+        const int quickW2 = juce::jmax (120, juce::jmin (190, (quickRow2.getWidth() - quickGap) / 2));
+        fxQuickRandomButton.setBounds (quickRow2.removeFromLeft (quickW2));
+        quickRow2.removeFromLeft (quickGap);
+        fxQuickUndoButton.setBounds (quickRow2.removeFromLeft (quickW2));
+        dt.removeFromTop (5);
+
+        auto abRow = dt.removeFromTop (24);
+        const int abW = juce::jmax (88, juce::jmin (132, (abRow.getWidth() - quickGap * 3) / 4));
+        fxQuickStoreAButton.setBounds (abRow.removeFromLeft (abW));
+        abRow.removeFromLeft (quickGap);
+        fxQuickStoreBButton.setBounds (abRow.removeFromLeft (abW));
+        abRow.removeFromLeft (quickGap);
+        fxQuickRecallAButton.setBounds (abRow.removeFromLeft (abW));
+        abRow.removeFromLeft (quickGap);
+        fxQuickRecallBButton.setBounds (abRow.removeFromLeft (abW));
+        dt.removeFromTop (5);
+
+        auto morphRow = dt.removeFromTop (24);
+        const int morphGap = 6;
+        const int morphLabelW = 34;
+        const int morphAutoW = juce::jmax (56, juce::jmin (78, morphRow.getWidth() / 7));
+        const int morphButtonW = juce::jmax (58, juce::jmin (88, morphRow.getWidth() / 6));
+        const int morphSliderW = juce::jmax (72, morphRow.getWidth() - morphLabelW - morphAutoW - morphButtonW * 2 - morphGap * 4);
+        fxQuickMorphLabel.setBounds (morphRow.removeFromLeft (morphLabelW));
+        morphRow.removeFromLeft (morphGap);
+        fxQuickMorphSlider.setBounds (morphRow.removeFromLeft (morphSliderW));
+        morphRow.removeFromLeft (morphGap);
+        fxQuickMorphAuto.setBounds (morphRow.removeFromLeft (morphAutoW));
+        morphRow.removeFromLeft (morphGap);
+        fxQuickMorphApplyButton.setBounds (morphRow.removeFromLeft (morphButtonW));
+        morphRow.removeFromLeft (morphGap);
+        fxQuickSwapButton.setBounds (morphRow.removeFromLeft (morphButtonW));
+        dt.removeFromTop (5);
+
+        auto routeRow = dt.removeFromTop (36);
+        fxRouteMapTitle.setBounds (routeRow.removeFromTop (16));
+        routeRow.removeFromTop (2);
+        fxRouteMapBody.setBounds (routeRow);
         dt.removeFromTop (7);
 
         auto setModeButtonVisual = [] (juce::TextButton& b, bool active)
@@ -4800,16 +5056,20 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
             if (count <= 0)
                 return;
 
-            const int gapC = 7;
-            const int gapR = 7;
-            int gridCols = juce::jlimit (2, 6, area.getWidth() / 168);
-            gridCols = juce::jmin (gridCols, count);
+            const bool denseFx = (selectedFxDetailMode == fxAdvanced);
+            const int gapC = denseFx ? 5 : 7;
+            const int gapR = denseFx ? 5 : 7;
+            const int targetCellW = denseFx ? 138 : 170;
+            const int maxCols = denseFx ? 6 : 4;
+            int gridCols = juce::jlimit (1, maxCols, area.getWidth() / targetCellW);
+            gridCols = juce::jmin (juce::jmax (1, gridCols), count);
             int gridRows = (count + gridCols - 1) / gridCols;
+            const int minCellH = denseFx ? 52 : 64;
 
             for (;;)
             {
                 const int cellH = juce::jmax (1, (area.getHeight() - gapR * (gridRows - 1)) / gridRows);
-                if (cellH >= 66 || gridCols <= 1)
+                if (cellH >= minCellH || gridCols <= 1)
                     break;
                 --gridCols;
                 gridRows = (count + gridCols - 1) / gridCols;
@@ -4868,15 +5128,159 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
                 layoutFxControls (dt, visible);
         };
 
+        auto showDelayLayout = [&]
+        {
+            const bool adv = (selectedFxDetailMode == fxAdvanced);
+
+            // Make Delay easier to read: timing row + toggle lane, then div/filter and modulation rows.
+            auto area = dt;
+            const int rowGap = 6;
+
+            const int row1H = adv ? juce::jlimit (74, 96, area.getHeight() / 3)
+                                  : juce::jlimit (86, 124, area.getHeight() / 2);
+            auto row1 = area.removeFromTop (row1H);
+            const int toggleW = juce::jlimit (116, 170, row1.getWidth() / 4);
+            auto toggleLane = row1.removeFromRight (toggleW);
+            row1.removeFromRight (6);
+            layoutKnobGrid (row1, { &fxDelayMix, &fxDelayTime, &fxDelayFeedback });
+
+            const int toggleGap = 4;
+            const int toggleH = juce::jmax (20, (toggleLane.getHeight() - toggleGap) / 2);
+            fxDelaySync.setBounds (toggleLane.removeFromTop (toggleH).reduced (0, 2));
+            toggleLane.removeFromTop (toggleGap);
+            fxDelayPingPong.setBounds (toggleLane.removeFromTop (toggleH).reduced (0, 2));
+
+            if (! adv)
+                return;
+
+            area.removeFromTop (rowGap);
+            const int row2H = juce::jlimit (64, 86, area.getHeight() / 3);
+            auto row2 = area.removeFromTop (row2H);
+            const int cGap = 6;
+            const int cW = juce::jmax (80, (row2.getWidth() - cGap * 2) / 3);
+            fxDelayDivL.setBounds (row2.removeFromLeft (cW));
+            row2.removeFromLeft (cGap);
+            fxDelayDivR.setBounds (row2.removeFromLeft (cW));
+            row2.removeFromLeft (cGap);
+            fxDelayFilter.setBounds (row2);
+
+            area.removeFromTop (rowGap);
+            layoutKnobGrid (area, { &fxDelayModRate, &fxDelayModDepth, &fxDelayDuck });
+        };
+
+        auto showReverbLayout = [&]
+        {
+            const bool adv = (selectedFxDetailMode == fxAdvanced);
+            auto area = dt;
+            const int rowGap = 6;
+
+            const int row1H = adv ? juce::jlimit (72, 96, area.getHeight() / 3)
+                                  : juce::jlimit (84, 122, area.getHeight() / 2);
+            auto row1 = area.removeFromTop (row1H);
+            layoutKnobGrid (row1, { &fxReverbMix, &fxReverbSize, &fxReverbDecay, &fxReverbWidth });
+
+            if (! adv)
+                return;
+
+            area.removeFromTop (rowGap);
+            auto row2 = area.removeFromTop (juce::jlimit (64, 90, area.getHeight() / 2));
+            const int qualityW = juce::jlimit (112, 170, row2.getWidth() / 4);
+            auto qualityLane = row2.removeFromRight (qualityW);
+            row2.removeFromRight (6);
+            layoutKnobGrid (row2, { &fxReverbDamp, &fxReverbPreDelay, &fxReverbLowCut, &fxReverbHighCut });
+            fxReverbQuality.setBounds (qualityLane);
+        };
+
+        auto showDistLayout = [&]
+        {
+            const bool adv = (selectedFxDetailMode == fxAdvanced);
+            auto area = dt;
+            const int rowGap = 6;
+
+            const int row1H = adv ? juce::jlimit (72, 96, area.getHeight() / 2)
+                                  : juce::jlimit (86, 126, area.getHeight() * 2 / 3);
+            auto row1 = area.removeFromTop (row1H);
+            const int typeW = juce::jlimit (138, 220, row1.getWidth() / 3);
+            fxDistType.setBounds (row1.removeFromLeft (typeW));
+            row1.removeFromLeft (6);
+            layoutKnobGrid (row1, { &fxDistDrive, &fxDistTone, &fxDistMix });
+
+            if (! adv)
+                return;
+
+            area.removeFromTop (rowGap);
+            layoutKnobGrid (area, { &fxDistPostLp, &fxDistTrim });
+        };
+
+        auto showPhaserLayout = [&]
+        {
+            const bool adv = (selectedFxDetailMode == fxAdvanced);
+            auto area = dt;
+            const int rowGap = 6;
+
+            const int row1H = adv ? juce::jlimit (72, 96, area.getHeight() / 2)
+                                  : juce::jlimit (86, 126, area.getHeight() * 2 / 3);
+            auto row1 = area.removeFromTop (row1H);
+            layoutKnobGrid (row1, { &fxPhaserMix, &fxPhaserRate, &fxPhaserDepth, &fxPhaserFeedback });
+
+            if (! adv)
+                return;
+
+            area.removeFromTop (rowGap);
+            auto row2 = area;
+            const int stagesW = juce::jlimit (112, 170, row2.getWidth() / 4);
+            auto stagesLane = row2.removeFromRight (stagesW);
+            row2.removeFromRight (6);
+            layoutKnobGrid (row2, { &fxPhaserCentre, &fxPhaserStereo });
+            fxPhaserStages.setBounds (stagesLane);
+        };
+
+        auto showXtraLayout = [&]
+        {
+            const bool adv = (selectedFxDetailMode == fxAdvanced);
+            auto area = dt;
+            const int rowGap = 6;
+
+            const int row1H = adv ? juce::jlimit (76, 102, area.getHeight() / 2)
+                                  : juce::jlimit (92, 136, area.getHeight() * 2 / 3);
+            auto row1 = area.removeFromTop (row1H);
+            layoutKnobGrid (row1, { &fxXtraMix, &fxXtraFlanger, &fxXtraTremolo, &fxXtraAutopan, &fxXtraSaturator, &fxXtraClipper });
+
+            if (! adv)
+                return;
+
+            area.removeFromTop (rowGap);
+            layoutKnobGrid (area, { &fxXtraWidth, &fxXtraTilt, &fxXtraGate, &fxXtraLofi, &fxXtraDoubler });
+        };
+
         fxGlobalMix.setVisible (showFx);
+        fxGlobalMorph.setVisible (showFx);
         fxGlobalOrder.setVisible (showFx);
         fxGlobalRoute.setVisible (showFx);
         fxGlobalOversample.setVisible (showFx);
+        fxGlobalDestroyPlacement.setVisible (showFx);
+        fxGlobalTonePlacement.setVisible (showFx);
         fxDetailBasicButton.setVisible (showFx);
         fxDetailAdvancedButton.setVisible (showFx);
         fxOrderUpButton.setVisible (showFx);
         fxOrderDownButton.setVisible (showFx);
         fxOrderResetButton.setVisible (showFx);
+        fxQuickSubtleButton.setVisible (showFx);
+        fxQuickWideButton.setVisible (showFx);
+        fxQuickHardButton.setVisible (showFx);
+        fxQuickRandomButton.setVisible (showFx);
+        fxQuickUndoButton.setVisible (showFx);
+        fxQuickStoreAButton.setVisible (showFx);
+        fxQuickStoreBButton.setVisible (showFx);
+        fxQuickRecallAButton.setVisible (showFx);
+        fxQuickRecallBButton.setVisible (showFx);
+        fxQuickMorphLabel.setVisible (showFx);
+        fxQuickMorphSlider.setVisible (showFx);
+        fxQuickMorphAuto.setVisible (showFx);
+        fxQuickMorphApplyButton.setVisible (showFx);
+        fxQuickSwapButton.setVisible (showFx);
+        fxRouteMapTitle.setVisible (showFx);
+        fxRouteMapBody.setVisible (showFx);
 
         hideAllFxDetail();
         if (showFx)
@@ -4888,28 +5292,67 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
                                    { &fxChorusDelay, &fxChorusHp });
                     break;
                 case fxDelay:
-                    showLayoutFor ({ &fxDelayMix, &fxDelayTime, &fxDelayFeedback, &fxDelaySync, &fxDelayPingPong },
-                                   { &fxDelayDivL, &fxDelayDivR, &fxDelayFilter, &fxDelayModRate, &fxDelayModDepth, &fxDelayDuck });
+                    fxDelayMix.setVisible (showFx);
+                    fxDelayTime.setVisible (showFx);
+                    fxDelayFeedback.setVisible (showFx);
+                    fxDelaySync.setVisible (showFx);
+                    fxDelayPingPong.setVisible (showFx);
+                    fxDelayDivL.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxDelayDivR.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxDelayFilter.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxDelayModRate.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxDelayModDepth.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxDelayDuck.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    showDelayLayout();
                     break;
                 case fxReverb:
-                    showLayoutFor ({ &fxReverbMix, &fxReverbSize, &fxReverbDecay, &fxReverbWidth },
-                                   { &fxReverbDamp, &fxReverbPreDelay, &fxReverbLowCut, &fxReverbHighCut, &fxReverbQuality });
+                    fxReverbMix.setVisible (showFx);
+                    fxReverbSize.setVisible (showFx);
+                    fxReverbDecay.setVisible (showFx);
+                    fxReverbWidth.setVisible (showFx);
+                    fxReverbDamp.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxReverbPreDelay.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxReverbLowCut.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxReverbHighCut.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxReverbQuality.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    showReverbLayout();
                     break;
                 case fxDist:
-                    showLayoutFor ({ &fxDistType, &fxDistMix, &fxDistDrive, &fxDistTone },
-                                   { &fxDistPostLp, &fxDistTrim });
+                    fxDistType.setVisible (showFx);
+                    fxDistDrive.setVisible (showFx);
+                    fxDistTone.setVisible (showFx);
+                    fxDistMix.setVisible (showFx);
+                    fxDistPostLp.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxDistTrim.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    showDistLayout();
                     break;
                 case fxPhaser:
-                    showLayoutFor ({ &fxPhaserMix, &fxPhaserRate, &fxPhaserDepth, &fxPhaserFeedback },
-                                   { &fxPhaserCentre, &fxPhaserStages, &fxPhaserStereo });
+                    fxPhaserMix.setVisible (showFx);
+                    fxPhaserRate.setVisible (showFx);
+                    fxPhaserDepth.setVisible (showFx);
+                    fxPhaserFeedback.setVisible (showFx);
+                    fxPhaserCentre.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxPhaserStages.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxPhaserStereo.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    showPhaserLayout();
                     break;
                 case fxOctaver:
                     showLayoutFor ({ &fxOctMix, &fxOctSub, &fxOctBlend },
                                    { &fxOctTone, &fxOctSensitivity });
                     break;
                 case fxXtra:
-                    showLayoutFor ({ &fxXtraMix, &fxXtraFlanger, &fxXtraTremolo, &fxXtraAutopan, &fxXtraSaturator, &fxXtraClipper },
-                                   { &fxXtraWidth, &fxXtraTilt, &fxXtraGate, &fxXtraLofi, &fxXtraDoubler });
+                    fxXtraMix.setVisible (showFx);
+                    fxXtraFlanger.setVisible (showFx);
+                    fxXtraTremolo.setVisible (showFx);
+                    fxXtraAutopan.setVisible (showFx);
+                    fxXtraSaturator.setVisible (showFx);
+                    fxXtraClipper.setVisible (showFx);
+                    fxXtraWidth.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxXtraTilt.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxXtraGate.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxXtraLofi.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    fxXtraDoubler.setVisible (showFx && selectedFxDetailMode == fxAdvanced);
+                    showXtraLayout();
                     break;
             }
         }
@@ -5078,12 +5521,14 @@ void IndustrialEnergySynthAudioProcessorEditor::openToneEqWindow()
                                                        juce::DocumentWindow::closeButton);
         toneEqWindow->setLookAndFeel (&lnf);
         toneEqWindow->setResizable (true, true);
+        toneEqWindow->setAlwaysOnTop (true);
         toneEqWindow->setContentNonOwned (&toneEqWindowContent, false);
         toneEqWindow->centreWithSize (1060, 640);
     }
     else
     {
         toneEqWindow->setName (title);
+        toneEqWindow->setAlwaysOnTop (true);
     }
 
     toneEqWindow->setVisible (true);
@@ -5399,14 +5844,33 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     fxOctaverEnable.setVisible (showFx);
     fxXtraEnable.setVisible (showFx);
     fxGlobalMix.setVisible (showFx);
+    fxGlobalMorph.setVisible (showFx);
     fxGlobalOrder.setVisible (showFx);
     fxGlobalRoute.setVisible (showFx);
     fxGlobalOversample.setVisible (showFx);
+    fxGlobalDestroyPlacement.setVisible (showFx);
+    fxGlobalTonePlacement.setVisible (showFx);
+    fxRouteMapTitle.setVisible (showFx);
+    fxRouteMapBody.setVisible (showFx);
     fxDetailBasicButton.setVisible (showFx);
     fxDetailAdvancedButton.setVisible (showFx);
     fxOrderUpButton.setVisible (showFx);
     fxOrderDownButton.setVisible (showFx);
     fxOrderResetButton.setVisible (showFx);
+    fxQuickSubtleButton.setVisible (showFx);
+    fxQuickWideButton.setVisible (showFx);
+    fxQuickHardButton.setVisible (showFx);
+    fxQuickRandomButton.setVisible (showFx);
+    fxQuickUndoButton.setVisible (showFx);
+    fxQuickStoreAButton.setVisible (showFx);
+    fxQuickStoreBButton.setVisible (showFx);
+    fxQuickRecallAButton.setVisible (showFx);
+    fxQuickRecallBButton.setVisible (showFx);
+    fxQuickMorphLabel.setVisible (showFx);
+    fxQuickMorphSlider.setVisible (showFx);
+    fxQuickMorphAuto.setVisible (showFx);
+    fxQuickMorphApplyButton.setVisible (showFx);
+    fxQuickSwapButton.setVisible (showFx);
     fxChorusMix.setVisible (showFx && selectedFxBlock == fxChorus);
     fxChorusRate.setVisible (showFx && selectedFxBlock == fxChorus);
     fxChorusDepth.setVisible (showFx && selectedFxBlock == fxChorus);
@@ -5523,6 +5987,27 @@ int IndustrialEnergySynthAudioProcessorEditor::getEngineBlockForFxUiBlock (int b
     return -1;
 }
 
+int IndustrialEnergySynthAudioProcessorEditor::getEngineBlockForRackComponent (const juce::Component* c) const noexcept
+{
+    if (c == nullptr)
+        return -1;
+
+    const juce::Component* cc = c;
+    if (cc != &fxBlockChorus && cc != &fxBlockDelay && cc != &fxBlockReverb
+        && cc != &fxBlockDist && cc != &fxBlockPhaser && cc != &fxBlockOctaver && cc != &fxBlockXtra)
+    {
+        cc = c->getParentComponent();
+    }
+
+    if (cc == &fxBlockChorus)  return (int) ies::dsp::FxChain::chorus;
+    if (cc == &fxBlockDelay)   return (int) ies::dsp::FxChain::delay;
+    if (cc == &fxBlockReverb)  return (int) ies::dsp::FxChain::reverb;
+    if (cc == &fxBlockDist)    return (int) ies::dsp::FxChain::dist;
+    if (cc == &fxBlockPhaser)  return (int) ies::dsp::FxChain::phaser;
+    if (cc == &fxBlockOctaver) return (int) ies::dsp::FxChain::octaver;
+    return -1; // Xtra is outside the ordered FXChain.
+}
+
 int IndustrialEnergySynthAudioProcessorEditor::getCustomOrderPositionForEngineBlock (int engineBlock) const noexcept
 {
     for (int i = 0; i < (int) fxCustomOrderUi.size(); ++i)
@@ -5532,22 +6017,18 @@ int IndustrialEnergySynthAudioProcessorEditor::getCustomOrderPositionForEngineBl
     return -1;
 }
 
-void IndustrialEnergySynthAudioProcessorEditor::moveSelectedFxBlockInCustomOrder (int delta)
+void IndustrialEnergySynthAudioProcessorEditor::moveEngineBlockToCustomOrderPosition (int engineBlock, int targetPos)
 {
-    if (delta == 0)
-        return;
     if (fxGlobalOrder.getCombo().getSelectedItemIndex() != (int) params::fx::global::orderCustom)
         return;
-
-    const int engineBlock = getEngineBlockForFxUiBlock ((int) selectedFxBlock);
-    if (engineBlock < 0)
+    if (engineBlock < 0 || engineBlock >= (int) ies::dsp::FxChain::numBlocks)
         return;
 
     const int pos = getCustomOrderPositionForEngineBlock (engineBlock);
     if (pos < 0)
         return;
 
-    const int target = juce::jlimit (0, (int) fxCustomOrderUi.size() - 1, pos + delta);
+    const int target = juce::jlimit (0, (int) fxCustomOrderUi.size() - 1, targetPos);
     if (target == pos)
         return;
 
@@ -5568,6 +6049,135 @@ void IndustrialEnergySynthAudioProcessorEditor::moveSelectedFxBlockInCustomOrder
     refreshLabels();
     updateEnabledStates();
     resized();
+
+    const auto isRu = isRussian();
+    const int movedPos = getCustomOrderPositionForEngineBlock (engineBlock);
+    if (movedPos >= 0)
+    {
+        statusLabel.setText (isRu
+                                 ? (juce::String::fromUTF8 (u8"FX порядок обновлён: позиция ") + juce::String (movedPos + 1))
+                                 : ("FX order updated: position " + juce::String (movedPos + 1)),
+                             juce::dontSendNotification);
+    }
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::moveSelectedFxBlockInCustomOrder (int delta)
+{
+    if (delta == 0)
+        return;
+
+    const int engineBlock = getEngineBlockForFxUiBlock ((int) selectedFxBlock);
+    if (engineBlock < 0)
+        return;
+
+    const int pos = getCustomOrderPositionForEngineBlock (engineBlock);
+    if (pos < 0)
+        return;
+
+    moveEngineBlockToCustomOrderPosition (engineBlock, pos + delta);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::refreshFxRouteMap()
+{
+    const auto isRu = isRussian();
+    const int orderMode = fxGlobalOrder.getCombo().getSelectedItemIndex();
+    const int routeMode = fxGlobalRoute.getCombo().getSelectedItemIndex();
+    const int destroyPlacementMode = fxGlobalDestroyPlacement.getCombo().getSelectedItemIndex();
+    const int tonePlacementMode = fxGlobalTonePlacement.getCombo().getSelectedItemIndex();
+    const int shaperPlacementMode = shaperPlacement.getCombo().getSelectedItemIndex();
+
+    std::array<int, (size_t) ies::dsp::FxChain::numBlocks> effectiveOrder {};
+    if (orderMode == (int) params::fx::global::orderFixedA)
+    {
+        effectiveOrder = { {
+            (int) ies::dsp::FxChain::chorus,
+            (int) ies::dsp::FxChain::phaser,
+            (int) ies::dsp::FxChain::dist,
+            (int) ies::dsp::FxChain::delay,
+            (int) ies::dsp::FxChain::reverb,
+            (int) ies::dsp::FxChain::octaver
+        } };
+    }
+    else if (orderMode == (int) params::fx::global::orderFixedB)
+    {
+        effectiveOrder = { {
+            (int) ies::dsp::FxChain::octaver,
+            (int) ies::dsp::FxChain::dist,
+            (int) ies::dsp::FxChain::chorus,
+            (int) ies::dsp::FxChain::phaser,
+            (int) ies::dsp::FxChain::delay,
+            (int) ies::dsp::FxChain::reverb
+        } };
+    }
+    else
+    {
+        effectiveOrder = fxCustomOrderUi;
+    }
+
+    auto blockName = [isRu] (int b) -> juce::String
+    {
+        switch ((ies::dsp::FxChain::Block) b)
+        {
+            case ies::dsp::FxChain::chorus:  return isRu ? juce::String::fromUTF8 (u8"Хорус") : juce::String ("Chorus");
+            case ies::dsp::FxChain::delay:   return isRu ? juce::String::fromUTF8 (u8"Дилей") : juce::String ("Delay");
+            case ies::dsp::FxChain::reverb:  return isRu ? juce::String::fromUTF8 (u8"Реверб") : juce::String ("Reverb");
+            case ies::dsp::FxChain::dist:    return isRu ? juce::String::fromUTF8 (u8"Дист") : juce::String ("Dist");
+            case ies::dsp::FxChain::phaser:  return isRu ? juce::String::fromUTF8 (u8"Фэйзер") : juce::String ("Phaser");
+            case ies::dsp::FxChain::octaver: return isRu ? juce::String::fromUTF8 (u8"Октавер") : juce::String ("Octaver");
+            case ies::dsp::FxChain::numBlocks: break;
+        }
+        return "FX";
+    };
+
+    juce::StringArray chainNames;
+    for (int i = 0; i < (int) effectiveOrder.size(); ++i)
+        chainNames.add (juce::String (i + 1) + "." + blockName (effectiveOrder[(size_t) i]));
+
+    juce::String orderTxt = (orderMode == (int) params::fx::global::orderFixedA)
+                                ? (isRu ? juce::String::fromUTF8 (u8"Порядок A") : juce::String ("Order A"))
+                            : (orderMode == (int) params::fx::global::orderFixedB)
+                                ? (isRu ? juce::String::fromUTF8 (u8"Порядок B") : juce::String ("Order B"))
+                                : (isRu ? juce::String::fromUTF8 (u8"Пользовательский") : juce::String ("Custom"));
+
+    juce::String routeTxt = (routeMode == (int) params::fx::global::routeParallel)
+                                ? (isRu ? juce::String::fromUTF8 (u8"Параллельно") : juce::String ("Parallel"))
+                                : (isRu ? juce::String::fromUTF8 (u8"Последовательно") : juce::String ("Serial"));
+    juce::String destroyTxt = (destroyPlacementMode == (int) params::fx::global::postFilter)
+                                  ? (isRu ? juce::String::fromUTF8 (u8"Destroy: после Filter") : juce::String ("Destroy: post Filter"))
+                                  : (isRu ? juce::String::fromUTF8 (u8"Destroy: до Filter") : juce::String ("Destroy: pre Filter"));
+    juce::String toneTxt = (tonePlacementMode == (int) params::fx::global::preFilter)
+                               ? (isRu ? juce::String::fromUTF8 (u8"Tone: до Filter") : juce::String ("Tone: pre Filter"))
+                               : (isRu ? juce::String::fromUTF8 (u8"Tone: после Filter") : juce::String ("Tone: post Filter"));
+    juce::String shaperTxt = (shaperPlacementMode == (int) params::shaper::postDestroy)
+                                 ? (isRu ? juce::String::fromUTF8 (u8"Shaper: после Destroy") : juce::String ("Shaper: post Destroy"))
+                                 : (isRu ? juce::String::fromUTF8 (u8"Shaper: до Destroy") : juce::String ("Shaper: pre Destroy"));
+
+    fxRouteMapTitle.setText ((isRu ? juce::String::fromUTF8 (u8"Маршрут FX") : juce::String ("FX Route")) + "  •  " + orderTxt + " / " + routeTxt,
+                             juce::dontSendNotification);
+
+    juce::String body;
+    body << (isRu ? juce::String::fromUTF8 (u8"Цепь: ") : juce::String ("Chain: "));
+    body << chainNames.joinIntoString ("  >  ");
+    body << "\n";
+    if (routeMode == (int) params::fx::global::routeParallel)
+        body << (isRu ? juce::String::fromUTF8 (u8"Поток: IN -> (FX Chain || Xtra) -> Blend -> OUT")
+                      : juce::String ("Flow: IN -> (FX Chain || Xtra) -> Blend -> OUT"));
+    else
+        body << (isRu ? juce::String::fromUTF8 (u8"Поток: IN -> FX Chain -> Xtra -> OUT")
+                      : juce::String ("Flow: IN -> FX Chain -> Xtra -> OUT"));
+    body << "\n";
+    body << destroyTxt << "  |  " << toneTxt << "  |  " << shaperTxt;
+
+    if (fxRackDragActive && fxRackDragEngineBlock >= 0)
+    {
+        const auto dragName = blockName (fxRackDragEngineBlock);
+        body << "\n";
+        body << (isRu ? juce::String::fromUTF8 (u8"Перетаскивание: ")
+                      : juce::String ("Drag: "));
+        body << dragName << " -> " << juce::String (fxRackDragTargetPos + 1);
+    }
+
+    fxRouteMapBody.setText (body, juce::dontSendNotification);
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::loadMacroNamesFromState()
@@ -5956,6 +6566,7 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     fxBlockOctaver.setButtonText (withCustomOrderPrefix ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Октавер") : juce::String ("Octaver"), fxOctaver));
     fxBlockXtra.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Экстра") : juce::String ("Xtra"));
     fxGlobalMix.setLabelText ("FX Mix");
+    fxGlobalMorph.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"FX Морф") : juce::String ("FX Morph"));
     fxGlobalOrder.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Порядок") : juce::String ("Order"));
     fxGlobalOrder.getCombo().changeItemText (1, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Порядок A") : juce::String ("Order A"));
     fxGlobalOrder.getCombo().changeItemText (2, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Порядок B") : juce::String ("Order B"));
@@ -5964,11 +6575,30 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     fxGlobalRoute.getCombo().changeItemText (1, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Последовательно") : juce::String ("Serial"));
     fxGlobalRoute.getCombo().changeItemText (2, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Параллельно") : juce::String ("Parallel"));
     fxGlobalOversample.setLabelText ("OS");
+    fxGlobalDestroyPlacement.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Destroy позиция") : juce::String ("Destroy Pos"));
+    fxGlobalDestroyPlacement.getCombo().changeItemText (1, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"До фильтра") : juce::String ("Pre Filter"));
+    fxGlobalDestroyPlacement.getCombo().changeItemText (2, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"После фильтра") : juce::String ("Post Filter"));
+    fxGlobalTonePlacement.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Tone позиция") : juce::String ("Tone Pos"));
+    fxGlobalTonePlacement.getCombo().changeItemText (1, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"До фильтра") : juce::String ("Pre Filter"));
+    fxGlobalTonePlacement.getCombo().changeItemText (2, (langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"После фильтра") : juce::String ("Post Filter"));
     fxDetailBasicButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Базово") : juce::String ("Basic"));
     fxDetailAdvancedButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Расшир.") : juce::String ("Advanced"));
     fxOrderUpButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Выше") : juce::String ("Up"));
     fxOrderDownButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Ниже") : juce::String ("Down"));
     fxOrderResetButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Сброс") : juce::String ("Reset"));
+    fxQuickSubtleButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Мягко") : juce::String ("Subtle"));
+    fxQuickWideButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Широко") : juce::String ("Wide"));
+    fxQuickHardButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Жёстко") : juce::String ("Hard"));
+    fxQuickRandomButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Рандом (safe)") : juce::String ("Random Safe"));
+    fxQuickUndoButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Откат") : juce::String ("Undo"));
+    fxQuickStoreAButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Сохранить A") : juce::String ("Store A"));
+    fxQuickStoreBButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Сохранить B") : juce::String ("Store B"));
+    fxQuickRecallAButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Загрузить A") : juce::String ("Recall A"));
+    fxQuickRecallBButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Загрузить B") : juce::String ("Recall B"));
+    fxQuickMorphLabel.setText ("A/B", juce::dontSendNotification);
+    fxQuickMorphAuto.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Авто") : juce::String ("Auto"));
+    fxQuickMorphApplyButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Применить") : juce::String ("Apply"));
+    fxQuickSwapButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Обмен A/B") : juce::String ("Swap A/B"));
     fxChorusMix.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Микс") : juce::String ("Mix"));
     fxChorusRate.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Скорость") : juce::String ("Rate"));
     fxChorusDepth.setLabelText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Глубина") : juce::String ("Depth"));
@@ -6029,6 +6659,7 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     fxDelayPingPong.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Пинг-понг") : juce::String ("PingPong"));
     for (auto* b : { &fxChorusEnable, &fxDelayEnable, &fxReverbEnable, &fxDistEnable, &fxPhaserEnable, &fxOctaverEnable, &fxXtraEnable })
         b->setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Вкл") : juce::String ("On"));
+    refreshFxRouteMap();
     modHeaderSlot.setText (ies::ui::tr (ies::ui::Key::modSlot, langIdx), juce::dontSendNotification);
     modHeaderSrc.setText (ies::ui::tr (ies::ui::Key::modSrc, langIdx), juce::dontSendNotification);
     modHeaderDst.setText (ies::ui::tr (ies::ui::Key::modDst, langIdx), juce::dontSendNotification);
@@ -6097,6 +6728,7 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
         modSlotDst[(size_t) i].changeItemText (39, "FX Xtra LoFi");
         modSlotDst[(size_t) i].changeItemText (40, "FX Xtra Doubler");
         modSlotDst[(size_t) i].changeItemText (41, "FX Xtra Mix");
+        modSlotDst[(size_t) i].changeItemText (42, "FX Global Morph");
     }
 
     refreshMacroNames();
@@ -6432,6 +7064,24 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
         fxGlobalOversample.getCombo().setTooltip (tip);
         fxGlobalOversample.getLabel().setTooltip (tip);
     }
+    {
+        const auto tip = T ("Global macro for the whole FX stack. Adds movement/space/aggression in one control.",
+                            u8"Глобальный макро-контрол для всего FX-стека. Добавляет движение/пространство/агрессию одной ручкой.");
+        fxGlobalMorph.getSlider().setTooltip (tip);
+        fxGlobalMorph.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Place Destroy before or after Filter/Tone stage.",
+                            u8"Положение Destroy до или после этапа Filter/Tone.");
+        fxGlobalDestroyPlacement.getCombo().setTooltip (tip);
+        fxGlobalDestroyPlacement.getLabel().setTooltip (tip);
+    }
+    {
+        const auto tip = T ("Place Tone EQ before or after Filter stage.",
+                            u8"Положение Tone EQ до или после этапа Filter.");
+        fxGlobalTonePlacement.getCombo().setTooltip (tip);
+        fxGlobalTonePlacement.getLabel().setTooltip (tip);
+    }
     fxDetailBasicButton.setTooltip (T ("Compact essential controls for the selected FX block.",
                                        u8"Компактный набор основных контролов выбранного FX-блока."));
     fxDetailAdvancedButton.setTooltip (T ("Show full parameter set for the selected FX block.",
@@ -6442,22 +7092,57 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
                                      u8"Сдвинуть выбранный FX-блок ниже в пользовательском порядке."));
     fxOrderResetButton.setTooltip (T ("Reset Custom order to default: Chorus > Delay > Reverb > Dist > Phaser > Octaver.",
                                       u8"Сбросить пользовательский порядок к умолчанию: Chorus > Delay > Reverb > Dist > Phaser > Octaver."));
+    fxQuickSubtleButton.setTooltip (T ("Apply quick 'Subtle' preset for the selected FX block (intent-aware).",
+                                       u8"Применить быстрый пресет «Мягко» для выбранного FX-блока (с учётом Intent)."));
+    fxQuickWideButton.setTooltip (T ("Apply quick 'Wide' preset for the selected FX block (intent-aware).",
+                                     u8"Применить быстрый пресет «Широко» для выбранного FX-блока (с учётом Intent)."));
+    fxQuickHardButton.setTooltip (T ("Apply quick 'Hard' preset for the selected FX block (intent-aware).",
+                                     u8"Применить быстрый пресет «Жёстко» для выбранного FX-блока (с учётом Intent)."));
+    fxQuickRandomButton.setTooltip (T ("Apply safe-random variation to the selected FX block (intent-aware).",
+                                       u8"Применить безопасную рандом-вариацию для выбранного FX-блока (с учётом Intent)."));
+    fxQuickUndoButton.setTooltip (T ("Undo last FX quick action/random (up to 5 steps).",
+                                     u8"Откатить последнее быстрое FX-действие/рандом (до 5 шагов)."));
+    fxQuickStoreAButton.setTooltip (T ("Store current selected FX block state into snapshot A.",
+                                       u8"Сохранить текущее состояние выбранного FX-блока в снимок A."));
+    fxQuickStoreBButton.setTooltip (T ("Store current selected FX block state into snapshot B.",
+                                       u8"Сохранить текущее состояние выбранного FX-блока в снимок B."));
+    fxQuickRecallAButton.setTooltip (T ("Recall snapshot A for the selected FX block.",
+                                        u8"Загрузить снимок A для выбранного FX-блока."));
+    fxQuickRecallBButton.setTooltip (T ("Recall snapshot B for the selected FX block.",
+                                        u8"Загрузить снимок B для выбранного FX-блока."));
+    fxQuickMorphSlider.setTooltip (T ("A/B morph amount for selected FX block. 0% = A, 100% = B.",
+                                      u8"A/B морф для выбранного FX-блока. 0% = A, 100% = B."));
+    fxQuickMorphLabel.setTooltip (fxQuickMorphSlider.getTooltip());
+    fxQuickMorphAuto.setTooltip (T ("Auto-apply A/B morph while moving the slider.",
+                                    u8"Авто-применение A/B морфа при движении слайдера."));
+    fxQuickMorphApplyButton.setTooltip (T ("Apply interpolated A/B snapshot state to selected FX block.",
+                                           u8"Применить интерполированное состояние между снимками A/B для выбранного FX-блока."));
+    fxQuickSwapButton.setTooltip (T ("Swap snapshot A and B for the selected FX block.",
+                                     u8"Поменять местами снимки A и B для выбранного FX-блока."));
+    fxRouteMapTitle.setTooltip (T ("Routing map for current FX order, route mode and placement (Destroy/Tone/Shaper).",
+                                   u8"Схема маршрута для текущего порядка FX, режима роутинга и placement (Destroy/Tone/Shaper)."));
+    fxRouteMapBody.setTooltip (fxRouteMapTitle.getTooltip());
     {
         const auto tip = T ("Enable/disable this FX block.",
                             u8"Включение/выключение выбранного FX-блока.");
         for (auto* b : { &fxChorusEnable, &fxDelayEnable, &fxReverbEnable, &fxDistEnable, &fxPhaserEnable, &fxOctaverEnable, &fxXtraEnable })
             b->setTooltip (tip);
     }
-    fxBlockChorus.setTooltip (T ("Select Chorus block controls.", u8"Показать параметры блока Chorus."));
-    fxBlockDelay.setTooltip (T ("Select Delay block controls.", u8"Показать параметры блока Delay."));
-    fxBlockReverb.setTooltip (T ("Select Reverb block controls.", u8"Показать параметры блока Reverb."));
-    fxBlockDist.setTooltip (T ("Select Dist block controls.", u8"Показать параметры блока Dist."));
-    fxBlockPhaser.setTooltip (T ("Select Phaser block controls.", u8"Показать параметры блока Phaser."));
-    fxBlockOctaver.setTooltip (T ("Select Octaver block controls.", u8"Показать параметры блока Octaver."));
+    fxBlockChorus.setTooltip (T ("Select Chorus block controls. In Custom order mode: drag to reorder in chain.",
+                                 u8"Показать параметры блока Chorus. В режиме Польз. порядка: перетаскивай для перестановки в цепи."));
+    fxBlockDelay.setTooltip (T ("Select Delay block controls. In Custom order mode: drag to reorder in chain.",
+                                u8"Показать параметры блока Delay. В режиме Польз. порядка: перетаскивай для перестановки в цепи."));
+    fxBlockReverb.setTooltip (T ("Select Reverb block controls. In Custom order mode: drag to reorder in chain.",
+                                 u8"Показать параметры блока Reverb. В режиме Польз. порядка: перетаскивай для перестановки в цепи."));
+    fxBlockDist.setTooltip (T ("Select Dist block controls. In Custom order mode: drag to reorder in chain.",
+                               u8"Показать параметры блока Dist. В режиме Польз. порядка: перетаскивай для перестановки в цепи."));
+    fxBlockPhaser.setTooltip (T ("Select Phaser block controls. In Custom order mode: drag to reorder in chain.",
+                                 u8"Показать параметры блока Phaser. В режиме Польз. порядка: перетаскивай для перестановки в цепи."));
+    fxBlockOctaver.setTooltip (T ("Select Octaver block controls. In Custom order mode: drag to reorder in chain.",
+                                  u8"Показать параметры блока Octaver. В режиме Польз. порядка: перетаскивай для перестановки в цепи."));
     fxBlockXtra.setTooltip (T ("Select Xtra block controls (Flanger/Tremolo/AutoPan/Saturator/Clipper/Width/Tilt/Gate/LoFi/Doubler).",
                                u8"Показать параметры блока Xtra (Flanger/Tremolo/AutoPan/Saturator/Clipper/Width/Tilt/Gate/LoFi/Doubler)."));
-    fxOutMeter.setTooltip (T ("FX output peak meter.", u8"Пиковый индикатор выхода FX."));
-    fxOutLabel.setTooltip (fxOutMeter.getTooltip());
+    fxOutLabel.setTooltip (T ("FX output peak meter.", u8"Пиковый индикатор выхода FX."));
     {
         const auto tip = T ("Amount of Flanger effect in Xtra block.", u8"Количество эффекта Flanger в блоке Xtra.");
         fxXtraFlanger.getSlider().setTooltip (tip);
@@ -6719,6 +7404,16 @@ void IndustrialEnergySynthAudioProcessorEditor::updateEnabledStates()
         }
     }
     fxOrderResetButton.setEnabled (isCustomOrder && ! isDefaultOrder);
+    fxQuickUndoButton.setEnabled (! fxQuickUndoHistory.empty());
+    const auto fxIdx = (size_t) juce::jlimit (0, 6, (int) selectedFxBlock);
+    const bool hasA = fxQuickSnapshotAValid[fxIdx];
+    const bool hasB = fxQuickSnapshotBValid[fxIdx];
+    fxQuickRecallAButton.setEnabled (hasA);
+    fxQuickRecallBButton.setEnabled (hasB);
+    fxQuickMorphAuto.setEnabled (hasA && hasB);
+    fxQuickMorphSlider.setEnabled (hasA && hasB);
+    fxQuickMorphApplyButton.setEnabled (hasA && hasB && ! fxQuickMorphAuto.getToggleState());
+    fxQuickSwapButton.setEnabled (hasA || hasB);
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::sendLabKeyboardAllNotesOff (bool resetControllers)
@@ -7315,6 +8010,36 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
 {
     updateEnabledStates();
 
+    if (fxQuickGlowCount > 0)
+    {
+        fxQuickGlowAmount = juce::jmax (0.0f, fxQuickGlowAmount - 0.10f);
+
+        for (int i = 0; i < fxQuickGlowCount; ++i)
+        {
+            if (auto* s = fxQuickGlowTargets[(size_t) i])
+            {
+                s->getProperties().set ("intentGlow", (double) fxQuickGlowAmount);
+                s->repaint();
+            }
+        }
+
+        if (fxQuickGlowAmount <= 0.001f)
+        {
+            for (int i = 0; i < fxQuickGlowCount; ++i)
+            {
+                if (auto* s = fxQuickGlowTargets[(size_t) i])
+                {
+                    s->getProperties().set ("intentGlow", 0.0);
+                    s->repaint();
+                }
+            }
+
+            fxQuickGlowCount = 0;
+            fxQuickGlowAmount = 0.0f;
+            fxQuickGlowTargets.fill (nullptr);
+        }
+    }
+
     outMeter.pushLevelLinear (audioProcessor.getUiOutputPeak());
     for (int i = 0; i < (int) fxPreMeters.size(); ++i)
     {
@@ -7825,6 +8550,7 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
 
         for (auto* k : { &osc1Level, &osc2Level, &osc3Level, &filterCutoff, &filterReso,
                          &foldAmount, &clipAmount, &modAmount, &crushMix, &shaperDrive, &shaperMix,
+                         &fxGlobalMorph,
                          &fxChorusRate, &fxChorusDepth, &fxChorusMix,
                          &fxDelayTime, &fxDelayFeedback, &fxDelayMix,
                          &fxReverbSize, &fxReverbDamp, &fxReverbMix,
@@ -7850,7 +8576,13 @@ void IndustrialEnergySynthAudioProcessorEditor::resetAllParamsKeepLanguage()
         param->endChangeGesture();
     }
 
-    fxCustomOrderUi = { { 0, 1, 2, 3, 4, 5 } };
+    fxQuickUndoHistory.clear();
+    for (auto& s : fxQuickSnapshotAByBlock) s.clear();
+    for (auto& s : fxQuickSnapshotBByBlock) s.clear();
+    fxQuickSnapshotAValid.fill (false);
+    fxQuickSnapshotBValid.fill (false);
+
+    fxCustomOrderUi = makeDefaultFxOrderUi();
     storeFxCustomOrderToState();
     refreshLabels();
     updateEnabledStates();
@@ -7958,6 +8690,11 @@ void IndustrialEnergySynthAudioProcessorEditor::loadPresetByComboSelection()
     loadLabChordFromState();
     loadFxCustomOrderFromProcessor();
     storeFxCustomOrderToState();
+    fxQuickUndoHistory.clear();
+    for (auto& s : fxQuickSnapshotAByBlock) s.clear();
+    for (auto& s : fxQuickSnapshotBByBlock) s.clear();
+    fxQuickSnapshotAValid.fill (false);
+    fxQuickSnapshotBValid.fill (false);
     refreshLabels();
     refreshTooltips();
     updateEnabledStates();
@@ -7976,6 +8713,1102 @@ void IndustrialEnergySynthAudioProcessorEditor::setParamValue (const char* param
     rp->beginChangeGesture();
     rp->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, norm));
     rp->endChangeGesture();
+}
+
+float IndustrialEnergySynthAudioProcessorEditor::getParamActualValue (const char* paramId) const
+{
+    auto* p = audioProcessor.getAPVTS().getParameter (paramId);
+    auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p);
+    if (rp == nullptr)
+        return 0.0f;
+
+    return rp->convertFrom0to1 (rp->getValue());
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::appendCurrentFxBlockSnapshot (std::vector<std::pair<const char*, float>>& snapshot) const
+{
+    const auto add = [this, &snapshot] (const char* id)
+    {
+        snapshot.emplace_back (id, getParamActualValue (id));
+    };
+
+    switch (selectedFxBlock)
+    {
+        case fxChorus:
+            add (params::fx::chorus::enable);
+            add (params::fx::chorus::mix);
+            add (params::fx::chorus::rateHz);
+            add (params::fx::chorus::depthMs);
+            add (params::fx::chorus::delayMs);
+            add (params::fx::chorus::feedback);
+            add (params::fx::chorus::stereo);
+            add (params::fx::chorus::hpHz);
+            break;
+        case fxDelay:
+            add (params::fx::delay::enable);
+            add (params::fx::delay::mix);
+            add (params::fx::delay::sync);
+            add (params::fx::delay::divL);
+            add (params::fx::delay::divR);
+            add (params::fx::delay::timeMs);
+            add (params::fx::delay::feedback);
+            add (params::fx::delay::filterHz);
+            add (params::fx::delay::modRate);
+            add (params::fx::delay::modDepth);
+            add (params::fx::delay::pingpong);
+            add (params::fx::delay::duck);
+            break;
+        case fxReverb:
+            add (params::fx::reverb::enable);
+            add (params::fx::reverb::mix);
+            add (params::fx::reverb::size);
+            add (params::fx::reverb::decay);
+            add (params::fx::reverb::damp);
+            add (params::fx::reverb::preDelayMs);
+            add (params::fx::reverb::width);
+            add (params::fx::reverb::lowCutHz);
+            add (params::fx::reverb::highCutHz);
+            add (params::fx::reverb::quality);
+            break;
+        case fxDist:
+            add (params::fx::dist::enable);
+            add (params::fx::dist::mix);
+            add (params::fx::dist::type);
+            add (params::fx::dist::driveDb);
+            add (params::fx::dist::tone);
+            add (params::fx::dist::postLPHz);
+            add (params::fx::dist::outputTrimDb);
+            break;
+        case fxPhaser:
+            add (params::fx::phaser::enable);
+            add (params::fx::phaser::mix);
+            add (params::fx::phaser::rateHz);
+            add (params::fx::phaser::depth);
+            add (params::fx::phaser::centreHz);
+            add (params::fx::phaser::feedback);
+            add (params::fx::phaser::stages);
+            add (params::fx::phaser::stereo);
+            break;
+        case fxOctaver:
+            add (params::fx::octaver::enable);
+            add (params::fx::octaver::mix);
+            add (params::fx::octaver::subLevel);
+            add (params::fx::octaver::blend);
+            add (params::fx::octaver::sensitivity);
+            add (params::fx::octaver::tone);
+            break;
+        case fxXtra:
+            add (params::fx::xtra::enable);
+            add (params::fx::xtra::mix);
+            add (params::fx::xtra::flangerAmount);
+            add (params::fx::xtra::tremoloAmount);
+            add (params::fx::xtra::autopanAmount);
+            add (params::fx::xtra::saturatorAmount);
+            add (params::fx::xtra::clipperAmount);
+            add (params::fx::xtra::widthAmount);
+            add (params::fx::xtra::tiltAmount);
+            add (params::fx::xtra::gateAmount);
+            add (params::fx::xtra::lofiAmount);
+            add (params::fx::xtra::doublerAmount);
+            break;
+    }
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::startFxQuickGlowForCurrentBlock()
+{
+    std::array<juce::Slider*, 16> touched {};
+    int touchedCount = 0;
+
+    const auto mark = [&] (juce::Slider& s)
+    {
+        for (int i = 0; i < touchedCount; ++i)
+            if (touched[(size_t) i] == &s)
+                return;
+        if (touchedCount < (int) touched.size())
+            touched[(size_t) touchedCount++] = &s;
+    };
+
+    switch (selectedFxBlock)
+    {
+        case fxChorus:
+            mark (fxChorusMix.getSlider());
+            mark (fxChorusRate.getSlider());
+            mark (fxChorusDepth.getSlider());
+            mark (fxChorusDelay.getSlider());
+            mark (fxChorusFeedback.getSlider());
+            mark (fxChorusStereo.getSlider());
+            mark (fxChorusHp.getSlider());
+            break;
+        case fxDelay:
+            mark (fxDelayMix.getSlider());
+            mark (fxDelayTime.getSlider());
+            mark (fxDelayFeedback.getSlider());
+            mark (fxDelayFilter.getSlider());
+            mark (fxDelayModRate.getSlider());
+            mark (fxDelayModDepth.getSlider());
+            mark (fxDelayDuck.getSlider());
+            break;
+        case fxReverb:
+            mark (fxReverbMix.getSlider());
+            mark (fxReverbSize.getSlider());
+            mark (fxReverbDecay.getSlider());
+            mark (fxReverbDamp.getSlider());
+            mark (fxReverbPreDelay.getSlider());
+            mark (fxReverbWidth.getSlider());
+            mark (fxReverbLowCut.getSlider());
+            mark (fxReverbHighCut.getSlider());
+            break;
+        case fxDist:
+            mark (fxDistMix.getSlider());
+            mark (fxDistDrive.getSlider());
+            mark (fxDistTone.getSlider());
+            mark (fxDistPostLp.getSlider());
+            mark (fxDistTrim.getSlider());
+            break;
+        case fxPhaser:
+            mark (fxPhaserMix.getSlider());
+            mark (fxPhaserRate.getSlider());
+            mark (fxPhaserDepth.getSlider());
+            mark (fxPhaserFeedback.getSlider());
+            mark (fxPhaserCentre.getSlider());
+            mark (fxPhaserStereo.getSlider());
+            break;
+        case fxOctaver:
+            mark (fxOctMix.getSlider());
+            mark (fxOctSub.getSlider());
+            mark (fxOctBlend.getSlider());
+            mark (fxOctSensitivity.getSlider());
+            mark (fxOctTone.getSlider());
+            break;
+        case fxXtra:
+            mark (fxXtraMix.getSlider());
+            mark (fxXtraFlanger.getSlider());
+            mark (fxXtraTremolo.getSlider());
+            mark (fxXtraAutopan.getSlider());
+            mark (fxXtraSaturator.getSlider());
+            mark (fxXtraClipper.getSlider());
+            mark (fxXtraWidth.getSlider());
+            mark (fxXtraTilt.getSlider());
+            mark (fxXtraGate.getSlider());
+            mark (fxXtraLofi.getSlider());
+            mark (fxXtraDoubler.getSlider());
+            break;
+    }
+
+    fxQuickGlowTargets.fill (nullptr);
+    fxQuickGlowCount = juce::jmin ((int) fxQuickGlowTargets.size(), touchedCount);
+    for (int i = 0; i < fxQuickGlowCount; ++i)
+    {
+        fxQuickGlowTargets[(size_t) i] = touched[(size_t) i];
+        if (auto* s = fxQuickGlowTargets[(size_t) i])
+        {
+            s->getProperties().set ("intentGlow", 1.0);
+            s->repaint();
+        }
+    }
+    fxQuickGlowAmount = (fxQuickGlowCount > 0) ? 1.0f : 0.0f;
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::pushFxQuickUndoSnapshot()
+{
+    FxQuickSnapshot snapshot;
+    snapshot.reserve (16);
+    appendCurrentFxBlockSnapshot (snapshot);
+
+    if (snapshot.empty())
+        return;
+
+    fxQuickUndoHistory.push_back (std::move (snapshot));
+    while ((int) fxQuickUndoHistory.size() > fxQuickUndoLimit)
+        fxQuickUndoHistory.pop_front();
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::storeFxQuickAbSnapshot (bool slotA)
+{
+    FxQuickSnapshot snapshot;
+    snapshot.reserve (16);
+    appendCurrentFxBlockSnapshot (snapshot);
+    if (snapshot.empty())
+        return;
+
+    const auto idx = (size_t) juce::jlimit (0, 6, (int) selectedFxBlock);
+    if (slotA)
+    {
+        fxQuickSnapshotAByBlock[idx] = std::move (snapshot);
+        fxQuickSnapshotAValid[idx] = true;
+    }
+    else
+    {
+        fxQuickSnapshotBByBlock[idx] = std::move (snapshot);
+        fxQuickSnapshotBValid[idx] = true;
+    }
+
+    updateEnabledStates();
+    if (isRussian())
+        statusLabel.setText (juce::String::fromUTF8 (u8"FX: сохранён снимок ") + (slotA ? "A." : "B."),
+                             juce::dontSendNotification);
+    else
+        statusLabel.setText (juce::String ("FX: snapshot ") + (slotA ? "A saved." : "B saved."),
+                             juce::dontSendNotification);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::recallFxQuickAbSnapshot (bool slotA)
+{
+    const auto idx = (size_t) juce::jlimit (0, 6, (int) selectedFxBlock);
+    const auto has = slotA ? fxQuickSnapshotAValid[idx] : fxQuickSnapshotBValid[idx];
+    if (! has)
+    {
+        if (isRussian())
+            statusLabel.setText (juce::String::fromUTF8 (u8"FX: снимок ") + (slotA ? "A" : "B") + juce::String::fromUTF8 (u8" пуст."),
+                                 juce::dontSendNotification);
+        else
+            statusLabel.setText (juce::String ("FX: snapshot ") + (slotA ? "A" : "B") + " is empty.",
+                                 juce::dontSendNotification);
+        return;
+    }
+
+    pushFxQuickUndoSnapshot();
+    const auto& snapshot = slotA ? fxQuickSnapshotAByBlock[idx] : fxQuickSnapshotBByBlock[idx];
+    for (const auto& kv : snapshot)
+        setParamValue (kv.first, kv.second);
+
+    startFxQuickGlowForCurrentBlock();
+    updateEnabledStates();
+
+    if (isRussian())
+        statusLabel.setText (juce::String::fromUTF8 (u8"FX: загружен снимок ") + (slotA ? "A." : "B."),
+                             juce::dontSendNotification);
+    else
+        statusLabel.setText (juce::String ("FX: snapshot ") + (slotA ? "A loaded." : "B loaded."),
+                             juce::dontSendNotification);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::applyFxQuickMorph (float morph01)
+{
+    applyFxQuickMorphInternal (morph01, true, true);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::applyFxQuickMorphInternal (float morph01, bool pushUndo, bool announceStatus)
+{
+    const auto idx = (size_t) juce::jlimit (0, 6, (int) selectedFxBlock);
+    if (! (fxQuickSnapshotAValid[idx] && fxQuickSnapshotBValid[idx]))
+    {
+        if (announceStatus)
+            statusLabel.setText (isRussian() ? juce::String::fromUTF8 (u8"FX: сначала сохрани снимки A и B.")
+                                             : juce::String ("FX: store snapshots A and B first."),
+                                 juce::dontSendNotification);
+        return;
+    }
+
+    morph01 = juce::jlimit (0.0f, 1.0f, morph01);
+    if (pushUndo)
+        pushFxQuickUndoSnapshot();
+
+    const auto& snapshotA = fxQuickSnapshotAByBlock[idx];
+    const auto& snapshotB = fxQuickSnapshotBByBlock[idx];
+    if (snapshotA.empty() || snapshotB.empty())
+        return;
+
+    const auto findInSnapshot = [] (const FxQuickSnapshot& snapshot, juce::StringRef id, float fallback)
+    {
+        for (const auto& kv : snapshot)
+            if (juce::StringRef (kv.first) == id)
+                return kv.second;
+        return fallback;
+    };
+
+    for (const auto& kvA : snapshotA)
+    {
+        const float valueA = kvA.second;
+        const float valueB = findInSnapshot (snapshotB, juce::StringRef (kvA.first), valueA);
+
+        auto* param = audioProcessor.getAPVTS().getParameter (kvA.first);
+        const bool isDiscrete = dynamic_cast<juce::AudioParameterBool*> (param) != nullptr
+                             || dynamic_cast<juce::AudioParameterChoice*> (param) != nullptr;
+
+        const float out = isDiscrete ? (morph01 < 0.5f ? valueA : valueB)
+                                     : (valueA + (valueB - valueA) * morph01);
+        setParamValue (kvA.first, out);
+    }
+
+    startFxQuickGlowForCurrentBlock();
+    updateEnabledStates();
+
+    if (announceStatus)
+    {
+        const int morphPercent = (int) std::lround (morph01 * 100.0f);
+        if (isRussian())
+            statusLabel.setText (juce::String::fromUTF8 (u8"FX: применён A/B морф ") + juce::String (morphPercent) + "%.",
+                                 juce::dontSendNotification);
+        else
+            statusLabel.setText ("FX: A/B morph applied " + juce::String (morphPercent) + "%.",
+                                 juce::dontSendNotification);
+    }
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::swapFxQuickAbSnapshots()
+{
+    const auto idx = (size_t) juce::jlimit (0, 6, (int) selectedFxBlock);
+    if (! (fxQuickSnapshotAValid[idx] || fxQuickSnapshotBValid[idx]))
+    {
+        statusLabel.setText (isRussian() ? juce::String::fromUTF8 (u8"FX: нет снимков для обмена.")
+                                         : juce::String ("FX: no snapshots to swap."),
+                             juce::dontSendNotification);
+        return;
+    }
+
+    std::swap (fxQuickSnapshotAByBlock[idx], fxQuickSnapshotBByBlock[idx]);
+    std::swap (fxQuickSnapshotAValid[idx], fxQuickSnapshotBValid[idx]);
+    updateEnabledStates();
+
+    statusLabel.setText (isRussian() ? juce::String::fromUTF8 (u8"FX: снимки A/B обменяны.")
+                                     : juce::String ("FX: snapshots A/B swapped."),
+                         juce::dontSendNotification);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::undoFxQuickAction()
+{
+    if (fxQuickUndoHistory.empty())
+    {
+        statusLabel.setText (isRussian() ? juce::String::fromUTF8 (u8"Откат недоступен.")
+                                         : juce::String ("Nothing to undo."),
+                             juce::dontSendNotification);
+        return;
+    }
+
+    auto snapshot = std::move (fxQuickUndoHistory.back());
+    fxQuickUndoHistory.pop_back();
+
+    for (const auto& kv : snapshot)
+        setParamValue (kv.first, kv.second);
+
+    updateEnabledStates();
+    statusLabel.setText (isRussian() ? juce::String::fromUTF8 (u8"FX: выполнен откат quick action.")
+                                     : juce::String ("FX: quick action undone."),
+                         juce::dontSendNotification);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::applyFxQuickRandomSafe()
+{
+    currentIntent = (IntentModeIndex) juce::jlimit (0, 2, intentMode.getCombo().getSelectedItemIndex());
+    pushFxQuickUndoSnapshot();
+
+    static thread_local juce::Random rng ((int64) juce::Time::currentTimeMillis());
+    const auto rnd = [&rng] () { return rng.nextFloat() * 2.0f - 1.0f; };
+    const auto apply = [this] (const char* id, float value) { setParamValue (id, value); };
+
+    std::array<juce::Slider*, 16> touched {};
+    int touchedCount = 0;
+    const auto markTouched = [&] (juce::Slider& slider)
+    {
+        for (int i = 0; i < touchedCount; ++i)
+            if (touched[(size_t) i] == &slider)
+                return;
+        if (touchedCount < (int) touched.size())
+            touched[(size_t) touchedCount++] = &slider;
+    };
+    const auto jitter = [&] (const char* id, juce::Slider& slider, float amount, float minV, float maxV)
+    {
+        const float v = juce::jlimit (minV, maxV, (float) slider.getValue() + rnd() * amount);
+        apply (id, v);
+        markTouched (slider);
+    };
+
+    const float intentMul = (currentIntent == intentBass) ? 0.85f : (currentIntent == intentLead ? 1.0f : 1.2f);
+
+    switch (selectedFxBlock)
+    {
+        case fxChorus:
+            apply (params::fx::chorus::enable, 1.0f);
+            jitter (params::fx::chorus::mix, fxChorusMix.getSlider(), 0.12f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::chorus::rateHz, fxChorusRate.getSlider(), 0.25f * intentMul, 0.01f, 10.0f);
+            jitter (params::fx::chorus::depthMs, fxChorusDepth.getSlider(), 3.0f * intentMul, 0.0f, 25.0f);
+            jitter (params::fx::chorus::feedback, fxChorusFeedback.getSlider(), 0.15f * intentMul, -0.98f, 0.98f);
+            jitter (params::fx::chorus::stereo, fxChorusStereo.getSlider(), 0.18f, 0.0f, 1.0f);
+            jitter (params::fx::chorus::hpHz, fxChorusHp.getSlider(), 120.0f, 10.0f, 2000.0f);
+            break;
+
+        case fxDelay:
+            apply (params::fx::delay::enable, 1.0f);
+            jitter (params::fx::delay::mix, fxDelayMix.getSlider(), 0.10f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::delay::timeMs, fxDelayTime.getSlider(), 80.0f * intentMul, 1.0f, 4000.0f);
+            jitter (params::fx::delay::feedback, fxDelayFeedback.getSlider(), 0.12f * intentMul, 0.0f, 0.98f);
+            jitter (params::fx::delay::filterHz, fxDelayFilter.getSlider(), 1800.0f, 200.0f, 20000.0f);
+            jitter (params::fx::delay::modRate, fxDelayModRate.getSlider(), 0.55f * intentMul, 0.01f, 20.0f);
+            jitter (params::fx::delay::modDepth, fxDelayModDepth.getSlider(), 1.6f * intentMul, 0.0f, 25.0f);
+            jitter (params::fx::delay::duck, fxDelayDuck.getSlider(), 0.10f, 0.0f, 1.0f);
+            apply (params::fx::delay::pingpong, rng.nextFloat() > 0.62f ? 1.0f : 0.0f);
+            break;
+
+        case fxReverb:
+            apply (params::fx::reverb::enable, 1.0f);
+            jitter (params::fx::reverb::mix, fxReverbMix.getSlider(), 0.10f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::reverb::size, fxReverbSize.getSlider(), 0.16f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::reverb::decay, fxReverbDecay.getSlider(), 0.16f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::reverb::damp, fxReverbDamp.getSlider(), 0.14f, 0.0f, 1.0f);
+            jitter (params::fx::reverb::preDelayMs, fxReverbPreDelay.getSlider(), 12.0f, 0.0f, 200.0f);
+            jitter (params::fx::reverb::width, fxReverbWidth.getSlider(), 0.20f, 0.0f, 1.0f);
+            jitter (params::fx::reverb::lowCutHz, fxReverbLowCut.getSlider(), 140.0f, 20.0f, 2000.0f);
+            jitter (params::fx::reverb::highCutHz, fxReverbHighCut.getSlider(), 1800.0f, 2000.0f, 20000.0f);
+            break;
+
+        case fxDist:
+            apply (params::fx::dist::enable, 1.0f);
+            jitter (params::fx::dist::mix, fxDistMix.getSlider(), 0.10f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::dist::driveDb, fxDistDrive.getSlider(), 4.0f * intentMul, -24.0f, 36.0f);
+            jitter (params::fx::dist::tone, fxDistTone.getSlider(), 0.14f, 0.0f, 1.0f);
+            jitter (params::fx::dist::postLPHz, fxDistPostLp.getSlider(), 1700.0f, 800.0f, 20000.0f);
+            jitter (params::fx::dist::outputTrimDb, fxDistTrim.getSlider(), 2.0f, -24.0f, 24.0f);
+            apply (params::fx::dist::type, (float) rng.nextInt (4));
+            break;
+
+        case fxPhaser:
+            apply (params::fx::phaser::enable, 1.0f);
+            jitter (params::fx::phaser::mix, fxPhaserMix.getSlider(), 0.11f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::phaser::rateHz, fxPhaserRate.getSlider(), 0.35f * intentMul, 0.01f, 20.0f);
+            jitter (params::fx::phaser::depth, fxPhaserDepth.getSlider(), 0.16f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::phaser::feedback, fxPhaserFeedback.getSlider(), 0.18f * intentMul, -0.95f, 0.95f);
+            jitter (params::fx::phaser::centreHz, fxPhaserCentre.getSlider(), 950.0f, 20.0f, 18000.0f);
+            jitter (params::fx::phaser::stereo, fxPhaserStereo.getSlider(), 0.20f, 0.0f, 1.0f);
+            apply (params::fx::phaser::stages, (float) rng.nextInt (4));
+            break;
+
+        case fxOctaver:
+            apply (params::fx::octaver::enable, 1.0f);
+            jitter (params::fx::octaver::mix, fxOctMix.getSlider(), 0.11f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::octaver::subLevel, fxOctSub.getSlider(), 0.15f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::octaver::blend, fxOctBlend.getSlider(), 0.14f, 0.0f, 1.0f);
+            jitter (params::fx::octaver::sensitivity, fxOctSensitivity.getSlider(), 0.14f, 0.0f, 1.0f);
+            jitter (params::fx::octaver::tone, fxOctTone.getSlider(), 0.13f, 0.0f, 1.0f);
+            break;
+
+        case fxXtra:
+            apply (params::fx::xtra::enable, 1.0f);
+            jitter (params::fx::xtra::mix, fxXtraMix.getSlider(), 0.09f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::xtra::flangerAmount, fxXtraFlanger.getSlider(), 0.14f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::xtra::tremoloAmount, fxXtraTremolo.getSlider(), 0.14f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::xtra::autopanAmount, fxXtraAutopan.getSlider(), 0.14f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::xtra::saturatorAmount, fxXtraSaturator.getSlider(), 0.14f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::xtra::clipperAmount, fxXtraClipper.getSlider(), 0.14f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::xtra::widthAmount, fxXtraWidth.getSlider(), 0.14f, 0.0f, 1.0f);
+            jitter (params::fx::xtra::tiltAmount, fxXtraTilt.getSlider(), 0.14f, 0.0f, 1.0f);
+            jitter (params::fx::xtra::gateAmount, fxXtraGate.getSlider(), 0.14f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::xtra::lofiAmount, fxXtraLofi.getSlider(), 0.14f * intentMul, 0.0f, 1.0f);
+            jitter (params::fx::xtra::doublerAmount, fxXtraDoubler.getSlider(), 0.14f * intentMul, 0.0f, 1.0f);
+            break;
+    }
+
+    fxQuickGlowTargets.fill (nullptr);
+    fxQuickGlowCount = juce::jmin ((int) fxQuickGlowTargets.size(), touchedCount);
+    for (int i = 0; i < fxQuickGlowCount; ++i)
+    {
+        fxQuickGlowTargets[(size_t) i] = touched[(size_t) i];
+        if (auto* s = fxQuickGlowTargets[(size_t) i])
+        {
+            s->getProperties().set ("intentGlow", 1.0);
+            s->repaint();
+        }
+    }
+    fxQuickGlowAmount = (fxQuickGlowCount > 0) ? 1.0f : 0.0f;
+
+    updateEnabledStates();
+    statusLabel.setText (isRussian() ? juce::String::fromUTF8 (u8"FX: применён безопасный рандом.")
+                                     : juce::String ("FX: safe random applied."),
+                         juce::dontSendNotification);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::applyFxQuickAction (int variant)
+{
+    variant = juce::jlimit (0, 2, variant);
+    currentIntent = (IntentModeIndex) juce::jlimit (0, 2, intentMode.getCombo().getSelectedItemIndex());
+    pushFxQuickUndoSnapshot();
+
+    const auto apply = [this] (const char* id, float value)
+    {
+        setParamValue (id, value);
+    };
+    const auto scaleParamFromSlider = [&] (const char* id, juce::Slider& slider, float mul, float minV, float maxV)
+    {
+        apply (id, juce::jlimit (minV, maxV, (float) slider.getValue() * mul));
+    };
+    const auto addParamFromSlider = [&] (const char* id, juce::Slider& slider, float delta, float minV, float maxV)
+    {
+        apply (id, juce::jlimit (minV, maxV, (float) slider.getValue() + delta));
+    };
+
+    auto variantText = [this, variant] () -> juce::String
+    {
+        if (isRussian())
+        {
+            if (variant == 0) return juce::String::fromUTF8 (u8"Мягко");
+            if (variant == 1) return juce::String::fromUTF8 (u8"Широко");
+            return juce::String::fromUTF8 (u8"Жёстко");
+        }
+
+        if (variant == 0) return "Subtle";
+        if (variant == 1) return "Wide";
+        return "Hard";
+    };
+
+    auto blockText = [this] () -> juce::String
+    {
+        if (isRussian())
+        {
+            switch (selectedFxBlock)
+            {
+                case fxChorus:  return juce::String::fromUTF8 (u8"Хорус");
+                case fxDelay:   return juce::String::fromUTF8 (u8"Дилей");
+                case fxReverb:  return juce::String::fromUTF8 (u8"Реверб");
+                case fxDist:    return juce::String::fromUTF8 (u8"Дист");
+                case fxPhaser:  return juce::String::fromUTF8 (u8"Фэйзер");
+                case fxOctaver: return juce::String::fromUTF8 (u8"Октавер");
+                case fxXtra:    return juce::String::fromUTF8 (u8"Экстра");
+            }
+        }
+        else
+        {
+            switch (selectedFxBlock)
+            {
+                case fxChorus:  return "Chorus";
+                case fxDelay:   return "Delay";
+                case fxReverb:  return "Reverb";
+                case fxDist:    return "Dist";
+                case fxPhaser:  return "Phaser";
+                case fxOctaver: return "Octaver";
+                case fxXtra:    return "Xtra";
+            }
+        }
+
+        return {};
+    };
+    auto intentText = [this] () -> juce::String
+    {
+        if (isRussian())
+        {
+            switch (currentIntent)
+            {
+                case intentBass:  return juce::String::fromUTF8 (u8"Бас");
+                case intentLead:  return juce::String::fromUTF8 (u8"Лид");
+                case intentDrone: return juce::String::fromUTF8 (u8"Дрон");
+            }
+        }
+        else
+        {
+            switch (currentIntent)
+            {
+                case intentBass:  return "Bass";
+                case intentLead:  return "Lead";
+                case intentDrone: return "Drone";
+            }
+        }
+
+        return {};
+    };
+
+    for (int i = 0; i < fxQuickGlowCount; ++i)
+        if (auto* s = fxQuickGlowTargets[(size_t) i])
+            s->getProperties().set ("intentGlow", 0.0);
+    fxQuickGlowTargets.fill (nullptr);
+    fxQuickGlowCount = 0;
+    fxQuickGlowAmount = 0.0f;
+
+    std::array<juce::Slider*, 16> touched {};
+    int touchedCount = 0;
+    const auto markTouched = [&] (juce::Slider& slider)
+    {
+        for (int i = 0; i < touchedCount; ++i)
+            if (touched[(size_t) i] == &slider)
+                return;
+
+        if (touchedCount < (int) touched.size())
+            touched[(size_t) touchedCount++] = &slider;
+    };
+
+    switch (selectedFxBlock)
+    {
+        case fxChorus:
+            markTouched (fxChorusMix.getSlider());
+            markTouched (fxChorusRate.getSlider());
+            markTouched (fxChorusDepth.getSlider());
+            markTouched (fxChorusDelay.getSlider());
+            markTouched (fxChorusFeedback.getSlider());
+            markTouched (fxChorusStereo.getSlider());
+            markTouched (fxChorusHp.getSlider());
+            apply (params::fx::chorus::enable, 1.0f);
+            if (variant == 0)
+            {
+                apply (params::fx::chorus::mix, 0.18f);
+                apply (params::fx::chorus::rateHz, 0.25f);
+                apply (params::fx::chorus::depthMs, 4.0f);
+                apply (params::fx::chorus::delayMs, 11.0f);
+                apply (params::fx::chorus::feedback, 0.10f);
+                apply (params::fx::chorus::stereo, 0.85f);
+                apply (params::fx::chorus::hpHz, 90.0f);
+            }
+            else if (variant == 1)
+            {
+                apply (params::fx::chorus::mix, 0.34f);
+                apply (params::fx::chorus::rateHz, 0.55f);
+                apply (params::fx::chorus::depthMs, 10.0f);
+                apply (params::fx::chorus::delayMs, 15.0f);
+                apply (params::fx::chorus::feedback, 0.24f);
+                apply (params::fx::chorus::stereo, 1.0f);
+                apply (params::fx::chorus::hpHz, 70.0f);
+            }
+            else
+            {
+                apply (params::fx::chorus::mix, 0.56f);
+                apply (params::fx::chorus::rateHz, 1.60f);
+                apply (params::fx::chorus::depthMs, 17.0f);
+                apply (params::fx::chorus::delayMs, 8.0f);
+                apply (params::fx::chorus::feedback, 0.42f);
+                apply (params::fx::chorus::stereo, 1.0f);
+                apply (params::fx::chorus::hpHz, 160.0f);
+            }
+
+            switch (currentIntent)
+            {
+                case intentBass:
+                    scaleParamFromSlider (params::fx::chorus::mix, fxChorusMix.getSlider(), 0.82f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::chorus::depthMs, fxChorusDepth.getSlider(), 0.78f, 0.0f, 25.0f);
+                    scaleParamFromSlider (params::fx::chorus::feedback, fxChorusFeedback.getSlider(), 0.85f, -0.98f, 0.98f);
+                    scaleParamFromSlider (params::fx::chorus::hpHz, fxChorusHp.getSlider(), 1.50f, 10.0f, 2000.0f);
+                    break;
+                case intentLead:
+                    scaleParamFromSlider (params::fx::chorus::mix, fxChorusMix.getSlider(), 1.06f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::chorus::rateHz, fxChorusRate.getSlider(), 1.15f, 0.01f, 10.0f);
+                    scaleParamFromSlider (params::fx::chorus::depthMs, fxChorusDepth.getSlider(), 1.08f, 0.0f, 25.0f);
+                    scaleParamFromSlider (params::fx::chorus::stereo, fxChorusStereo.getSlider(), 1.08f, 0.0f, 1.0f);
+                    break;
+                case intentDrone:
+                    scaleParamFromSlider (params::fx::chorus::mix, fxChorusMix.getSlider(), 1.18f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::chorus::rateHz, fxChorusRate.getSlider(), 0.78f, 0.01f, 10.0f);
+                    scaleParamFromSlider (params::fx::chorus::depthMs, fxChorusDepth.getSlider(), 1.22f, 0.0f, 25.0f);
+                    scaleParamFromSlider (params::fx::chorus::feedback, fxChorusFeedback.getSlider(), 1.15f, -0.98f, 0.98f);
+                    break;
+            }
+            break;
+
+        case fxDelay:
+            markTouched (fxDelayMix.getSlider());
+            markTouched (fxDelayTime.getSlider());
+            markTouched (fxDelayFeedback.getSlider());
+            markTouched (fxDelayFilter.getSlider());
+            markTouched (fxDelayModRate.getSlider());
+            markTouched (fxDelayModDepth.getSlider());
+            markTouched (fxDelayDuck.getSlider());
+            apply (params::fx::delay::enable, 1.0f);
+            if (variant == 0)
+            {
+                apply (params::fx::delay::mix, 0.18f);
+                apply (params::fx::delay::sync, 1.0f);
+                apply (params::fx::delay::divL, (float) params::lfo::div1_8);
+                apply (params::fx::delay::divR, (float) params::lfo::div1_8D);
+                apply (params::fx::delay::timeMs, 250.0f);
+                apply (params::fx::delay::feedback, 0.32f);
+                apply (params::fx::delay::filterHz, 11500.0f);
+                apply (params::fx::delay::modRate, 0.25f);
+                apply (params::fx::delay::modDepth, 1.2f);
+                apply (params::fx::delay::pingpong, 0.0f);
+                apply (params::fx::delay::duck, 0.08f);
+            }
+            else if (variant == 1)
+            {
+                apply (params::fx::delay::mix, 0.32f);
+                apply (params::fx::delay::sync, 1.0f);
+                apply (params::fx::delay::divL, (float) params::lfo::div1_4);
+                apply (params::fx::delay::divR, (float) params::lfo::div1_8D);
+                apply (params::fx::delay::timeMs, 360.0f);
+                apply (params::fx::delay::feedback, 0.52f);
+                apply (params::fx::delay::filterHz, 8200.0f);
+                apply (params::fx::delay::modRate, 0.42f);
+                apply (params::fx::delay::modDepth, 3.2f);
+                apply (params::fx::delay::pingpong, 1.0f);
+                apply (params::fx::delay::duck, 0.18f);
+            }
+            else
+            {
+                apply (params::fx::delay::mix, 0.48f);
+                apply (params::fx::delay::sync, 0.0f);
+                apply (params::fx::delay::timeMs, 430.0f);
+                apply (params::fx::delay::feedback, 0.74f);
+                apply (params::fx::delay::filterHz, 4200.0f);
+                apply (params::fx::delay::modRate, 2.40f);
+                apply (params::fx::delay::modDepth, 9.0f);
+                apply (params::fx::delay::pingpong, 1.0f);
+                apply (params::fx::delay::duck, 0.25f);
+            }
+
+            switch (currentIntent)
+            {
+                case intentBass:
+                    scaleParamFromSlider (params::fx::delay::mix, fxDelayMix.getSlider(), 0.78f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::delay::feedback, fxDelayFeedback.getSlider(), 0.86f, 0.0f, 0.98f);
+                    scaleParamFromSlider (params::fx::delay::timeMs, fxDelayTime.getSlider(), 0.85f, 1.0f, 4000.0f);
+                    scaleParamFromSlider (params::fx::delay::filterHz, fxDelayFilter.getSlider(), 1.30f, 200.0f, 20000.0f);
+                    addParamFromSlider (params::fx::delay::duck, fxDelayDuck.getSlider(), 0.12f, 0.0f, 1.0f);
+                    break;
+                case intentLead:
+                    scaleParamFromSlider (params::fx::delay::mix, fxDelayMix.getSlider(), 1.04f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::delay::feedback, fxDelayFeedback.getSlider(), 1.05f, 0.0f, 0.98f);
+                    scaleParamFromSlider (params::fx::delay::modRate, fxDelayModRate.getSlider(), 1.20f, 0.01f, 20.0f);
+                    scaleParamFromSlider (params::fx::delay::modDepth, fxDelayModDepth.getSlider(), 1.20f, 0.0f, 25.0f);
+                    break;
+                case intentDrone:
+                    scaleParamFromSlider (params::fx::delay::mix, fxDelayMix.getSlider(), 1.20f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::delay::feedback, fxDelayFeedback.getSlider(), 1.18f, 0.0f, 0.98f);
+                    scaleParamFromSlider (params::fx::delay::timeMs, fxDelayTime.getSlider(), 1.25f, 1.0f, 4000.0f);
+                    scaleParamFromSlider (params::fx::delay::modDepth, fxDelayModDepth.getSlider(), 1.35f, 0.0f, 25.0f);
+                    scaleParamFromSlider (params::fx::delay::filterHz, fxDelayFilter.getSlider(), 0.75f, 200.0f, 20000.0f);
+                    break;
+            }
+            break;
+
+        case fxReverb:
+            markTouched (fxReverbMix.getSlider());
+            markTouched (fxReverbSize.getSlider());
+            markTouched (fxReverbDecay.getSlider());
+            markTouched (fxReverbDamp.getSlider());
+            markTouched (fxReverbPreDelay.getSlider());
+            markTouched (fxReverbWidth.getSlider());
+            markTouched (fxReverbLowCut.getSlider());
+            markTouched (fxReverbHighCut.getSlider());
+            apply (params::fx::reverb::enable, 1.0f);
+            if (variant == 0)
+            {
+                apply (params::fx::reverb::mix, 0.14f);
+                apply (params::fx::reverb::size, 0.45f);
+                apply (params::fx::reverb::decay, 0.35f);
+                apply (params::fx::reverb::damp, 0.52f);
+                apply (params::fx::reverb::preDelayMs, 8.0f);
+                apply (params::fx::reverb::width, 0.72f);
+                apply (params::fx::reverb::lowCutHz, 120.0f);
+                apply (params::fx::reverb::highCutHz, 10500.0f);
+                apply (params::fx::reverb::quality, (float) params::fx::reverb::eco);
+            }
+            else if (variant == 1)
+            {
+                apply (params::fx::reverb::mix, 0.28f);
+                apply (params::fx::reverb::size, 0.66f);
+                apply (params::fx::reverb::decay, 0.58f);
+                apply (params::fx::reverb::damp, 0.42f);
+                apply (params::fx::reverb::preDelayMs, 18.0f);
+                apply (params::fx::reverb::width, 1.0f);
+                apply (params::fx::reverb::lowCutHz, 80.0f);
+                apply (params::fx::reverb::highCutHz, 13500.0f);
+                apply (params::fx::reverb::quality, (float) params::fx::reverb::hi);
+            }
+            else
+            {
+                apply (params::fx::reverb::mix, 0.44f);
+                apply (params::fx::reverb::size, 0.84f);
+                apply (params::fx::reverb::decay, 0.78f);
+                apply (params::fx::reverb::damp, 0.30f);
+                apply (params::fx::reverb::preDelayMs, 42.0f);
+                apply (params::fx::reverb::width, 1.0f);
+                apply (params::fx::reverb::lowCutHz, 60.0f);
+                apply (params::fx::reverb::highCutHz, 9800.0f);
+                apply (params::fx::reverb::quality, (float) params::fx::reverb::hi);
+            }
+
+            switch (currentIntent)
+            {
+                case intentBass:
+                    scaleParamFromSlider (params::fx::reverb::mix, fxReverbMix.getSlider(), 0.72f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::reverb::decay, fxReverbDecay.getSlider(), 0.78f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::reverb::lowCutHz, fxReverbLowCut.getSlider(), 1.60f, 20.0f, 2000.0f);
+                    scaleParamFromSlider (params::fx::reverb::preDelayMs, fxReverbPreDelay.getSlider(), 1.20f, 0.0f, 200.0f);
+                    break;
+                case intentLead:
+                    scaleParamFromSlider (params::fx::reverb::mix, fxReverbMix.getSlider(), 0.95f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::reverb::width, fxReverbWidth.getSlider(), 1.08f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::reverb::preDelayMs, fxReverbPreDelay.getSlider(), 1.18f, 0.0f, 200.0f);
+                    scaleParamFromSlider (params::fx::reverb::highCutHz, fxReverbHighCut.getSlider(), 1.08f, 2000.0f, 20000.0f);
+                    break;
+                case intentDrone:
+                    scaleParamFromSlider (params::fx::reverb::mix, fxReverbMix.getSlider(), 1.22f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::reverb::size, fxReverbSize.getSlider(), 1.18f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::reverb::decay, fxReverbDecay.getSlider(), 1.24f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::reverb::highCutHz, fxReverbHighCut.getSlider(), 0.82f, 2000.0f, 20000.0f);
+                    break;
+            }
+            break;
+
+        case fxDist:
+            markTouched (fxDistMix.getSlider());
+            markTouched (fxDistDrive.getSlider());
+            markTouched (fxDistTone.getSlider());
+            markTouched (fxDistPostLp.getSlider());
+            markTouched (fxDistTrim.getSlider());
+            apply (params::fx::dist::enable, 1.0f);
+            if (variant == 0)
+            {
+                apply (params::fx::dist::mix, 0.20f);
+                apply (params::fx::dist::type, (float) params::fx::dist::softclip);
+                apply (params::fx::dist::driveDb, 4.0f);
+                apply (params::fx::dist::tone, 0.58f);
+                apply (params::fx::dist::postLPHz, 15000.0f);
+                apply (params::fx::dist::outputTrimDb, -1.0f);
+            }
+            else if (variant == 1)
+            {
+                apply (params::fx::dist::mix, 0.36f);
+                apply (params::fx::dist::type, (float) params::fx::dist::tanh);
+                apply (params::fx::dist::driveDb, 11.0f);
+                apply (params::fx::dist::tone, 0.68f);
+                apply (params::fx::dist::postLPHz, 9200.0f);
+                apply (params::fx::dist::outputTrimDb, -2.0f);
+            }
+            else
+            {
+                apply (params::fx::dist::mix, 0.58f);
+                apply (params::fx::dist::type, (float) params::fx::dist::hardclip);
+                apply (params::fx::dist::driveDb, 22.0f);
+                apply (params::fx::dist::tone, 0.74f);
+                apply (params::fx::dist::postLPHz, 5200.0f);
+                apply (params::fx::dist::outputTrimDb, -4.0f);
+            }
+
+            switch (currentIntent)
+            {
+                case intentBass:
+                    scaleParamFromSlider (params::fx::dist::mix, fxDistMix.getSlider(), 0.90f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::dist::driveDb, fxDistDrive.getSlider(), 1.08f, -24.0f, 36.0f);
+                    scaleParamFromSlider (params::fx::dist::postLPHz, fxDistPostLp.getSlider(), 0.85f, 800.0f, 20000.0f);
+                    break;
+                case intentLead:
+                    scaleParamFromSlider (params::fx::dist::mix, fxDistMix.getSlider(), 1.05f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::dist::driveDb, fxDistDrive.getSlider(), 1.04f, -24.0f, 36.0f);
+                    scaleParamFromSlider (params::fx::dist::tone, fxDistTone.getSlider(), 1.12f, 0.0f, 1.0f);
+                    break;
+                case intentDrone:
+                    scaleParamFromSlider (params::fx::dist::mix, fxDistMix.getSlider(), 1.12f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::dist::driveDb, fxDistDrive.getSlider(), 1.16f, -24.0f, 36.0f);
+                    scaleParamFromSlider (params::fx::dist::tone, fxDistTone.getSlider(), 0.92f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::dist::postLPHz, fxDistPostLp.getSlider(), 0.78f, 800.0f, 20000.0f);
+                    break;
+            }
+            break;
+
+        case fxPhaser:
+            markTouched (fxPhaserMix.getSlider());
+            markTouched (fxPhaserRate.getSlider());
+            markTouched (fxPhaserDepth.getSlider());
+            markTouched (fxPhaserFeedback.getSlider());
+            markTouched (fxPhaserCentre.getSlider());
+            markTouched (fxPhaserStereo.getSlider());
+            apply (params::fx::phaser::enable, 1.0f);
+            if (variant == 0)
+            {
+                apply (params::fx::phaser::mix, 0.18f);
+                apply (params::fx::phaser::rateHz, 0.22f);
+                apply (params::fx::phaser::depth, 0.40f);
+                apply (params::fx::phaser::feedback, 0.12f);
+                apply (params::fx::phaser::centreHz, 820.0f);
+                apply (params::fx::phaser::stages, 0.0f); // 4
+                apply (params::fx::phaser::stereo, 0.72f);
+            }
+            else if (variant == 1)
+            {
+                apply (params::fx::phaser::mix, 0.31f);
+                apply (params::fx::phaser::rateHz, 0.45f);
+                apply (params::fx::phaser::depth, 0.66f);
+                apply (params::fx::phaser::feedback, 0.28f);
+                apply (params::fx::phaser::centreHz, 1200.0f);
+                apply (params::fx::phaser::stages, 2.0f); // 8
+                apply (params::fx::phaser::stereo, 1.0f);
+            }
+            else
+            {
+                apply (params::fx::phaser::mix, 0.54f);
+                apply (params::fx::phaser::rateHz, 1.80f);
+                apply (params::fx::phaser::depth, 0.85f);
+                apply (params::fx::phaser::feedback, 0.55f);
+                apply (params::fx::phaser::centreHz, 2200.0f);
+                apply (params::fx::phaser::stages, 3.0f); // 12
+                apply (params::fx::phaser::stereo, 1.0f);
+            }
+
+            switch (currentIntent)
+            {
+                case intentBass:
+                    scaleParamFromSlider (params::fx::phaser::mix, fxPhaserMix.getSlider(), 0.78f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::phaser::depth, fxPhaserDepth.getSlider(), 0.80f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::phaser::feedback, fxPhaserFeedback.getSlider(), 0.86f, -0.95f, 0.95f);
+                    scaleParamFromSlider (params::fx::phaser::centreHz, fxPhaserCentre.getSlider(), 0.75f, 20.0f, 18000.0f);
+                    break;
+                case intentLead:
+                    scaleParamFromSlider (params::fx::phaser::mix, fxPhaserMix.getSlider(), 1.06f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::phaser::rateHz, fxPhaserRate.getSlider(), 1.15f, 0.01f, 20.0f);
+                    scaleParamFromSlider (params::fx::phaser::depth, fxPhaserDepth.getSlider(), 1.08f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::phaser::stereo, fxPhaserStereo.getSlider(), 1.10f, 0.0f, 1.0f);
+                    break;
+                case intentDrone:
+                    scaleParamFromSlider (params::fx::phaser::mix, fxPhaserMix.getSlider(), 1.22f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::phaser::rateHz, fxPhaserRate.getSlider(), 0.72f, 0.01f, 20.0f);
+                    scaleParamFromSlider (params::fx::phaser::depth, fxPhaserDepth.getSlider(), 1.25f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::phaser::feedback, fxPhaserFeedback.getSlider(), 1.20f, -0.95f, 0.95f);
+                    break;
+            }
+            break;
+
+        case fxOctaver:
+            markTouched (fxOctMix.getSlider());
+            markTouched (fxOctSub.getSlider());
+            markTouched (fxOctBlend.getSlider());
+            markTouched (fxOctSensitivity.getSlider());
+            markTouched (fxOctTone.getSlider());
+            apply (params::fx::octaver::enable, 1.0f);
+            if (variant == 0)
+            {
+                apply (params::fx::octaver::mix, 0.20f);
+                apply (params::fx::octaver::subLevel, 0.42f);
+                apply (params::fx::octaver::blend, 0.42f);
+                apply (params::fx::octaver::sensitivity, 0.68f);
+                apply (params::fx::octaver::tone, 0.54f);
+            }
+            else if (variant == 1)
+            {
+                apply (params::fx::octaver::mix, 0.36f);
+                apply (params::fx::octaver::subLevel, 0.70f);
+                apply (params::fx::octaver::blend, 0.64f);
+                apply (params::fx::octaver::sensitivity, 0.72f);
+                apply (params::fx::octaver::tone, 0.62f);
+            }
+            else
+            {
+                apply (params::fx::octaver::mix, 0.52f);
+                apply (params::fx::octaver::subLevel, 0.92f);
+                apply (params::fx::octaver::blend, 0.84f);
+                apply (params::fx::octaver::sensitivity, 0.82f);
+                apply (params::fx::octaver::tone, 0.70f);
+            }
+
+            switch (currentIntent)
+            {
+                case intentBass:
+                    scaleParamFromSlider (params::fx::octaver::mix, fxOctMix.getSlider(), 1.15f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::octaver::subLevel, fxOctSub.getSlider(), 1.20f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::octaver::tone, fxOctTone.getSlider(), 0.92f, 0.0f, 1.0f);
+                    break;
+                case intentLead:
+                    scaleParamFromSlider (params::fx::octaver::mix, fxOctMix.getSlider(), 0.90f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::octaver::subLevel, fxOctSub.getSlider(), 0.78f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::octaver::tone, fxOctTone.getSlider(), 1.15f, 0.0f, 1.0f);
+                    break;
+                case intentDrone:
+                    scaleParamFromSlider (params::fx::octaver::mix, fxOctMix.getSlider(), 1.02f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::octaver::blend, fxOctBlend.getSlider(), 1.22f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::octaver::tone, fxOctTone.getSlider(), 0.85f, 0.0f, 1.0f);
+                    break;
+            }
+            break;
+
+        case fxXtra:
+            markTouched (fxXtraMix.getSlider());
+            markTouched (fxXtraFlanger.getSlider());
+            markTouched (fxXtraTremolo.getSlider());
+            markTouched (fxXtraAutopan.getSlider());
+            markTouched (fxXtraSaturator.getSlider());
+            markTouched (fxXtraClipper.getSlider());
+            markTouched (fxXtraWidth.getSlider());
+            markTouched (fxXtraTilt.getSlider());
+            markTouched (fxXtraGate.getSlider());
+            markTouched (fxXtraLofi.getSlider());
+            markTouched (fxXtraDoubler.getSlider());
+            apply (params::fx::xtra::enable, 1.0f);
+            if (variant == 0)
+            {
+                apply (params::fx::xtra::mix, 0.22f);
+                apply (params::fx::xtra::flangerAmount, 0.12f);
+                apply (params::fx::xtra::tremoloAmount, 0.08f);
+                apply (params::fx::xtra::autopanAmount, 0.10f);
+                apply (params::fx::xtra::saturatorAmount, 0.18f);
+                apply (params::fx::xtra::clipperAmount, 0.05f);
+                apply (params::fx::xtra::widthAmount, 0.22f);
+                apply (params::fx::xtra::tiltAmount, 0.14f);
+                apply (params::fx::xtra::gateAmount, 0.04f);
+                apply (params::fx::xtra::lofiAmount, 0.06f);
+                apply (params::fx::xtra::doublerAmount, 0.10f);
+            }
+            else if (variant == 1)
+            {
+                apply (params::fx::xtra::mix, 0.38f);
+                apply (params::fx::xtra::flangerAmount, 0.28f);
+                apply (params::fx::xtra::tremoloAmount, 0.20f);
+                apply (params::fx::xtra::autopanAmount, 0.24f);
+                apply (params::fx::xtra::saturatorAmount, 0.34f);
+                apply (params::fx::xtra::clipperAmount, 0.20f);
+                apply (params::fx::xtra::widthAmount, 0.42f);
+                apply (params::fx::xtra::tiltAmount, 0.26f);
+                apply (params::fx::xtra::gateAmount, 0.14f);
+                apply (params::fx::xtra::lofiAmount, 0.20f);
+                apply (params::fx::xtra::doublerAmount, 0.30f);
+            }
+            else
+            {
+                apply (params::fx::xtra::mix, 0.62f);
+                apply (params::fx::xtra::flangerAmount, 0.54f);
+                apply (params::fx::xtra::tremoloAmount, 0.44f);
+                apply (params::fx::xtra::autopanAmount, 0.52f);
+                apply (params::fx::xtra::saturatorAmount, 0.64f);
+                apply (params::fx::xtra::clipperAmount, 0.58f);
+                apply (params::fx::xtra::widthAmount, 0.62f);
+                apply (params::fx::xtra::tiltAmount, 0.46f);
+                apply (params::fx::xtra::gateAmount, 0.42f);
+                apply (params::fx::xtra::lofiAmount, 0.54f);
+                apply (params::fx::xtra::doublerAmount, 0.66f);
+            }
+
+            switch (currentIntent)
+            {
+                case intentBass:
+                    scaleParamFromSlider (params::fx::xtra::mix, fxXtraMix.getSlider(), 0.88f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::xtra::saturatorAmount, fxXtraSaturator.getSlider(), 1.10f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::xtra::clipperAmount, fxXtraClipper.getSlider(), 1.15f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::xtra::widthAmount, fxXtraWidth.getSlider(), 0.85f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::xtra::gateAmount, fxXtraGate.getSlider(), 1.20f, 0.0f, 1.0f);
+                    break;
+                case intentLead:
+                    scaleParamFromSlider (params::fx::xtra::mix, fxXtraMix.getSlider(), 1.00f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::xtra::flangerAmount, fxXtraFlanger.getSlider(), 1.10f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::xtra::autopanAmount, fxXtraAutopan.getSlider(), 1.10f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::xtra::widthAmount, fxXtraWidth.getSlider(), 1.22f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::xtra::doublerAmount, fxXtraDoubler.getSlider(), 1.20f, 0.0f, 1.0f);
+                    break;
+                case intentDrone:
+                    scaleParamFromSlider (params::fx::xtra::mix, fxXtraMix.getSlider(), 1.18f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::xtra::flangerAmount, fxXtraFlanger.getSlider(), 1.22f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::xtra::tremoloAmount, fxXtraTremolo.getSlider(), 1.18f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::xtra::autopanAmount, fxXtraAutopan.getSlider(), 1.20f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::xtra::tiltAmount, fxXtraTilt.getSlider(), 1.15f, 0.0f, 1.0f);
+                    scaleParamFromSlider (params::fx::xtra::lofiAmount, fxXtraLofi.getSlider(), 1.25f, 0.0f, 1.0f);
+                    break;
+            }
+            break;
+    }
+
+    fxQuickGlowTargets.fill (nullptr);
+    fxQuickGlowCount = juce::jmin ((int) fxQuickGlowTargets.size(), touchedCount);
+    for (int i = 0; i < fxQuickGlowCount; ++i)
+    {
+        fxQuickGlowTargets[(size_t) i] = touched[(size_t) i];
+        if (auto* s = fxQuickGlowTargets[(size_t) i])
+        {
+            s->getProperties().set ("intentGlow", 1.0);
+            s->repaint();
+        }
+    }
+    fxQuickGlowAmount = (fxQuickGlowCount > 0) ? 1.0f : 0.0f;
+
+    updateEnabledStates();
+
+    if (isRussian())
+        statusLabel.setText (juce::String::fromUTF8 (u8"FX пресет: ") + blockText() + " / " + variantText() + " / " + intentText(),
+                             juce::dontSendNotification);
+    else
+        statusLabel.setText ("FX preset: " + blockText() + " / " + variantText() + " / " + intentText(),
+                             juce::dontSendNotification);
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::clearModSlot (int slotIndex)
@@ -8129,6 +9962,7 @@ void IndustrialEnergySynthAudioProcessorEditor::assignModulation (params::mod::S
                 case params::mod::dstFxXtraLofiAmount: return "FX Xtra LoFi";
                 case params::mod::dstFxXtraDoublerAmount: return "FX Xtra Doubler";
                 case params::mod::dstFxXtraMix: return "FX Xtra Mix";
+                case params::mod::dstFxGlobalMorph: return "FX Global Morph";
                 default: break;
             }
             return "Off";
@@ -8209,6 +10043,12 @@ void IndustrialEnergySynthAudioProcessorEditor::applyFactoryPreset (int factoryI
     if (factoryIndex < 0 || factoryIndex >= getNumFactoryPresets())
         return;
 
+    fxQuickUndoHistory.clear();
+    for (auto& s : fxQuickSnapshotAByBlock) s.clear();
+    for (auto& s : fxQuickSnapshotBByBlock) s.clear();
+    fxQuickSnapshotAValid.fill (false);
+    fxQuickSnapshotBValid.fill (false);
+
     // Keep current UI language stable while applying preset.
     auto* langParam = audioProcessor.getAPVTS().getParameter (params::ui::language);
     const float langNorm = (langParam != nullptr) ? langParam->getValue() : 0.0f;
@@ -8223,6 +10063,9 @@ void IndustrialEnergySynthAudioProcessorEditor::applyFactoryPreset (int factoryI
         setParamValue (params::fx::global::order, (float) params::fx::global::orderFixedA);
         setParamValue (params::fx::global::route, (float) params::fx::global::routeSerial);
         setParamValue (params::fx::global::oversample, (float) params::fx::global::osOff);
+        setParamValue (params::fx::global::morph, 0.0f);
+        setParamValue (params::fx::global::destroyPlacement, (float) params::fx::global::preFilter);
+        setParamValue (params::fx::global::tonePlacement, (float) params::fx::global::postFilter);
 
         setParamValue (params::fx::chorus::enable, 0.0f);
         setParamValue (params::fx::chorus::mix, 0.0f);
@@ -8457,6 +10300,7 @@ params::mod::Dest IndustrialEnergySynthAudioProcessorEditor::getModDestForCompon
     if (s == &fxXtraLofi.getSlider()) return params::mod::dstFxXtraLofiAmount;
     if (s == &fxXtraDoubler.getSlider()) return params::mod::dstFxXtraDoublerAmount;
     if (s == &fxXtraMix.getSlider()) return params::mod::dstFxXtraMix;
+    if (s == &fxGlobalMorph.getSlider()) return params::mod::dstFxGlobalMorph;
 
     return params::mod::dstOff;
 }
@@ -8511,6 +10355,7 @@ void IndustrialEnergySynthAudioProcessorEditor::setLastTouchedModDest (params::m
             case params::mod::dstFxXtraLofiAmount: return "FX Xtra LoFi";
             case params::mod::dstFxXtraDoublerAmount: return "FX Xtra Doubler";
             case params::mod::dstFxXtraMix: return "FX Xtra Mix";
+            case params::mod::dstFxGlobalMorph: return "FX Global Morph";
             case params::mod::dstOff:              break;
         }
         return "-";
@@ -8644,6 +10489,86 @@ void IndustrialEnergySynthAudioProcessorEditor::mouseDoubleClick (const juce::Mo
         promptMacroRename (2);
         return;
     }
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
+{
+    if (uiPage != pageFx)
+        return;
+    if (fxGlobalOrder.getCombo().getSelectedItemIndex() != (int) params::fx::global::orderCustom)
+        return;
+
+    const int engineBlock = getEngineBlockForRackComponent (e.eventComponent);
+    if (engineBlock < 0)
+        return;
+
+    fxRackDragActive = true;
+    fxRackDragEngineBlock = engineBlock;
+    fxRackDragSourcePos = getCustomOrderPositionForEngineBlock (engineBlock);
+    fxRackDragTargetPos = fxRackDragSourcePos;
+    refreshFxRouteMap();
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::mouseDrag (const juce::MouseEvent& e)
+{
+    if (! fxRackDragActive)
+        return;
+
+    const auto p = e.getEventRelativeTo (this).getPosition();
+    int targetPos = fxRackDragSourcePos;
+
+    auto targetFromComponent = [this, p] (const juce::TextButton& b) -> int
+    {
+        if (! b.getBounds().expanded (2, 2).contains (p))
+            return -1;
+        return getCustomOrderPositionForEngineBlock (getEngineBlockForRackComponent (&b));
+    };
+
+    for (const auto* b : { &fxBlockChorus, &fxBlockDelay, &fxBlockReverb, &fxBlockDist, &fxBlockPhaser, &fxBlockOctaver })
+    {
+        const int pos = targetFromComponent (*b);
+        if (pos >= 0)
+        {
+            targetPos = pos;
+            break;
+        }
+    }
+
+    if (targetPos < 0)
+    {
+        if (p.y < fxBlockChorus.getY())
+            targetPos = 0;
+        else if (p.y > fxBlockOctaver.getBottom())
+            targetPos = (int) ies::dsp::FxChain::numBlocks - 1;
+    }
+
+    targetPos = juce::jlimit (0, (int) ies::dsp::FxChain::numBlocks - 1, targetPos);
+    if (targetPos == fxRackDragTargetPos)
+        return;
+
+    fxRackDragTargetPos = targetPos;
+    refreshFxRouteMap();
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::mouseUp (const juce::MouseEvent& e)
+{
+    juce::ignoreUnused (e);
+    if (! fxRackDragActive)
+        return;
+
+    const int engineBlock = fxRackDragEngineBlock;
+    const int target = fxRackDragTargetPos;
+    const int source = fxRackDragSourcePos;
+
+    fxRackDragActive = false;
+    fxRackDragEngineBlock = -1;
+    fxRackDragSourcePos = -1;
+    fxRackDragTargetPos = -1;
+
+    if (engineBlock >= 0 && target >= 0 && source >= 0 && target != source)
+        moveEngineBlockToCustomOrderPosition (engineBlock, target);
+    else
+        refreshFxRouteMap();
 }
 
 void IndustrialEnergySynthAudioProcessorEditor::mouseEnter (const juce::MouseEvent& e)

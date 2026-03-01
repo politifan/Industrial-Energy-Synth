@@ -952,6 +952,8 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
     paramPointers.fxGlobalRoute = apvts.getRawParameterValue (params::fx::global::route);
     paramPointers.fxGlobalOversample = apvts.getRawParameterValue (params::fx::global::oversample);
     paramPointers.fxGlobalMorph = apvts.getRawParameterValue (params::fx::global::morph);
+    paramPointers.fxGlobalDestroyPlacement = apvts.getRawParameterValue (params::fx::global::destroyPlacement);
+    paramPointers.fxGlobalTonePlacement = apvts.getRawParameterValue (params::fx::global::tonePlacement);
 
     paramPointers.fxChorusEnable = apvts.getRawParameterValue (params::fx::chorus::enable);
     paramPointers.fxChorusMix = apvts.getRawParameterValue (params::fx::chorus::mix);
@@ -2045,6 +2047,12 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
                                                                    (int) params::fx::global::osOff));
         g->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::fx::global::morph), "FX Morph",
                                                                   juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f));
+        g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::global::destroyPlacement), "Destroy Placement",
+                                                                   juce::StringArray { "Pre Filter", "Post Filter" },
+                                                                   (int) params::fx::global::preFilter));
+        g->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::fx::global::tonePlacement), "Tone Placement",
+                                                                   juce::StringArray { "Pre Filter", "Post Filter" },
+                                                                   (int) params::fx::global::postFilter));
         layout.add (std::move (g));
     }
 

@@ -9,11 +9,27 @@
 - **Качество**: стабильность в Reaper, быстрый UI, ноль аллокаций в аудио‑потоке, предсказуемая автомейшн‑кривая.
 
 ## Текущий статус (реализовано в коде)
+- (2026-03-01) V2.5 FX Dense UI pass: уплотнена раскладка FX detail-панели (меньше пустоты, больше параметров на экран), уменьшены высоты служебных строк (Global/Placement/Route).
+- (2026-03-01) V2.5 Delay UX pass: для блока Delay добавлен отдельный layout (Timing + Sync/PingPong lane + Div/Filter + Mod row), чтобы контролы не «плавали» и быстрее читались.
+- (2026-03-01) V2.5 Reverb/Dist UX pass: отдельные layout для Reverb и Dist (без универсальной сетки), с более предсказуемой геометрией и лучшей читаемостью.
+- (2026-03-01) V2.5 Phaser/Xtra UX pass: отдельные layout для Phaser и Xtra, чтобы Advanced-режим помещал больше ручек без хаотичных перестроений.
+- (2026-03-01) V2.5 FX Quick Actions v1: для выбранного FX-блока добавлены кнопки `Subtle/Wide/Hard` с рабочими пресетными наборами параметров (RU/EN labels + tooltips + status feedback).
+- (2026-03-01) V2.5 FX Quick Actions v2: `Subtle/Wide/Hard` стали intent-aware (`Bass/Lead/Drone`) + добавлена fade-подсветка ручек, которые изменились от quick action.
+- (2026-03-01) V2.5 FX Quick Tools v3: добавлены `Random Safe` и `Undo` (до 5 шагов истории quick-действий) для ускоренного FX саунд-дизайна.
+- (2026-03-01) V2.5 FX A/B Snapshots v4: для каждого FX-блока добавлены `Store/Recall A/B` (быстрое сравнение двух вариантов без потери текущего потока работы).
+- (2026-03-01) V2.5 FX A/B Morph v5: для выбранного FX-блока добавлены `A/B Morph` (0..100%), `Apply` и `Swap A/B` для быстрых промежуточных вариантов и сравнения.
+- (2026-03-01) V2.5 FX A/B Morph v6: добавлен `Auto Morph` (live-применение морфа при движении слайдера) с безопасным undo-поведением на drag-сессию.
+- (2026-03-01) UI stability: для ComboBox добавлен фиксированно-компактный popup item height (22px), чтобы выпадающие списки не растягивались при больших контейнерах.
+- (2026-03-01) V2.5 Quick Assign v2: в top-menu Quick Assign добавлены источники `ModWheel/Aftertouch/Velocity/Note/FilterEnv/AmpEnv/Random` (помимо `M1/M2/LFO1/LFO2`).
+- (2026-03-01) V2.5 FX Morph Mod Target: добавлен новый destination Mod Matrix `FX Global Morph` + целевая ручка `FX Morph` на FX-странице + применение модуляции в движке.
 - (2026-02-28) FX Expansion Pack v1: добавлен блок `FX Xtra` (Flanger/Tremolo/AutoPan/Saturator/Clipper/Width/Tilt/Gate/LoFi/Doubler) с `enable + mix + amount` для каждого эффекта.
 - (2026-02-28) FX Routing Pro v1: добавлен `fx.global.route` (`Serial/Parallel`) в APVTS + DSP + UI.
 - (2026-02-28) Modulation 2.0 (FX-aware) v1: Mod Matrix расширена destination-ами для `FX Xtra` + интеграция в аудио-движок с клампами и сглаживанием.
 - (2026-02-28) Factory preset safety: reset/default логика пресетов обновлена под новые `fx.global.route` и `fx.xtra.*` параметры.
 - (2026-02-28) FX Compact UX v2: добавлен переключаемый режим `Basic/Advanced` для каждого FX-блока + более плотная раскладка контролов в detail-панели.
+- (2026-02-28) V2.4 Routing UX v1: добавлен drag-reorder FX-блоков прямо в rack (в режиме `Order=Custom`) + live `Routing Map` (serial/parallel + фактический порядок цепи).
+- (2026-02-28) V2.4.1 Placement Routing: добавлены `Destroy pre/post Filter` и `Tone pre/post Filter` (APVTS + DSP + UI).
+- (2026-02-28) V2.4.2 Routing Map+: карта маршрута теперь показывает placement-состояния `Destroy/Tone/Shaper` в реальном времени.
 - (2026-02-11) Synth Layout Compact v2: удалён отдельный `Output` блок, `Gain` перенесён в `Mono`; пересобрана сетка страницы `Synth` для меньшего пустого пространства.
 - (2026-02-11) Dense UI Fit Fixes: устранён клиппинг контролов/лейблов в `Destroy/Filter`, увеличены текст-боксы значений и вертикальные интервалы.
 - (2026-02-11) Fast Destroy Reset: double-click по заголовку `Destroy` сбрасывает параметры блока к дефолту.
@@ -54,12 +70,13 @@
 
 **Критерий:** все 10 FX доступны из одной компактной панели, без перегруза layout и без щелчков при автомейшне.
 
-### V2.4 — FX Routing Pro
-- Drag reorder порядка FX-блоков в цепи.
+### V2.4 — FX Routing Pro (MVP закрыт)
+- Drag reorder порядка FX-блоков в цепи (через rack, режим `Order=Custom`).
 - Режимы маршрутизации:
   - serial
   - parallel (минимум 2 ветки с blend)
 - Переключение pre/post для ключевых блоков (минимум Destroy/Shaper/Tone/FX).
+  - уже есть `Shaper pre/post`, `FX serial/parallel`, `Destroy pre/post Filter`, `Tone pre/post Filter`.
 - Визуализация маршрута (простая схема в UI) + безопасный fallback к fixed order.
 
 **Критерий:** пользователь может быстро менять topology FX/Destroy без потери управляемости и без нестабильности.
@@ -69,6 +86,7 @@
 - Быстрый assign `Last touched` -> `source` без открытия полной матрицы.
 - Улучшить визуал глубины модуляции в dense режимах UI.
 - Ввести лимиты/клампы для “опасных” направлений (delay time, drive, feedback).
+- Статус: частично закрыто (`Quick Assign v2` + destination `FX Global Morph`).
 
 **Критерий:** маршрутизация модуляции для FX делается за 1-2 действия, звук остаётся стабильным при stress automation.
 
@@ -190,6 +208,26 @@
 - Билингвальность RU/EN: все строки через единый i18n слой; подписи должны помещаться.
 
 ## Changelog (work-in-progress)
+### 2026-03-01
+- FX-страница уплотнена: уменьшены высоты строк `Global/Placement/Mode/Order/Route`, увеличено полезное поле для параметров выбранного FX-блока.
+- Переработана сетка `layoutFxControls`: в `Advanced` режиме больше колонок и плотнее отступы, чтобы на экране помещалось больше ручек без гигантских ячеек.
+- Для `FX Delay` сделан отдельный специализированный layout вместо общей сетки (более предсказуемая геометрия для `Mix/Time/Feedback`, `Sync/PingPong`, `Div/Filter`, `Mod`).
+- Для `FX Reverb` и `FX Dist` добавлены отдельные layout-профили: основные ручки наверху, расширенные параметры в `Advanced`, без «скачущей» авто-сетки.
+- Для `FX Phaser` и `FX Xtra` добавлены собственные layout-профили: стабильная геометрия `Basic/Advanced` и более плотная упаковка параметров.
+- Добавлены `FX Quick Actions` (`Subtle/Wide/Hard`) для текущего выбранного FX-блока с мгновенным применением тематических значений параметров и локализованной обратной связью в status line.
+- `FX Quick Actions` теперь intent-aware: при одинаковой кнопке (`Subtle/Wide/Hard`) итоговый набор параметров адаптируется под `Bass/Lead/Drone`.
+- Добавлена визуальная fade-подсветка изменённых FX-ручек после quick action для мгновенной обратной связи по изменённым контролам.
+- На FX-странице добавлены `Random Safe` и `Undo`: безопасный рандом выбранного блока и откат последних quick-действий (история до 5 шагов).
+- Добавлены `Store/Recall A/B` для выбранного FX-блока (снимки A/B), чтобы мгновенно сравнивать две версии настроек блока в реальном времени.
+- Добавлены `A/B Morph`, `Apply` и `Swap A/B` для выбранного FX-блока: можно получить промежуточный вариант между снимками и быстро поменять снимки местами.
+- Добавлен `Auto Morph` на FX-странице: при включении морф A/B применяется в реальном времени во время движения слайдера.
+- В `IndustrialLookAndFeel` добавлен override `getOptionsForComboBoxPopupMenu(...)` с `standardItemHeight=22` для компактных и предсказуемых dropdown-меню.
+- `FX Morph` включён в update мод-колец (видно модуляцию destination `FX Global Morph` прямо на ручке).
+- Добавлен destination `FX Global Morph` в Mod Matrix (append-only в `params::mod::Dest`).
+- Добавлена ручка `FX Morph` в глобальные контролы FX-страницы (UI + APVTS attachment + compact value formatting).
+- Модуляция `FX Global Morph` интегрирована в DSP (`MonoSynthEngine`) с ограничением и scaling.
+- Расширен `Quick Assign` в меню: кроме `M1/M2/LFO1/LFO2` доступны `MW/AT/VEL/NOTE/FENV/AENV/RND`.
+
 ### 2026-02-28
 - Добавлен приоритетный execution-трек `V2.3 -> V2.7`:
   - FX Expansion (10 FX),
@@ -204,6 +242,7 @@
 - Добавлены factory-default reset значения для новых FX параметров.
 - Обновлены tooltip-подсказки и визуальные mod-rings для FX/Xtra ручек.
 - Добавлен режим `Basic/Advanced` на FX-странице: compact essentials vs full control set для выбранного блока.
+- Для `V2.4 Routing UX` добавлены drag-reorder FX блоков в rack (режим `Custom`) и live `Routing Map` с отображением фактической цепи и serial/parallel flow.
 
 ### 2026-02-12
 - Добавлен каркас `FXChain` (Chorus / Delay / Reverb / Distortion / Phaser / Octaver) с per-block mix + global FX mix.

@@ -123,6 +123,13 @@ juce::Font IndustrialLookAndFeel::getLabelFont (juce::Label&)
     return juce::Font (juce::Font::getDefaultSansSerifFontName(), 12.0f, juce::Font::plain);
 }
 
+juce::PopupMenu::Options IndustrialLookAndFeel::getOptionsForComboBoxPopupMenu (juce::ComboBox& box, juce::Label& label)
+{
+    // Keep dropdown rows compact regardless of oversized parent component bounds.
+    return juce::LookAndFeel_V4::getOptionsForComboBoxPopupMenu (box, label)
+        .withStandardItemHeight (22);
+}
+
 void IndustrialLookAndFeel::drawRotarySlider (juce::Graphics& g,
                                              int x, int y, int width, int height,
                                              float sliderPos,
