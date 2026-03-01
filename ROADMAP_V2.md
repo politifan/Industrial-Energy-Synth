@@ -12,6 +12,13 @@
 - (2026-03-01) R&D Hub v1.3: вкладка `OSC` переведена из stub в рабочий `OSC Prep` (выбор Osc1/2/3, wave/level/coarse/fine/detune, quick character кнопки `Init/Bright/Metal/Noisy/Draw`, live APVTS control).
 - (2026-03-01) R&D Hub v1.4: вкладка `MOD` переведена из stub в `Mod Matrix Pro` (редактирование 8 слотов Src/Dst/Depth, быстрые действия `Apply Src->All`, `Insert Slot`, `Clear`, `Refresh`).
 - (2026-03-01) R&D Hub v1.5: начат следующий раздел `FX PRO` (реальные global-контролы `order/route/OS/destroy/tone/mix/morph` + live routing summary вместо stub).
+- (2026-03-01) R&D Hub v1.6: `FX PRO` получил кликабельную `Routing Map` (узлы `IN/Destroy/Filter/Tone/Shaper/FX/OUT`), клики по узлам меняют topology (`pre/post`, `serial/parallel`, `order`, `OS`) в реальном времени.
+- (2026-03-01) R&D Hub v1.7: начат следующий раздел `UI PROD` (рабочая вкладка вместо stub: тема/анимация/контраст/плотность/акцент + cockpit switches + live preview + state persistence).
+- (2026-03-01) R&D Hub v1.8: начат следующий раздел `WORKFLOW` (рабочая вкладка вместо stub: quick actions `Init/Factory`, flags `AutoLearn/SafeRandom/SnapLastTouched`, session notes и reset MSEG source).
+- (2026-03-01) R&D Hub v1.9: `FX PRO` расширен A/B topology snapshots (`Store A/B`, `Recall A/B`, `Swap A/B`) для быстрых сравнений маршрутизации.
+- (2026-03-01) R&D Hub v1.10: `WORKFLOW` получил mini undo/redo журнал (до 32 шагов, restore APVTS state, clear history).
+- (2026-03-01) R&D Hub v1.11: `UI PROD` получил quick cockpit presets (`Dark/Cockpit/Signal`) + экспорт/импорт UI профилей (`*.iesuip`).
+- (2026-03-01) R&D Hub v1.12: `FX PRO` snapshots A/B сохранены в `APVTS.state` (переживают reopen/reload); в Hub больше нет вкладок-заглушек — весь R&D набор рабочий (`OSC/MOD/MSEG/VOICING/FX PRO/BROWSER/UI PROD/WORKFLOW`).
 - (2026-03-01) R&D Hub v1.1: страницы `VOICING/MSEG/BROWSER` доведены до рабочего состояния: live-хуки на `mono.*` (Legato/Glide), интерактивный MSEG c `Apply Target` (Macro1/2, FX Morph, Shaper Drive/Mix), Preset Browser получил `Save/Delete`, double-click load, draft-name persistence и A/B recall через `APVTS`.
 - (2026-03-01) R&D Hub v1.2: MSEG получил live-поток в отдельный источник `MSEG` (`ui.msegOut`) + one-click routing в слоты Mod Matrix (`MSEG -> Dest`) и очистку таких маршрутов; Preset Browser расширен до unified списка `Init + Factory + User` с загрузкой всех типов.
 - (2026-03-01) R&D Hub Stubs v1: добавлено отдельное окно `R&D Hub` (Osc/Mod/MSEG/Voicing/FX Pro/Presets/UI Prod/Workflow) с визуальными заготовками Serum‑уровня для следующего этапа разработки (без тяжёлого DSP).
