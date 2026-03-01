@@ -1436,10 +1436,6 @@ public:
         numNodes
     };
 
-    std::function<void(Node)> onNodeClick;
-    std::function<void(Node, juce::Point<int>)> onNodeContext;
-    std::function<void(const RenderOptions&)> onRenderOptionsChanged;
-
     struct RenderOptions final
     {
         bool snapToGrid = true;
@@ -1451,6 +1447,10 @@ public:
         float wireTension = 0.55f; // 0.20 .. 0.95
         float flowSpeed = 0.45f; // 0.05 .. 1.50
     };
+
+    std::function<void(Node)> onNodeClick;
+    std::function<void(Node, juce::Point<int>)> onNodeContext;
+    std::function<void(const RenderOptions&)> onRenderOptionsChanged;
 
     void setTopology (bool isParallel, bool isDestroyPost, bool isTonePost, int orderMode, int osMode)
     {
@@ -1552,13 +1552,13 @@ public:
             if (hit >= 0)
             {
                 selectedNode = hit;
-                showNodeContextMenu ((Node) hit);
+                showNodeContextMenu ((Node) hit, e.getScreenPosition());
                 if (onNodeContext != nullptr)
                     onNodeContext ((Node) hit, e.getScreenPosition());
             }
             else
             {
-                showBackgroundContextMenu();
+                showBackgroundContextMenu (e.getScreenPosition());
             }
             repaint();
             return;
@@ -1835,18 +1835,8 @@ private:
         }
     }
 
-    void showBackgroundContextMenu()
+    void handleBackgroundMenuResult (int res)
     {
-        juce::PopupMenu m;
-        m.addItem (1, options.snapToGrid ? "Disable Snap Grid" : "Enable Snap Grid");
-        m.addItem (2, options.compactNodes ? "Standard Nodes" : "Compact Nodes");
-        m.addItem (3, options.miniMap ? "Hide MiniMap" : "Show MiniMap");
-        m.addItem (4, options.flowAnimation ? "Flow Animation Off" : "Flow Animation On");
-        m.addSeparator();
-        m.addItem (5, "Reset Graph Layout");
-        m.addItem (6, isolateSolo ? "Disable Solo Isolate" : "Enable Solo Isolate");
-
-        const int res = m.show();
         auto next = options;
         switch (res)
         {
@@ -1860,25 +1850,37 @@ private:
         }
     }
 
-    void showNodeContextMenu (Node n)
+    void showBackgroundContextMenu (juce::Point<int> screenPos)
+    {
+        juce::PopupMenu m;
+        m.addItem (1, options.snapToGrid ? "Disable Snap Grid" : "Enable Snap Grid");
+        m.addItem (2, options.compactNodes ? "Standard Nodes" : "Compact Nodes");
+        m.addItem (3, options.miniMap ? "Hide MiniMap" : "Show MiniMap");
+        m.addItem (4, options.flowAnimation ? "Flow Animation Off" : "Flow Animation On");
+        m.addSeparator();
+        m.addItem (5, "Reset Graph Layout");
+        m.addItem (6, isolateSolo ? "Disable Solo Isolate" : "Enable Solo Isolate");
+
+        const auto safeThis = juce::Component::SafePointer<FxRoutingGraph> (this);
+        auto menuOptions = juce::PopupMenu::Options()
+                               .withTargetScreenArea (juce::Rectangle<int> (screenPos.x, screenPos.y, 1, 1))
+                               .withMinimumWidth (190);
+        m.showMenuAsync (menuOptions, [safeThis] (int result)
+        {
+            if (safeThis == nullptr)
+                return;
+            safeThis->handleBackgroundMenuResult (result);
+        });
+    }
+
+    void handleNodeMenuResult (Node n, int res)
     {
         const auto idx = (size_t) n;
-        const bool canBypass = n != nodeIn && n != nodeOut;
-        juce::PopupMenu m;
-        m.addItem (1, canBypass, bypassed[idx] ? "Un-bypass Node" : "Bypass Node");
-        m.addItem (2, soloed[idx] ? "Unsolo Node" : "Solo Node");
-        m.addItem (3, locked[idx] ? "Unlock Position" : "Lock Position");
-        m.addItem (4, rerouteEnabled[idx] ? "Disable Reroute Pin" : "Enable Reroute Pin");
-        m.addSeparator();
-        m.addItem (5, "Center View on Node");
-        m.addItem (6, "Reset Graph Layout");
-        m.addSeparator();
-        m.addItem (7, "Apply Node Topology Action");
-        const int res = m.show();
-
         switch (res)
         {
             case 1:
+                if (n == nodeIn || n == nodeOut)
+                    break;
                 bypassed[idx] = ! bypassed[idx];
                 break;
             case 2:
@@ -1912,6 +1914,33 @@ private:
         }
 
         repaint();
+    }
+
+    void showNodeContextMenu (Node n, juce::Point<int> screenPos)
+    {
+        const auto idx = (size_t) n;
+        const bool canBypass = n != nodeIn && n != nodeOut;
+        juce::PopupMenu m;
+        m.addItem (1, bypassed[idx] ? "Un-bypass Node" : "Bypass Node", canBypass, bypassed[idx]);
+        m.addItem (2, soloed[idx] ? "Unsolo Node" : "Solo Node", true, soloed[idx]);
+        m.addItem (3, locked[idx] ? "Unlock Position" : "Lock Position", true, locked[idx]);
+        m.addItem (4, rerouteEnabled[idx] ? "Disable Reroute Pin" : "Enable Reroute Pin", true, rerouteEnabled[idx]);
+        m.addSeparator();
+        m.addItem (5, "Center View on Node");
+        m.addItem (6, "Reset Graph Layout");
+        m.addSeparator();
+        m.addItem (7, "Apply Node Topology Action");
+
+        const auto safeThis = juce::Component::SafePointer<FxRoutingGraph> (this);
+        auto menuOptions = juce::PopupMenu::Options()
+                               .withTargetScreenArea (juce::Rectangle<int> (screenPos.x, screenPos.y, 1, 1))
+                               .withMinimumWidth (220);
+        m.showMenuAsync (menuOptions, [safeThis, n] (int result)
+        {
+            if (safeThis == nullptr)
+                return;
+            safeThis->handleNodeMenuResult (n, result);
+        });
     }
 
     void rebuildLayout()
@@ -4922,11 +4951,11 @@ private:
         auto defaultFile = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
                                .getChildFile ("IES_UI_PROFILE.iesuip");
         profileChooser = std::make_unique<juce::FileChooser> ("Export UI profile", defaultFile, "*.iesuip;*.xml");
-        const auto flags = juce::FileBrowserComponent::saveMode
-                           | juce::FileBrowserComponent::canSelectFiles
-                           | juce::FileBrowserComponent::warnAboutOverwriting;
+        const auto chooserFlags = juce::FileBrowserComponent::saveMode
+                                  | juce::FileBrowserComponent::canSelectFiles
+                                  | juce::FileBrowserComponent::warnAboutOverwriting;
         const auto safeThis = juce::Component::SafePointer<UiProdPage> (this);
-        profileChooser->launchAsync (flags, [safeThis] (const juce::FileChooser& chooser)
+        profileChooser->launchAsync (chooserFlags, [safeThis] (const juce::FileChooser& chooser)
         {
             if (safeThis == nullptr)
                 return;
@@ -4968,10 +4997,10 @@ private:
         profileChooser = std::make_unique<juce::FileChooser> ("Import UI profile",
                                                                juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
                                                                "*.iesuip;*.xml");
-        const auto flags = juce::FileBrowserComponent::openMode
-                           | juce::FileBrowserComponent::canSelectFiles;
+        const auto chooserFlags = juce::FileBrowserComponent::openMode
+                                  | juce::FileBrowserComponent::canSelectFiles;
         const auto safeThis = juce::Component::SafePointer<UiProdPage> (this);
-        profileChooser->launchAsync (flags, [safeThis] (const juce::FileChooser& chooser)
+        profileChooser->launchAsync (chooserFlags, [safeThis] (const juce::FileChooser& chooser)
         {
             if (safeThis == nullptr)
                 return;
