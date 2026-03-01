@@ -62,6 +62,8 @@ target_sources(IndustrialEnergySynth PRIVATE
   Source/ui/I18n.h
   Source/ui/AdsrPreview.cpp
   Source/ui/AdsrPreview.h
+  Source/ui/FutureHub.cpp
+  Source/ui/FutureHub.h
   Source/ui/IndustrialLookAndFeel.cpp
   Source/ui/IndustrialLookAndFeel.h
   Source/ui/LevelMeter.cpp

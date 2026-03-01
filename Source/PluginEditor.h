@@ -9,6 +9,7 @@
 #include "ui/LevelMeter.h"
 #include "ui/SpectrumEditor.h"
 #include "ui/ShaperEditor.h"
+#include "ui/FutureHub.h"
 #include "ui/WavePreview.h"
 #include "ui/ModSourceBadge.h"
 #include "ui/LabKeyboardComponent.h"
@@ -81,9 +82,12 @@ private:
     void setUiPage (int newPageIndex);
     void applyUiPageVisibility();
     void openToneEqWindow();
+    void openFutureHubWindow();
     void layoutToneEqIn (juce::Rectangle<int> bounds);
     void restoreEditorSizeFromState();
     void storeEditorSizeToStateIfChanged();
+    void loadTopBarVisibilityFromState();
+    void storeTopBarVisibilityToState();
 
     void timerCallback() override;
     void handleNoteOn (juce::MidiKeyboardState* source, int midiChannel, int midiNoteNumber, float velocity) override;
@@ -122,7 +126,10 @@ private:
     juce::TextButton initButton;
     juce::TextButton panicButton;
     juce::TextButton helpButton;
+    juce::TextButton futureHubButton;
     juce::TextButton menuButton;
+    juce::TextButton pagePrevButton;
+    juce::TextButton pageNextButton;
     juce::TextButton pageSynthButton;
     juce::TextButton pageModButton;
     juce::TextButton pageLabButton;
@@ -360,6 +367,7 @@ private:
     };
     ToneEqWindowContent toneEqWindowContent { *this };
     std::unique_ptr<juce::DocumentWindow> toneEqWindow;
+    std::unique_ptr<juce::DocumentWindow> futureHubWindow;
 
     // Modulation (V1.2): Macros + 2 LFO + Mod Matrix
     juce::GroupComponent modGroup;
@@ -469,6 +477,9 @@ private:
     juce::TextButton fxOrderUpButton;
     juce::TextButton fxOrderDownButton;
     juce::TextButton fxOrderResetButton;
+    juce::TextButton fxSectionQuickButton;
+    juce::TextButton fxSectionMorphButton;
+    juce::TextButton fxSectionRouteButton;
     juce::TextButton fxQuickSubtleButton;
     juce::TextButton fxQuickWideButton;
     juce::TextButton fxQuickHardButton;
@@ -640,6 +651,21 @@ private:
     int fxRackDragEngineBlock = -1;
     int fxRackDragSourcePos = -1;
     int fxRackDragTargetPos = -1;
+    bool fxQuickSectionExpanded = true;
+    bool fxMorphSectionExpanded = true;
+    bool fxRouteSectionExpanded = true;
+    float fxQuickSectionAnim = 1.0f;
+    float fxMorphSectionAnim = 1.0f;
+    float fxRouteSectionAnim = 1.0f;
+    bool topShowPageTabs = true;
+    bool topShowPanicInit = false;
+    bool topShowPresetActions = false;
+    bool topShowQuickAssign = false;
+    bool topShowIntent = false;
+    bool topShowLanguage = false;
+    bool topShowSafety = false;
+    bool topShowClipIndicators = true;
+    float uiAnimPhase = 0.0f;
 
     // Sequencer / Arp page (fourth page): performance helpers (Serum-ish ARP).
     juce::GroupComponent seqGroup;

@@ -9,6 +9,10 @@
 - **Качество**: стабильность в Reaper, быстрый UI, ноль аллокаций в аудио‑потоке, предсказуемая автомейшн‑кривая.
 
 ## Текущий статус (реализовано в коде)
+- (2026-03-01) R&D Hub v1.1: страницы `VOICING/MSEG/BROWSER` доведены до рабочего состояния: live-хуки на `mono.*` (Legato/Glide), интерактивный MSEG c `Apply Target` (Macro1/2, FX Morph, Shaper Drive/Mix), Preset Browser получил `Save/Delete`, double-click load, draft-name persistence и A/B recall через `APVTS`.
+- (2026-03-01) R&D Hub v1.2: MSEG получил live-поток в `Macro 2` + one-click routing в слоты Mod Matrix (`Macro2 -> Dest`) и очистку таких маршрутов; Preset Browser расширен до unified списка `Init + Factory + User` с загрузкой всех типов.
+- (2026-03-01) R&D Hub Stubs v1: добавлено отдельное окно `R&D Hub` (Osc/Mod/MSEG/Voicing/FX Pro/Presets/UI Prod/Workflow) с визуальными заготовками Serum‑уровня для следующего этапа разработки (без тяжёлого DSP).
+- (2026-03-01) UI Animation Pack v1: добавлены живые анимации top bar/панелей (phase-driven pulse), анимированные sweep/scanline акценты и более “железная” cockpit-стилизация кнопок/крутилок/тумблеров.
 - (2026-03-01) V2.5 FX Dense UI pass: уплотнена раскладка FX detail-панели (меньше пустоты, больше параметров на экран), уменьшены высоты служебных строк (Global/Placement/Route).
 - (2026-03-01) V2.5 Delay UX pass: для блока Delay добавлен отдельный layout (Timing + Sync/PingPong lane + Div/Filter + Mod row), чтобы контролы не «плавали» и быстрее читались.
 - (2026-03-01) V2.5 Reverb/Dist UX pass: отдельные layout для Reverb и Dist (без универсальной сетки), с более предсказуемой геометрией и лучшей читаемостью.
@@ -47,6 +51,57 @@
 - (2026-02-10) Tone/Spectrum: Serum‑like EQ до 8 peak‑узлов, добавление `double-click` по пустому месту, удаление `ПКМ` по узлу.
 - (2026-02-10) Destroy OS: oversampling Off/2x/4x для Fold/Clip/Mod (снижение алиасинга, цена = CPU).
 - (2026-02-10) Modulation v1: 2x LFO (free/sync) + 2x Macros + 8-slot Mod Matrix + drag‑and‑drop назначение на ручки.
+
+## Cockpit Texture Plan (Knobs / Buttons / Panels)
+Цель: визуальный язык “кабины самолёта” без потери читаемости и скорости работы.
+
+### Phase C1 — Material Base (быстрый фундамент)
+- Ввести 3 материала UI:
+  - `Anodized Dark` (основные панели),
+  - `Brushed Steel` (кнопки/рамки),
+  - `Matte Rubber` (крутилки и переключатели).
+- Добавить единые texture tokens: `grain`, `hatch`, `sweep`, `bevel`, `screw`.
+- Вынести параметры материалов в один конфиг (альфы/контраст/толщины), чтобы быстро переключать темы.
+
+### Phase C2 — Knob Pack
+- Набор 3 текстур крутилок:
+  - `Flight Small` (компакт),
+  - `Flight Main` (главные ручки),
+  - `Safety Critical` (drive/cutoff/mix с повышенным контрастом).
+- Добавить визуальные элементы:
+  - knurl ring,
+  - metal cap,
+  - value arc glow,
+  - fine ticks вокруг окружности.
+- Ввести режимы указателя (needle / blade) и выбор на уровне контролов.
+
+### Phase C3 — Button & Toggle Pack
+- Текстуры кнопок:
+  - `Momentary`,
+  - `Latch`,
+  - `Danger` (panic/reset),
+  - `Section` (collapse headers).
+- Тумблеры:
+  - рычажный стиль (lever slot),
+  - LED-индикатор состояний,
+  - единый стиль для On/Off/Sync/Keytrack.
+- Добавить “hardware details”: винты/шайбы/рамки (только на крупные элементы, чтобы не перегружать UI).
+
+### Phase C4 — Group Panels & Readability
+- Разделить визуальные слои:
+  - фон,
+  - рабочая панель,
+  - header strip,
+  - status accents.
+- Для групп сделать 2 режима:
+  - `Calm` (минимум анимации),
+  - `Live` (scanline + pulse по activity).
+- Прогнать аудит контраста текста/цифр (RU/EN), чтобы текстуры не “съедали” подписи.
+
+### Phase C5 — Performance Guardrails
+- Ограничить частоту repaint для тяжёлых секций и синхронизировать анимации с `timerHz`.
+- Ввести quality switch для анимаций (`Eco/Hi`) на уровне UI.
+- Замерить CPU UI в stress-сценариях (большое окно + открытый FX + активный анализатор).
 
 ## V2 Milestones (после v1.0)
 

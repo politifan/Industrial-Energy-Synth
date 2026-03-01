@@ -3,6 +3,7 @@
 #include "Params.h"
 
 #include <cctype>
+#include <cmath>
 #include <vector>
 
 namespace
@@ -31,6 +32,14 @@ static constexpr const char* kModSlotDepthIds[params::mod::numSlots] =
 };
 static constexpr const char* kUiMacro1NameId = "ui.macro1Name";
 static constexpr const char* kUiMacro2NameId = "ui.macro2Name";
+static constexpr const char* kUiTopShowPageArrowsId = "ui.top.showPageArrows";
+static constexpr const char* kUiTopShowPanicInitId = "ui.top.showPanicInit";
+static constexpr const char* kUiTopShowPresetActionsId = "ui.top.showPresetActions";
+static constexpr const char* kUiTopShowQuickAssignId = "ui.top.showQuickAssign";
+static constexpr const char* kUiTopShowIntentId = "ui.top.showIntent";
+static constexpr const char* kUiTopShowLanguageId = "ui.top.showLanguage";
+static constexpr const char* kUiTopShowSafetyId = "ui.top.showSafety";
+static constexpr const char* kUiTopShowClipIndicatorsId = "ui.top.showClipIndicators";
 static constexpr const char* kToneDynEnableIds[8] =
 {
     params::tone::peak1DynEnable, params::tone::peak2DynEnable, params::tone::peak3DynEnable, params::tone::peak4DynEnable,
@@ -1184,6 +1193,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                             safeThis->loadMacroNamesFromState();
                                             safeThis->loadLabChordFromState();
                                             safeThis->loadFxCustomOrderFromProcessor();
+                                            safeThis->loadTopBarVisibilityFromState();
                                             safeThis->storeFxCustomOrderToState();
                                             safeThis->refreshLabels();
                                             safeThis->refreshTooltips();
@@ -1251,6 +1261,14 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                                nullptr);
     };
 
+    // --- R&D Hub (future Serum-level roadmap stubs) ---
+    addAndMakeVisible (futureHubButton);
+    futureHubButton.setButtonText ("R&D");
+    futureHubButton.onClick = [this]
+    {
+        openFutureHubWindow();
+    };
+
     // --- Overflow Menu (Serum-ish) ---
     addAndMakeVisible (menuButton);
     menuButton.setButtonText ("MENU");
@@ -1264,56 +1282,124 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
         juce::PopupMenu m;
 
-        m.addSectionHeader (T ("Pages", u8"Страницы"));
-        m.addItem (1001, T ("Synth", u8"Синт"), true, uiPage == pageSynth);
-        m.addItem (1002, T ("Mod", u8"Мод"), true, uiPage == pageMod);
-        m.addItem (1003, T ("Lab", u8"Лаб"), true, uiPage == pageLab);
-        m.addItem (1004, "FX", true, uiPage == pageFx);
-        m.addItem (1005, T ("Seq", u8"Сек"), true, uiPage == pageSeq);
+        juce::PopupMenu nav;
+        nav.addItem (1001, T ("Synth", u8"Синт"), true, uiPage == pageSynth);
+        nav.addItem (1002, T ("Mod", u8"Мод"), true, uiPage == pageMod);
+        nav.addItem (1003, T ("Lab", u8"Лаб"), true, uiPage == pageLab);
+        nav.addItem (1004, "FX", true, uiPage == pageFx);
+        nav.addItem (1005, T ("Seq", u8"Сек"), true, uiPage == pageSeq);
+        nav.addSeparator();
+        nav.addItem (1006, T ("Prev page", u8"Пред. страница"));
+        nav.addItem (1007, T ("Next page", u8"След. страница"));
+        m.addSubMenu (T ("Navigate", u8"Навигация"), nav, true);
 
-        m.addSeparator();
-        m.addItem (2001, T ("Panic (All Notes Off)", u8"Стоп (снять все ноты)"));
-        m.addItem (2002, T ("Init (Reset Params)", u8"Сброс (инициализация)"));
+        juce::PopupMenu presetMenu;
+        presetMenu.addItem (3003, T ("Previous preset", u8"Предыдущий пресет"));
+        presetMenu.addItem (3004, T ("Next preset", u8"Следующий пресет"));
+        presetMenu.addSeparator();
+        presetMenu.addItem (3001, T ("Save preset...", u8"Сохранить пресет..."));
+        presetMenu.addItem (3002, T ("Load preset...", u8"Загрузить пресет..."));
+        m.addSubMenu (T ("Presets", u8"Пресеты"), presetMenu, true);
 
-        m.addSeparator();
-        m.addSectionHeader (T ("Presets", u8"Пресеты"));
-        m.addItem (3001, T ("Save preset...", u8"Сохранить пресет..."));
-        m.addItem (3002, T ("Load preset...", u8"Загрузить пресет..."));
+        juce::PopupMenu fxBlockMenu;
+        fxBlockMenu.addItem (8001, T ("Chorus", u8"Хорус"), true, selectedFxBlock == fxChorus);
+        fxBlockMenu.addItem (8002, T ("Delay", u8"Дилей"), true, selectedFxBlock == fxDelay);
+        fxBlockMenu.addItem (8003, T ("Reverb", u8"Реверб"), true, selectedFxBlock == fxReverb);
+        fxBlockMenu.addItem (8004, T ("Dist", u8"Дист"), true, selectedFxBlock == fxDist);
+        fxBlockMenu.addItem (8005, T ("Phaser", u8"Фэйзер"), true, selectedFxBlock == fxPhaser);
+        fxBlockMenu.addItem (8006, T ("Octaver", u8"Октавер"), true, selectedFxBlock == fxOctaver);
+        fxBlockMenu.addItem (8007, "Xtra", true, selectedFxBlock == fxXtra);
 
-        m.addSeparator();
-        m.addSectionHeader (T ("Language", u8"Язык"));
-        m.addItem (4001, "English", true, getLanguageIndex() == (int) params::ui::en);
-        m.addItem (4002, juce::String::fromUTF8 (u8"Русский"), true, getLanguageIndex() == (int) params::ui::ru);
+        juce::PopupMenu fxModeMenu;
+        fxModeMenu.addItem (8101, T ("Basic", u8"Базово"), true, selectedFxDetailMode == fxBasic);
+        fxModeMenu.addItem (8102, T ("Advanced", u8"Расшир."), true, selectedFxDetailMode == fxAdvanced);
 
-        m.addSeparator();
-        m.addSectionHeader (T ("Intent", u8"Цель"));
-        m.addItem (5001, T ("Bass", u8"Бас"), true, currentIntent == intentBass);
-        m.addItem (5002, T ("Lead", u8"Лид"), true, currentIntent == intentLead);
-        m.addItem (5003, T ("Drone", u8"Дрон"), true, currentIntent == intentDrone);
+        juce::PopupMenu fxOrderMenu;
+        fxOrderMenu.addItem (8201, T ("Order A", u8"Порядок A"), true, fxGlobalOrder.getCombo().getSelectedItemIndex() == (int) params::fx::global::orderFixedA);
+        fxOrderMenu.addItem (8202, T ("Order B", u8"Порядок B"), true, fxGlobalOrder.getCombo().getSelectedItemIndex() == (int) params::fx::global::orderFixedB);
+        fxOrderMenu.addItem (8203, T ("Custom", u8"Пользовательский"), true, fxGlobalOrder.getCombo().getSelectedItemIndex() == (int) params::fx::global::orderCustom);
 
-        m.addSeparator();
-        m.addSectionHeader (T ("Windows", u8"Окна"));
-        m.addItem (7001, T ("Tone EQ...", u8"Эквалайзер..."));
+        juce::PopupMenu fxRouteMenu;
+        fxRouteMenu.addItem (8211, T ("Serial", u8"Последовательно"), true, fxGlobalRoute.getCombo().getSelectedItemIndex() == (int) params::fx::global::routeSerial);
+        fxRouteMenu.addItem (8212, T ("Parallel", u8"Параллельно"), true, fxGlobalRoute.getCombo().getSelectedItemIndex() == (int) params::fx::global::routeParallel);
+
+        juce::PopupMenu fxOsMenu;
+        fxOsMenu.addItem (8221, T ("Off", u8"Выкл"), true, fxGlobalOversample.getCombo().getSelectedItemIndex() == (int) params::fx::global::osOff);
+        fxOsMenu.addItem (8222, "2x", true, fxGlobalOversample.getCombo().getSelectedItemIndex() == (int) params::fx::global::os2x);
+        fxOsMenu.addItem (8223, "4x", true, fxGlobalOversample.getCombo().getSelectedItemIndex() == (int) params::fx::global::os4x);
+
+        juce::PopupMenu fxPlacementMenu;
+        fxPlacementMenu.addItem (8231, T ("Destroy: Pre Filter", u8"Destroy: до Filter"), true,
+                                 fxGlobalDestroyPlacement.getCombo().getSelectedItemIndex() == (int) params::fx::global::preFilter);
+        fxPlacementMenu.addItem (8232, T ("Destroy: Post Filter", u8"Destroy: после Filter"), true,
+                                 fxGlobalDestroyPlacement.getCombo().getSelectedItemIndex() == (int) params::fx::global::postFilter);
+        fxPlacementMenu.addSeparator();
+        fxPlacementMenu.addItem (8241, T ("Tone: Pre Filter", u8"Tone: до Filter"), true,
+                                 fxGlobalTonePlacement.getCombo().getSelectedItemIndex() == (int) params::fx::global::preFilter);
+        fxPlacementMenu.addItem (8242, T ("Tone: Post Filter", u8"Tone: после Filter"), true,
+                                 fxGlobalTonePlacement.getCombo().getSelectedItemIndex() == (int) params::fx::global::postFilter);
+
+        juce::PopupMenu fxMenu;
+        fxMenu.addSubMenu (T ("Block", u8"Блок"), fxBlockMenu, true);
+        fxMenu.addSubMenu (T ("Detail mode", u8"Режим деталей"), fxModeMenu, true);
+        fxMenu.addSubMenu (T ("Order", u8"Порядок"), fxOrderMenu, true);
+        fxMenu.addSubMenu (T ("Route", u8"Роутинг"), fxRouteMenu, true);
+        fxMenu.addSubMenu ("OS", fxOsMenu, true);
+        fxMenu.addSubMenu (T ("Placement", u8"Расположение"), fxPlacementMenu, true);
+        m.addSubMenu ("FX", fxMenu, true);
+
+        juce::PopupMenu languageMenu;
+        languageMenu.addItem (4001, "English", true, getLanguageIndex() == (int) params::ui::en);
+        languageMenu.addItem (4002, juce::String::fromUTF8 (u8"Русский"), true, getLanguageIndex() == (int) params::ui::ru);
+        m.addSubMenu (T ("Language", u8"Язык"), languageMenu, true);
+
+        juce::PopupMenu intentMenu;
+        intentMenu.addItem (5001, T ("Bass", u8"Бас"), true, currentIntent == intentBass);
+        intentMenu.addItem (5002, T ("Lead", u8"Лид"), true, currentIntent == intentLead);
+        intentMenu.addItem (5003, T ("Drone", u8"Дрон"), true, currentIntent == intentDrone);
+        m.addSubMenu (T ("Intent", u8"Цель"), intentMenu, true);
+
+        juce::PopupMenu windowsMenu;
+        windowsMenu.addItem (7001, T ("Tone EQ...", u8"Эквалайзер..."));
+        windowsMenu.addItem (7002, T ("R&D Hub...", u8"R&D Хаб..."));
+        m.addSubMenu (T ("Windows", u8"Окна"), windowsMenu, true);
+
+        juce::PopupMenu topBarMenu;
+        topBarMenu.addItem (9001, T ("Show page arrows", u8"Показывать стрелки страниц"), true, topShowPageTabs);
+        topBarMenu.addItem (9002, T ("Show Panic/Init buttons", u8"Показывать кнопки Стоп/Сброс"), true, topShowPanicInit);
+        topBarMenu.addItem (9003, T ("Show preset action buttons", u8"Показывать кнопки действий пресета"), true, topShowPresetActions);
+        topBarMenu.addItem (9004, T ("Show quick assign chips", u8"Показывать быстрые назначения"), true, topShowQuickAssign);
+        topBarMenu.addItem (9005, T ("Show intent selector", u8"Показывать выбор цели"), true, topShowIntent);
+        topBarMenu.addItem (9006, T ("Show language selector", u8"Показывать выбор языка"), true, topShowLanguage);
+        topBarMenu.addItem (9007, T ("Show safety budget", u8"Показывать safety-бюджет"), true, topShowSafety);
+        topBarMenu.addItem (9008, T ("Show clip indicators", u8"Показывать clip-индикаторы"), true, topShowClipIndicators);
+        topBarMenu.addSeparator();
+        topBarMenu.addItem (9009, T ("Compact top bar preset", u8"Компактный верхний бар"));
+        topBarMenu.addItem (9010, T ("Show all top controls", u8"Показать все верхние контролы"));
+        m.addSubMenu (T ("Top Bar", u8"Верхняя панель"), topBarMenu, true);
 
         const auto hasTarget = (lastTouchedModDest != params::mod::dstOff);
-        if (hasTarget)
-        {
-            m.addSeparator();
-            m.addSectionHeader (T ("Quick Assign", u8"Быстрое назначение"));
-            m.addItem (6001, "M1");
-            m.addItem (6002, "M2");
-            m.addItem (6003, "LFO 1");
-            m.addItem (6004, "LFO 2");
-            m.addItem (6005, "MW");
-            m.addItem (6006, "AT");
-            m.addItem (6007, "VEL");
-            m.addItem (6008, "NOTE");
-            m.addItem (6009, "FENV");
-            m.addItem (6010, "AENV");
-            m.addItem (6011, "RND");
-            m.addSeparator();
-            m.addItem (6012, T ("Clear Target Mods", u8"Очистить модуляции цели"));
-        }
+        juce::PopupMenu assignMenu;
+        assignMenu.addItem (6001, "M1", hasTarget);
+        assignMenu.addItem (6002, "M2", hasTarget);
+        assignMenu.addItem (6003, "LFO 1", hasTarget);
+        assignMenu.addItem (6004, "LFO 2", hasTarget);
+        assignMenu.addItem (6005, "MW", hasTarget);
+        assignMenu.addItem (6006, "AT", hasTarget);
+        assignMenu.addItem (6007, "VEL", hasTarget);
+        assignMenu.addItem (6008, "NOTE", hasTarget);
+        assignMenu.addItem (6009, "FENV", hasTarget);
+        assignMenu.addItem (6010, "AENV", hasTarget);
+        assignMenu.addItem (6011, "RND", hasTarget);
+        assignMenu.addSeparator();
+        assignMenu.addItem (6012, T ("Clear Target Mods", u8"Очистить модуляции цели"), hasTarget);
+        m.addSubMenu (T ("Quick Assign", u8"Быстрое назначение"), assignMenu, true);
+
+        juce::PopupMenu actionsMenu;
+        actionsMenu.addItem (2001, T ("Panic (All Notes Off)", u8"Стоп (снять все ноты)"));
+        actionsMenu.addItem (2002, T ("Init (Reset Params)", u8"Сброс (инициализация)"));
+        actionsMenu.addItem (2003, T ("Help", u8"Справка"));
+        m.addSubMenu (T ("Actions", u8"Действия"), actionsMenu, true);
 
         juce::Component::SafePointer<IndustrialEnergySynthAudioProcessorEditor> safeThis (this);
         m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton),
@@ -1329,12 +1415,17 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                  case 1003: safeThis->setUiPage (pageLab); break;
                                  case 1004: safeThis->setUiPage (pageFx); break;
                                  case 1005: safeThis->setUiPage (pageSeq); break;
+                                 case 1006: safeThis->setUiPage ((int) safeThis->uiPage - 1); break;
+                                 case 1007: safeThis->setUiPage ((int) safeThis->uiPage + 1); break;
 
                                  case 2001: safeThis->panicButton.triggerClick(); break;
                                  case 2002: safeThis->initButton.triggerClick(); break;
+                                 case 2003: safeThis->helpButton.triggerClick(); break;
 
                                  case 3001: safeThis->presetSave.triggerClick(); break;
                                  case 3002: safeThis->presetLoad.triggerClick(); break;
+                                 case 3003: safeThis->presetPrev.triggerClick(); break;
+                                 case 3004: safeThis->presetNext.triggerClick(); break;
 
                                  case 4001: safeThis->language.getCombo().setSelectedId (1, juce::sendNotification); break;
                                  case 4002: safeThis->language.getCombo().setSelectedId (2, juce::sendNotification); break;
@@ -1344,6 +1435,64 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                  case 5003: safeThis->intentMode.getCombo().setSelectedId (3, juce::sendNotification); break;
 
                                  case 7001: safeThis->openToneEqWindow(); break;
+                                 case 7002: safeThis->openFutureHubWindow(); break;
+
+                                 case 8001: safeThis->fxBlockChorus.triggerClick(); break;
+                                 case 8002: safeThis->fxBlockDelay.triggerClick(); break;
+                                 case 8003: safeThis->fxBlockReverb.triggerClick(); break;
+                                 case 8004: safeThis->fxBlockDist.triggerClick(); break;
+                                 case 8005: safeThis->fxBlockPhaser.triggerClick(); break;
+                                 case 8006: safeThis->fxBlockOctaver.triggerClick(); break;
+                                 case 8007: safeThis->fxBlockXtra.triggerClick(); break;
+
+                                 case 8101: safeThis->selectedFxDetailMode = fxBasic; safeThis->resized(); break;
+                                 case 8102: safeThis->selectedFxDetailMode = fxAdvanced; safeThis->resized(); break;
+
+                                 case 8201: safeThis->fxGlobalOrder.getCombo().setSelectedItemIndex ((int) params::fx::global::orderFixedA, juce::sendNotification); break;
+                                 case 8202: safeThis->fxGlobalOrder.getCombo().setSelectedItemIndex ((int) params::fx::global::orderFixedB, juce::sendNotification); break;
+                                 case 8203: safeThis->fxGlobalOrder.getCombo().setSelectedItemIndex ((int) params::fx::global::orderCustom, juce::sendNotification); break;
+                                 case 8211: safeThis->fxGlobalRoute.getCombo().setSelectedItemIndex ((int) params::fx::global::routeSerial, juce::sendNotification); break;
+                                 case 8212: safeThis->fxGlobalRoute.getCombo().setSelectedItemIndex ((int) params::fx::global::routeParallel, juce::sendNotification); break;
+                                 case 8221: safeThis->fxGlobalOversample.getCombo().setSelectedItemIndex ((int) params::fx::global::osOff, juce::sendNotification); break;
+                                 case 8222: safeThis->fxGlobalOversample.getCombo().setSelectedItemIndex ((int) params::fx::global::os2x, juce::sendNotification); break;
+                                 case 8223: safeThis->fxGlobalOversample.getCombo().setSelectedItemIndex ((int) params::fx::global::os4x, juce::sendNotification); break;
+                                 case 8231: safeThis->fxGlobalDestroyPlacement.getCombo().setSelectedItemIndex ((int) params::fx::global::preFilter, juce::sendNotification); break;
+                                 case 8232: safeThis->fxGlobalDestroyPlacement.getCombo().setSelectedItemIndex ((int) params::fx::global::postFilter, juce::sendNotification); break;
+                                 case 8241: safeThis->fxGlobalTonePlacement.getCombo().setSelectedItemIndex ((int) params::fx::global::preFilter, juce::sendNotification); break;
+                                 case 8242: safeThis->fxGlobalTonePlacement.getCombo().setSelectedItemIndex ((int) params::fx::global::postFilter, juce::sendNotification); break;
+
+                                 case 9001: safeThis->topShowPageTabs = ! safeThis->topShowPageTabs; safeThis->storeTopBarVisibilityToState(); safeThis->resized(); break;
+                                 case 9002: safeThis->topShowPanicInit = ! safeThis->topShowPanicInit; safeThis->storeTopBarVisibilityToState(); safeThis->resized(); break;
+                                 case 9003: safeThis->topShowPresetActions = ! safeThis->topShowPresetActions; safeThis->storeTopBarVisibilityToState(); safeThis->resized(); break;
+                                 case 9004: safeThis->topShowQuickAssign = ! safeThis->topShowQuickAssign; safeThis->storeTopBarVisibilityToState(); safeThis->resized(); break;
+                                 case 9005: safeThis->topShowIntent = ! safeThis->topShowIntent; safeThis->storeTopBarVisibilityToState(); safeThis->resized(); break;
+                                 case 9006: safeThis->topShowLanguage = ! safeThis->topShowLanguage; safeThis->storeTopBarVisibilityToState(); safeThis->resized(); break;
+                                 case 9007: safeThis->topShowSafety = ! safeThis->topShowSafety; safeThis->storeTopBarVisibilityToState(); safeThis->resized(); break;
+                                 case 9008: safeThis->topShowClipIndicators = ! safeThis->topShowClipIndicators; safeThis->storeTopBarVisibilityToState(); safeThis->resized(); break;
+                                 case 9009:
+                                     safeThis->topShowPageTabs = false;
+                                     safeThis->topShowPanicInit = false;
+                                     safeThis->topShowPresetActions = false;
+                                     safeThis->topShowQuickAssign = false;
+                                     safeThis->topShowIntent = false;
+                                     safeThis->topShowLanguage = false;
+                                     safeThis->topShowSafety = false;
+                                     safeThis->topShowClipIndicators = true;
+                                     safeThis->storeTopBarVisibilityToState();
+                                     safeThis->resized();
+                                     break;
+                                 case 9010:
+                                     safeThis->topShowPageTabs = true;
+                                     safeThis->topShowPanicInit = true;
+                                     safeThis->topShowPresetActions = true;
+                                     safeThis->topShowQuickAssign = true;
+                                     safeThis->topShowIntent = true;
+                                     safeThis->topShowLanguage = true;
+                                     safeThis->topShowSafety = true;
+                                     safeThis->topShowClipIndicators = true;
+                                     safeThis->storeTopBarVisibilityToState();
+                                     safeThis->resized();
+                                     break;
 
                                  case 6001: safeThis->assignModulation (params::mod::srcMacro1, safeThis->lastTouchedModDest); break;
                                  case 6002: safeThis->assignModulation (params::mod::srcMacro2, safeThis->lastTouchedModDest); break;
@@ -1363,6 +1512,14 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     };
 
     // --- UI Page Toggle ---
+    addAndMakeVisible (pagePrevButton);
+    pagePrevButton.setButtonText ("<");
+    pagePrevButton.onClick = [this] { setUiPage ((int) uiPage - 1); };
+
+    addAndMakeVisible (pageNextButton);
+    pageNextButton.setButtonText (">");
+    pageNextButton.onClick = [this] { setUiPage ((int) uiPage + 1); };
+
     addAndMakeVisible (pageSynthButton);
     pageSynthButton.onClick = [this] { setUiPage (pageSynth); };
 
@@ -2876,7 +3033,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
     addAndMakeVisible (fxRouteMapBody);
     fxRouteMapBody.setJustificationType (juce::Justification::centredLeft);
-    fxRouteMapBody.setMinimumHorizontalScale (0.72f);
+    fxRouteMapBody.setMinimumHorizontalScale (0.55f);
     fxRouteMapBody.setColour (juce::Label::textColourId, juce::Colour (0xffc7d5ea).withAlpha (0.88f));
 
     addAndMakeVisible (fxDetailBasicButton);
@@ -2918,6 +3075,27 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         refreshLabels();
         updateEnabledStates();
         resized();
+    };
+
+    addAndMakeVisible (fxSectionQuickButton);
+    fxSectionQuickButton.onClick = [this]
+    {
+        fxQuickSectionExpanded = ! fxQuickSectionExpanded;
+        refreshLabels();
+    };
+
+    addAndMakeVisible (fxSectionMorphButton);
+    fxSectionMorphButton.onClick = [this]
+    {
+        fxMorphSectionExpanded = ! fxMorphSectionExpanded;
+        refreshLabels();
+    };
+
+    addAndMakeVisible (fxSectionRouteButton);
+    fxSectionRouteButton.onClick = [this]
+    {
+        fxRouteSectionExpanded = ! fxRouteSectionExpanded;
+        refreshLabels();
     };
 
     addAndMakeVisible (fxQuickSubtleButton);
@@ -3558,20 +3736,20 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         spectrumSource.getCombo().onChange();
     spectrumEditor.setFrozen (spectrumFreeze.getToggleState());
 
-    // --- Serum-ish colour accents per block ---
-    const auto cMono   = juce::Colour (0xff9aa4b2);
-    const auto cOsc1   = juce::Colour (0xff00c7ff);
-    const auto cOsc2   = juce::Colour (0xffb56cff);
-    const auto cOsc3   = juce::Colour (0xff6be9ff);
-    const auto cNoise  = juce::Colour (0xffc7d5ea);
-    const auto cDestroy= juce::Colour (0xffff5b2e);
-    const auto cShaper = juce::Colour (0xff00e8c6);
-    const auto cFilter = juce::Colour (0xff5dff7a);
-    const auto cEnv    = juce::Colour (0xff4aa3ff);
-    const auto cTone   = juce::Colour (0xff00ffd5);
-    const auto cMod    = juce::Colour (0xff7d5fff);
-    const auto cOut    = juce::Colour (0xffffd166);
-    const auto cPanic  = juce::Colour (0xffff3b30);
+    // --- Cockpit palette per block ---
+    const auto cMono    = juce::Colour (0xffa8b6c9);
+    const auto cOsc1    = juce::Colour (0xff4eb9ff);
+    const auto cOsc2    = juce::Colour (0xff86a2ff);
+    const auto cOsc3    = juce::Colour (0xff49d4c8);
+    const auto cNoise   = juce::Colour (0xffd6deea);
+    const auto cDestroy = juce::Colour (0xffff8448);
+    const auto cShaper  = juce::Colour (0xff36d8c7);
+    const auto cFilter  = juce::Colour (0xff7ef38b);
+    const auto cEnv     = juce::Colour (0xff78afff);
+    const auto cTone    = juce::Colour (0xff3bcbe0);
+    const auto cMod     = juce::Colour (0xffa289ff);
+    const auto cOut     = juce::Colour (0xffffc85a);
+    const auto cPanic   = juce::Colour (0xffff5a5a);
 
     auto setGroupAccent = [] (juce::Component& c, juce::Colour col)
     {
@@ -3581,7 +3759,10 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (initButton, cOut);
     setGroupAccent (panicButton, cPanic);
     setGroupAccent (helpButton, cOut);
+    setGroupAccent (futureHubButton, cOut);
     setGroupAccent (menuButton, cOut);
+    setGroupAccent (pagePrevButton, cOut);
+    setGroupAccent (pageNextButton, cOut);
     setGroupAccent (pageSynthButton, cOsc1);
     setGroupAccent (pageModButton, cMod);
     setGroupAccent (pageLabButton, cTone);
@@ -3685,6 +3866,9 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     setGroupAccent (fxOrderUpButton, cOut);
     setGroupAccent (fxOrderDownButton, cOut);
     setGroupAccent (fxOrderResetButton, cOut);
+    setGroupAccent (fxSectionQuickButton, cOut);
+    setGroupAccent (fxSectionMorphButton, cOut);
+    setGroupAccent (fxSectionRouteButton, cOut);
     setGroupAccent (fxQuickSubtleButton, cOut);
     setGroupAccent (fxQuickWideButton, cOut);
     setGroupAccent (fxQuickHardButton, cOut);
@@ -3847,6 +4031,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
     loadLabChordFromState();
     loadLabKeyBindsFromState();
     loadFxCustomOrderFromProcessor();
+    loadTopBarVisibilityFromState();
     storeFxCustomOrderToState();
     refreshLabels();
     refreshTooltips();
@@ -3908,6 +4093,12 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
 
 IndustrialEnergySynthAudioProcessorEditor::~IndustrialEnergySynthAudioProcessorEditor()
 {
+    if (futureHubWindow != nullptr)
+    {
+        futureHubWindow->setVisible (false);
+        futureHubWindow->setLookAndFeel (nullptr);
+        futureHubWindow.reset();
+    }
     if (toneEqWindow != nullptr)
     {
         toneEqWindow->setVisible (false);
@@ -3923,33 +4114,41 @@ IndustrialEnergySynthAudioProcessorEditor::~IndustrialEnergySynthAudioProcessorE
 
 void IndustrialEnergySynthAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    // Calm, high-contrast-free background (Serum-ish: dark, technical, but not noisy).
-    const auto bgTop = juce::Colour (0xff121826);
-    const auto bgBot = juce::Colour (0xff0b0e13);
+    // Cockpit-style background: steel navy base + instrument panel texture.
+    const auto bgTop = juce::Colour (0xff182332);
+    const auto bgMid = juce::Colour (0xff111a26);
+    const auto bgBot = juce::Colour (0xff0a1018);
     g.fillAll (bgBot);
 
     {
         juce::ColourGradient cg (bgTop, 0.0f, 0.0f,
-                                 bgBot, 0.0f, (float) getHeight(), false);
+                                 bgMid, 0.0f, (float) getHeight() * 0.42f, false);
+        cg.addColour (1.0, bgBot);
         g.setGradientFill (cg);
         g.fillAll();
     }
 
-    // Accent glow (subtle) near the Shaper panel to hint at "energy".
+    // Brushed horizontal texture (kept subtle).
     {
-        auto glowArea = shaperGroup.getBounds().toFloat();
-        if (! glowArea.isEmpty())
+        const auto r = getLocalBounds();
+        for (int y = 0; y < r.getHeight(); y += 3)
         {
-            glowArea = glowArea.expanded (120.0f, 80.0f);
-            const auto centre = glowArea.getCentre();
-            juce::ColourGradient glow (juce::Colour (0xff00e8c6).withAlpha (0.10f),
-                                       centre.x, centre.y,
-                                       juce::Colour (0xff00e8c6).withAlpha (0.0f),
-                                       glowArea.getRight(), glowArea.getBottom(),
-                                       true);
-            g.setGradientFill (glow);
-            g.fillEllipse (glowArea);
+            const float t = 0.5f + 0.5f * std::sin ((float) y * 0.20f);
+            g.setColour (juce::Colour (0xffcdd8e8).withAlpha (0.010f + 0.008f * t));
+            g.drawHorizontalLine (y, 0.0f, (float) r.getWidth());
         }
+    }
+
+    // Soft radial ambient under center panel area.
+    {
+        const auto r = getLocalBounds().toFloat();
+        const auto cx = r.getCentreX();
+        const auto cy = r.getHeight() * 0.58f;
+        juce::ColourGradient cg (juce::Colour (0xff2a3f56).withAlpha (0.19f), cx, cy,
+                                 bgBot, 0.0f, (float) getHeight(), false);
+        cg.addColour (1.0, juce::Colour (0xff0a1018).withAlpha (0.0f));
+        g.setGradientFill (cg);
+        g.fillEllipse (r.expanded (-r.getWidth() * 0.08f, -r.getHeight() * 0.22f));
     }
 
     // Soft vignette so panels pop without harsh borders.
@@ -3965,26 +4164,34 @@ void IndustrialEnergySynthAudioProcessorEditor::paint (juce::Graphics& g)
         g.fillRect (r);
     }
 
-    // Sparse grid (calmer than the old 32px grid).
+    // Engineering grid + sparse rivet lines.
     g.setColour (juce::Colour (0x03ffffff));
     const auto b = getLocalBounds();
-    for (int x = 0; x < b.getWidth(); x += 64)
+    for (int x = 0; x < b.getWidth(); x += 72)
         g.drawVerticalLine (x, 0.0f, (float) b.getHeight());
-    for (int y = 0; y < b.getHeight(); y += 64)
+    for (int y = 0; y < b.getHeight(); y += 72)
         g.drawHorizontalLine (y, 0.0f, (float) b.getWidth());
-
-    // Top bar plate (slight gradient + separator).
+    g.setColour (juce::Colour (0xffb7c5d9).withAlpha (0.05f));
+    for (int x = 42; x < b.getWidth(); x += 148)
     {
-        auto top = getLocalBounds().removeFromTop (56).toFloat();
-        juce::ColourGradient tg (juce::Colour (0xff0f1218).withAlpha (0.98f), top.getX(), top.getY(),
-                                 juce::Colour (0xff0c0f14).withAlpha (0.98f), top.getX(), top.getBottom(), false);
-        g.setGradientFill (tg);
-        g.fillRect (top);
-        g.setColour (juce::Colour (0xff323846).withAlpha (0.85f));
-        g.drawLine (top.getX(), top.getBottom() - 0.5f, top.getRight(), top.getBottom() - 0.5f, 1.0f);
+        g.fillEllipse ((float) x - 1.2f, 58.0f, 2.4f, 2.4f);
+        g.fillEllipse ((float) x - 1.2f, (float) b.getHeight() - 12.0f, 2.4f, 2.4f);
     }
 
-    g.setColour (juce::Colours::whitesmoke);
+    // Top bar plate.
+    {
+        auto top = getLocalBounds().removeFromTop (56).toFloat();
+        juce::ColourGradient tg (juce::Colour (0xff0f1825).withAlpha (0.99f), top.getX(), top.getY(),
+                                 juce::Colour (0xff0b121c).withAlpha (0.99f), top.getX(), top.getBottom(), false);
+        g.setGradientFill (tg);
+        g.fillRect (top);
+        g.setColour (juce::Colour (0xff455a72).withAlpha (0.90f));
+        g.drawLine (top.getX(), top.getBottom() - 0.5f, top.getRight(), top.getBottom() - 0.5f, 1.0f);
+        g.setColour (juce::Colour (0xffffc85a).withAlpha (0.28f));
+        g.drawLine (top.getX(), top.getBottom() - 1.5f, top.getRight(), top.getBottom() - 1.5f, 1.0f);
+    }
+
+    g.setColour (juce::Colour (0xffeef4ff));
     g.setFont (juce::Font (juce::Font::getDefaultSansSerifFontName(), 18.0f, juce::Font::bold));
     {
         auto titleArea = juce::Rectangle<int> (16, 10, getWidth() - 32, 24);
@@ -3994,6 +4201,10 @@ void IndustrialEnergySynthAudioProcessorEditor::paint (juce::Graphics& g)
             titleArea.setX (juce::jmax (titleArea.getX(), initButton.getRight() + 8));
         if (panicButton.isVisible())
             titleArea.setX (juce::jmax (titleArea.getX(), panicButton.getRight() + 8));
+        if (futureHubButton.isVisible())
+            titleArea.setX (juce::jmax (titleArea.getX(), futureHubButton.getRight() + 8));
+        else if (helpButton.isVisible())
+            titleArea.setX (juce::jmax (titleArea.getX(), helpButton.getRight() + 8));
         if (preset.isVisible())
             titleArea.setX (juce::jmax (titleArea.getX(), preset.getRight() + 8));
         if (presetLoad.isVisible())
@@ -4032,7 +4243,7 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     menuButton.setVisible (true);
     menuButton.setBounds (top.removeFromRight (68).reduced (3, 7));
 
-    const bool showLanguageTop = (topW >= 820);
+    const bool showLanguageTop = topShowLanguage && (topW >= 820);
     language.setVisible (showLanguageTop);
     if (showLanguageTop)
     {
@@ -4044,7 +4255,7 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         language.setBounds (0, 0, 0, 0);
     }
 
-    const bool showIntentTop = (topW >= 1040);
+    const bool showIntentTop = topShowIntent && (topW >= 980);
     intentMode.setVisible (showIntentTop);
     if (showIntentTop)
     {
@@ -4057,14 +4268,14 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         intentMode.setBounds (0, 0, 0, 0);
     }
 
-    const bool showSafetyTop = (topW >= 1240);
+    const bool showSafetyTop = topShowSafety && (topW >= 1240);
     safetyBudgetLabel.setVisible (showSafetyTop);
     if (showSafetyTop)
         safetyBudgetLabel.setBounds (top.removeFromRight (168).reduced (3, 8));
     else
         safetyBudgetLabel.setBounds (0, 0, 0, 0);
 
-    const bool showClipsTop = ! narrow;
+    const bool showClipsTop = topShowClipIndicators && ! narrow;
     preClipIndicator.setVisible (showClipsTop);
     outClipIndicator.setVisible (showClipsTop);
     if (showClipsTop)
@@ -4088,32 +4299,40 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
     // Left side
     helpButton.setBounds (top.removeFromLeft (28).reduced (3, 7));
+    const bool showFutureHub = (topW >= 700);
+    futureHubButton.setVisible (showFutureHub);
+    if (showFutureHub)
+        futureHubButton.setBounds (top.removeFromLeft (52).reduced (3, 7));
+    else
+        futureHubButton.setBounds (0, 0, 0, 0);
 
-    const bool showPageButtons = ! ultraNarrow;
-    pageSynthButton.setVisible (showPageButtons);
-    pageModButton.setVisible (showPageButtons);
-    pageLabButton.setVisible (showPageButtons);
-    pageFxButton.setVisible (showPageButtons);
-    pageSeqButton.setVisible (showPageButtons);
-
-    if (showPageButtons)
+    const bool showPageArrows = topShowPageTabs && ! ultraNarrow;
+    pagePrevButton.setVisible (showPageArrows);
+    pageNextButton.setVisible (showPageArrows);
+    if (showPageArrows)
     {
-        pageSynthButton.setBounds (top.removeFromLeft (56).reduced (3, 7));
-        pageModButton.setBounds (top.removeFromLeft (48).reduced (3, 7));
-        pageLabButton.setBounds (top.removeFromLeft (48).reduced (3, 7));
-        pageFxButton.setBounds (top.removeFromLeft (44).reduced (3, 7));
-        pageSeqButton.setBounds (top.removeFromLeft (48).reduced (3, 7));
+        pagePrevButton.setBounds (top.removeFromLeft (28).reduced (3, 7));
+        pageNextButton.setBounds (top.removeFromLeft (28).reduced (3, 7));
     }
     else
     {
-        pageSynthButton.setBounds (0, 0, 0, 0);
-        pageModButton.setBounds (0, 0, 0, 0);
-        pageLabButton.setBounds (0, 0, 0, 0);
-        pageFxButton.setBounds (0, 0, 0, 0);
-        pageSeqButton.setBounds (0, 0, 0, 0);
+        pagePrevButton.setBounds (0, 0, 0, 0);
+        pageNextButton.setBounds (0, 0, 0, 0);
     }
 
-    const bool showQuickAssign = showModTop && showPageButtons && (topW >= 1080);
+    // Full page tabs are moved to MENU to keep the top bar compact.
+    pageSynthButton.setVisible (false);
+    pageModButton.setVisible (false);
+    pageLabButton.setVisible (false);
+    pageFxButton.setVisible (false);
+    pageSeqButton.setVisible (false);
+    pageSynthButton.setBounds (0, 0, 0, 0);
+    pageModButton.setBounds (0, 0, 0, 0);
+    pageLabButton.setBounds (0, 0, 0, 0);
+    pageFxButton.setBounds (0, 0, 0, 0);
+    pageSeqButton.setBounds (0, 0, 0, 0);
+
+    const bool showQuickAssign = showModTop && topShowQuickAssign && (topW >= 1080);
     lastTouchedLabel.setVisible (showQuickAssign && (topW >= 1180));
     if (lastTouchedLabel.isVisible())
         lastTouchedLabel.setBounds (top.removeFromLeft (124).reduced (3, 9));
@@ -4143,7 +4362,7 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     }
 
     // Panic/Init are moved into MENU on narrow widths.
-    const bool showPanicInit = (topW >= 920) && showPageButtons;
+    const bool showPanicInit = topShowPanicInit && (topW >= 920);
     panicButton.setVisible (showPanicInit);
     initButton.setVisible (showPanicInit);
     if (showPanicInit)
@@ -4158,10 +4377,10 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
     }
 
     // Preset strip: tighten/hide optional buttons on narrow widths.
-    presetPrev.setVisible (! narrow && ! ultraNarrow);
-    presetNext.setVisible (! narrow && ! ultraNarrow);
-    presetSave.setVisible (! narrow && ! ultraNarrow);
-    presetLoad.setVisible (! narrow && ! ultraNarrow);
+    presetPrev.setVisible (topShowPresetActions && ! narrow && ! ultraNarrow);
+    presetNext.setVisible (topShowPresetActions && ! narrow && ! ultraNarrow);
+    presetSave.setVisible (topShowPresetActions && ! narrow && ! ultraNarrow);
+    presetLoad.setVisible (topShowPresetActions && ! narrow && ! ultraNarrow);
 
     if (presetPrev.isVisible())
         presetPrev.setBounds (top.removeFromLeft (28).reduced (3, 7));
@@ -4955,24 +5174,44 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         fxOutMeter.setBounds (rk.removeFromTop (16).reduced (0, 1));
 
         auto dt = detail.reduced (8, 22);
-        auto globalRow = dt.removeFromTop (64);
-        const int gw = juce::jmax (74, (globalRow.getWidth() - gap2 * 4) / 5);
-        fxGlobalMix.setBounds (globalRow.removeFromLeft (gw));
-        globalRow.removeFromLeft (gap2);
-        fxGlobalMorph.setBounds (globalRow.removeFromLeft (gw));
-        globalRow.removeFromLeft (gap2);
-        fxGlobalOrder.setBounds (globalRow.removeFromLeft (gw));
-        globalRow.removeFromLeft (gap2);
-        fxGlobalRoute.setBounds (globalRow.removeFromLeft (gw));
-        globalRow.removeFromLeft (gap2);
-        fxGlobalOversample.setBounds (globalRow.removeFromLeft (gw));
-        dt.removeFromTop (4);
-        auto placementRow = dt.removeFromTop (44);
-        const int pw = juce::jmax (120, (placementRow.getWidth() - gap2) / 2);
-        fxGlobalDestroyPlacement.setBounds (placementRow.removeFromLeft (pw));
-        placementRow.removeFromLeft (gap2);
-        fxGlobalTonePlacement.setBounds (placementRow.removeFromLeft (pw));
-        dt.removeFromTop (4);
+        const bool showInlineFxSwitches = false;
+
+        auto globalRow = dt.removeFromTop (showInlineFxSwitches ? 64 : 50);
+        if (showInlineFxSwitches)
+        {
+            const int gw = juce::jmax (74, (globalRow.getWidth() - gap2 * 4) / 5);
+            fxGlobalMix.setBounds (globalRow.removeFromLeft (gw));
+            globalRow.removeFromLeft (gap2);
+            fxGlobalMorph.setBounds (globalRow.removeFromLeft (gw));
+            globalRow.removeFromLeft (gap2);
+            fxGlobalOrder.setBounds (globalRow.removeFromLeft (gw));
+            globalRow.removeFromLeft (gap2);
+            fxGlobalRoute.setBounds (globalRow.removeFromLeft (gw));
+            globalRow.removeFromLeft (gap2);
+            fxGlobalOversample.setBounds (globalRow.removeFromLeft (gw));
+            dt.removeFromTop (4);
+
+            auto placementRow = dt.removeFromTop (44);
+            const int pw = juce::jmax (120, (placementRow.getWidth() - gap2) / 2);
+            fxGlobalDestroyPlacement.setBounds (placementRow.removeFromLeft (pw));
+            placementRow.removeFromLeft (gap2);
+            fxGlobalTonePlacement.setBounds (placementRow.removeFromLeft (pw));
+            dt.removeFromTop (4);
+        }
+        else
+        {
+            const int gw = juce::jmax (120, juce::jmin (188, (globalRow.getWidth() - gap2) / 2));
+            fxGlobalMix.setBounds (globalRow.removeFromLeft (gw));
+            globalRow.removeFromLeft (gap2);
+            fxGlobalMorph.setBounds (globalRow.removeFromLeft (gw));
+            fxGlobalOrder.setBounds (0, 0, 0, 0);
+            fxGlobalRoute.setBounds (0, 0, 0, 0);
+            fxGlobalOversample.setBounds (0, 0, 0, 0);
+            fxGlobalDestroyPlacement.setBounds (0, 0, 0, 0);
+            fxGlobalTonePlacement.setBounds (0, 0, 0, 0);
+            dt.removeFromTop (2);
+        }
+
         auto modeRow = dt.removeFromTop (24);
         const int modeGap = 6;
         const int modeW = juce::jmax (92, juce::jmin (138, (modeRow.getWidth() - modeGap) / 2));
@@ -4981,66 +5220,136 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
         fxDetailAdvancedButton.setBounds (modeRow.removeFromLeft (modeW));
         dt.removeFromTop (5);
 
-        auto orderRow = dt.removeFromTop (24);
-        const int orderGap = 6;
-        const int orderW = juce::jmax (70, juce::jmin (120, (orderRow.getWidth() - orderGap * 2) / 3));
-        fxOrderUpButton.setBounds (orderRow.removeFromLeft (orderW));
-        orderRow.removeFromLeft (orderGap);
-        fxOrderDownButton.setBounds (orderRow.removeFromLeft (orderW));
-        orderRow.removeFromLeft (orderGap);
-        fxOrderResetButton.setBounds (orderRow.removeFromLeft (orderW));
-        dt.removeFromTop (5);
+        if (showInlineFxSwitches)
+        {
+            auto orderRow = dt.removeFromTop (24);
+            const int orderGap = 6;
+            const int orderW = juce::jmax (70, juce::jmin (120, (orderRow.getWidth() - orderGap * 2) / 3));
+            fxOrderUpButton.setBounds (orderRow.removeFromLeft (orderW));
+            orderRow.removeFromLeft (orderGap);
+            fxOrderDownButton.setBounds (orderRow.removeFromLeft (orderW));
+            orderRow.removeFromLeft (orderGap);
+            fxOrderResetButton.setBounds (orderRow.removeFromLeft (orderW));
+            dt.removeFromTop (5);
+        }
+        else
+        {
+            fxOrderUpButton.setBounds (0, 0, 0, 0);
+            fxOrderDownButton.setBounds (0, 0, 0, 0);
+            fxOrderResetButton.setBounds (0, 0, 0, 0);
+        }
 
-        auto quickRow = dt.removeFromTop (24);
+        const int sectionHeaderH = 22;
+        const int sectionGap = 4;
         const int quickGap = 6;
-        const int quickW = juce::jmax (82, juce::jmin (130, (quickRow.getWidth() - quickGap * 2) / 3));
-        fxQuickSubtleButton.setBounds (quickRow.removeFromLeft (quickW));
-        quickRow.removeFromLeft (quickGap);
-        fxQuickWideButton.setBounds (quickRow.removeFromLeft (quickW));
-        quickRow.removeFromLeft (quickGap);
-        fxQuickHardButton.setBounds (quickRow.removeFromLeft (quickW));
-        dt.removeFromTop (5);
-
-        auto quickRow2 = dt.removeFromTop (24);
-        const int quickW2 = juce::jmax (120, juce::jmin (190, (quickRow2.getWidth() - quickGap) / 2));
-        fxQuickRandomButton.setBounds (quickRow2.removeFromLeft (quickW2));
-        quickRow2.removeFromLeft (quickGap);
-        fxQuickUndoButton.setBounds (quickRow2.removeFromLeft (quickW2));
-        dt.removeFromTop (5);
-
-        auto abRow = dt.removeFromTop (24);
-        const int abW = juce::jmax (88, juce::jmin (132, (abRow.getWidth() - quickGap * 3) / 4));
-        fxQuickStoreAButton.setBounds (abRow.removeFromLeft (abW));
-        abRow.removeFromLeft (quickGap);
-        fxQuickStoreBButton.setBounds (abRow.removeFromLeft (abW));
-        abRow.removeFromLeft (quickGap);
-        fxQuickRecallAButton.setBounds (abRow.removeFromLeft (abW));
-        abRow.removeFromLeft (quickGap);
-        fxQuickRecallBButton.setBounds (abRow.removeFromLeft (abW));
-        dt.removeFromTop (5);
-
-        auto morphRow = dt.removeFromTop (24);
         const int morphGap = 6;
-        const int morphLabelW = 34;
-        const int morphAutoW = juce::jmax (56, juce::jmin (78, morphRow.getWidth() / 7));
-        const int morphButtonW = juce::jmax (58, juce::jmin (88, morphRow.getWidth() / 6));
-        const int morphSliderW = juce::jmax (72, morphRow.getWidth() - morphLabelW - morphAutoW - morphButtonW * 2 - morphGap * 4);
-        fxQuickMorphLabel.setBounds (morphRow.removeFromLeft (morphLabelW));
-        morphRow.removeFromLeft (morphGap);
-        fxQuickMorphSlider.setBounds (morphRow.removeFromLeft (morphSliderW));
-        morphRow.removeFromLeft (morphGap);
-        fxQuickMorphAuto.setBounds (morphRow.removeFromLeft (morphAutoW));
-        morphRow.removeFromLeft (morphGap);
-        fxQuickMorphApplyButton.setBounds (morphRow.removeFromLeft (morphButtonW));
-        morphRow.removeFromLeft (morphGap);
-        fxQuickSwapButton.setBounds (morphRow.removeFromLeft (morphButtonW));
+
+        auto quickHeader = dt.removeFromTop (sectionHeaderH);
+        fxSectionQuickButton.setBounds (quickHeader.removeFromLeft (juce::jmax (130, juce::jmin (220, dt.getWidth() / 3))));
+        dt.removeFromTop (sectionGap);
+
+        const int quickBaseH = 24 * 3 + 10;
+        const int quickH = juce::jmax (0, (int) std::round ((double) quickBaseH * fxQuickSectionAnim));
+        const bool showQuickSectionContent = showFx && quickH > 0;
+        if (showQuickSectionContent)
+        {
+            auto quickSection = dt.removeFromTop (quickH);
+            const int rowH = juce::jmax (10, (quickSection.getHeight() - 10) / 3);
+
+            auto quickRow = quickSection.removeFromTop (rowH);
+            const int quickW = juce::jmax (72, juce::jmin (130, (quickRow.getWidth() - quickGap * 2) / 3));
+            fxQuickSubtleButton.setBounds (quickRow.removeFromLeft (quickW));
+            quickRow.removeFromLeft (quickGap);
+            fxQuickWideButton.setBounds (quickRow.removeFromLeft (quickW));
+            quickRow.removeFromLeft (quickGap);
+            fxQuickHardButton.setBounds (quickRow.removeFromLeft (quickW));
+            quickSection.removeFromTop (5);
+
+            auto quickRow2 = quickSection.removeFromTop (rowH);
+            const int quickW2 = juce::jmax (96, juce::jmin (190, (quickRow2.getWidth() - quickGap) / 2));
+            fxQuickRandomButton.setBounds (quickRow2.removeFromLeft (quickW2));
+            quickRow2.removeFromLeft (quickGap);
+            fxQuickUndoButton.setBounds (quickRow2.removeFromLeft (quickW2));
+            quickSection.removeFromTop (5);
+
+            auto abRow = quickSection;
+            const int abW = juce::jmax (80, juce::jmin (132, (abRow.getWidth() - quickGap * 3) / 4));
+            fxQuickStoreAButton.setBounds (abRow.removeFromLeft (abW));
+            abRow.removeFromLeft (quickGap);
+            fxQuickStoreBButton.setBounds (abRow.removeFromLeft (abW));
+            abRow.removeFromLeft (quickGap);
+            fxQuickRecallAButton.setBounds (abRow.removeFromLeft (abW));
+            abRow.removeFromLeft (quickGap);
+            fxQuickRecallBButton.setBounds (abRow.removeFromLeft (abW));
+        }
+        else
+        {
+            fxQuickSubtleButton.setBounds (0, 0, 0, 0);
+            fxQuickWideButton.setBounds (0, 0, 0, 0);
+            fxQuickHardButton.setBounds (0, 0, 0, 0);
+            fxQuickRandomButton.setBounds (0, 0, 0, 0);
+            fxQuickUndoButton.setBounds (0, 0, 0, 0);
+            fxQuickStoreAButton.setBounds (0, 0, 0, 0);
+            fxQuickStoreBButton.setBounds (0, 0, 0, 0);
+            fxQuickRecallAButton.setBounds (0, 0, 0, 0);
+            fxQuickRecallBButton.setBounds (0, 0, 0, 0);
+        }
         dt.removeFromTop (5);
 
-        auto routeRow = dt.removeFromTop (36);
-        fxRouteMapTitle.setBounds (routeRow.removeFromTop (16));
-        routeRow.removeFromTop (2);
-        fxRouteMapBody.setBounds (routeRow);
-        dt.removeFromTop (7);
+        auto morphHeader = dt.removeFromTop (sectionHeaderH);
+        fxSectionMorphButton.setBounds (morphHeader.removeFromLeft (juce::jmax (130, juce::jmin (220, dt.getWidth() / 3))));
+        dt.removeFromTop (sectionGap);
+
+        const int morphBaseH = 24;
+        const int morphH = juce::jmax (0, (int) std::round ((double) morphBaseH * fxMorphSectionAnim));
+        const bool showMorphSectionContent = showFx && morphH > 0;
+        if (showMorphSectionContent)
+        {
+            auto morphRow = dt.removeFromTop (morphH);
+            const int morphLabelW = 34;
+            const int morphAutoW = juce::jmax (56, juce::jmin (78, morphRow.getWidth() / 7));
+            const int morphButtonW = juce::jmax (58, juce::jmin (88, morphRow.getWidth() / 6));
+            const int morphSliderW = juce::jmax (72, morphRow.getWidth() - morphLabelW - morphAutoW - morphButtonW * 2 - morphGap * 4);
+            fxQuickMorphLabel.setBounds (morphRow.removeFromLeft (morphLabelW));
+            morphRow.removeFromLeft (morphGap);
+            fxQuickMorphSlider.setBounds (morphRow.removeFromLeft (morphSliderW));
+            morphRow.removeFromLeft (morphGap);
+            fxQuickMorphAuto.setBounds (morphRow.removeFromLeft (morphAutoW));
+            morphRow.removeFromLeft (morphGap);
+            fxQuickMorphApplyButton.setBounds (morphRow.removeFromLeft (morphButtonW));
+            morphRow.removeFromLeft (morphGap);
+            fxQuickSwapButton.setBounds (morphRow.removeFromLeft (morphButtonW));
+        }
+        else
+        {
+            fxQuickMorphLabel.setBounds (0, 0, 0, 0);
+            fxQuickMorphSlider.setBounds (0, 0, 0, 0);
+            fxQuickMorphAuto.setBounds (0, 0, 0, 0);
+            fxQuickMorphApplyButton.setBounds (0, 0, 0, 0);
+            fxQuickSwapButton.setBounds (0, 0, 0, 0);
+        }
+        dt.removeFromTop (5);
+
+        auto routeHeader = dt.removeFromTop (sectionHeaderH);
+        fxSectionRouteButton.setBounds (routeHeader.removeFromLeft (juce::jmax (130, juce::jmin (220, dt.getWidth() / 3))));
+        dt.removeFromTop (sectionGap);
+
+        const int routeBaseH = 32;
+        const int routeH = juce::jmax (0, (int) std::round ((double) routeBaseH * fxRouteSectionAnim));
+        const bool showRouteSectionContent = showFx && routeH > 0;
+        if (showRouteSectionContent)
+        {
+            auto routeRow = dt.removeFromTop (routeH);
+            fxRouteMapTitle.setBounds (routeRow.removeFromTop (14));
+            routeRow.removeFromTop (1);
+            fxRouteMapBody.setBounds (routeRow);
+        }
+        else
+        {
+            fxRouteMapTitle.setBounds (0, 0, 0, 0);
+            fxRouteMapBody.setBounds (0, 0, 0, 0);
+        }
+        dt.removeFromTop (5);
 
         auto setModeButtonVisual = [] (juce::TextButton& b, bool active)
         {
@@ -5255,32 +5564,35 @@ void IndustrialEnergySynthAudioProcessorEditor::resized()
 
         fxGlobalMix.setVisible (showFx);
         fxGlobalMorph.setVisible (showFx);
-        fxGlobalOrder.setVisible (showFx);
-        fxGlobalRoute.setVisible (showFx);
-        fxGlobalOversample.setVisible (showFx);
-        fxGlobalDestroyPlacement.setVisible (showFx);
-        fxGlobalTonePlacement.setVisible (showFx);
+        fxGlobalOrder.setVisible (false);
+        fxGlobalRoute.setVisible (false);
+        fxGlobalOversample.setVisible (false);
+        fxGlobalDestroyPlacement.setVisible (false);
+        fxGlobalTonePlacement.setVisible (false);
         fxDetailBasicButton.setVisible (showFx);
         fxDetailAdvancedButton.setVisible (showFx);
-        fxOrderUpButton.setVisible (showFx);
-        fxOrderDownButton.setVisible (showFx);
-        fxOrderResetButton.setVisible (showFx);
-        fxQuickSubtleButton.setVisible (showFx);
-        fxQuickWideButton.setVisible (showFx);
-        fxQuickHardButton.setVisible (showFx);
-        fxQuickRandomButton.setVisible (showFx);
-        fxQuickUndoButton.setVisible (showFx);
-        fxQuickStoreAButton.setVisible (showFx);
-        fxQuickStoreBButton.setVisible (showFx);
-        fxQuickRecallAButton.setVisible (showFx);
-        fxQuickRecallBButton.setVisible (showFx);
-        fxQuickMorphLabel.setVisible (showFx);
-        fxQuickMorphSlider.setVisible (showFx);
-        fxQuickMorphAuto.setVisible (showFx);
-        fxQuickMorphApplyButton.setVisible (showFx);
-        fxQuickSwapButton.setVisible (showFx);
-        fxRouteMapTitle.setVisible (showFx);
-        fxRouteMapBody.setVisible (showFx);
+        fxOrderUpButton.setVisible (false);
+        fxOrderDownButton.setVisible (false);
+        fxOrderResetButton.setVisible (false);
+        fxSectionQuickButton.setVisible (showFx);
+        fxSectionMorphButton.setVisible (showFx);
+        fxSectionRouteButton.setVisible (showFx);
+        fxQuickSubtleButton.setVisible (showQuickSectionContent);
+        fxQuickWideButton.setVisible (showQuickSectionContent);
+        fxQuickHardButton.setVisible (showQuickSectionContent);
+        fxQuickRandomButton.setVisible (showQuickSectionContent);
+        fxQuickUndoButton.setVisible (showQuickSectionContent);
+        fxQuickStoreAButton.setVisible (showQuickSectionContent);
+        fxQuickStoreBButton.setVisible (showQuickSectionContent);
+        fxQuickRecallAButton.setVisible (showQuickSectionContent);
+        fxQuickRecallBButton.setVisible (showQuickSectionContent);
+        fxQuickMorphLabel.setVisible (showMorphSectionContent);
+        fxQuickMorphSlider.setVisible (showMorphSectionContent);
+        fxQuickMorphAuto.setVisible (showMorphSectionContent);
+        fxQuickMorphApplyButton.setVisible (showMorphSectionContent);
+        fxQuickSwapButton.setVisible (showMorphSectionContent);
+        fxRouteMapTitle.setVisible (showRouteSectionContent);
+        fxRouteMapBody.setVisible (showRouteSectionContent);
 
         hideAllFxDetail();
         if (showFx)
@@ -5448,6 +5760,33 @@ void IndustrialEnergySynthAudioProcessorEditor::storeEditorSizeToStateIfChanged(
     state.setProperty (params::ui::editorH, h, nullptr);
 }
 
+void IndustrialEnergySynthAudioProcessorEditor::loadTopBarVisibilityFromState()
+{
+    const auto& state = audioProcessor.getAPVTS().state;
+
+    topShowPageTabs = (bool) state.getProperty (kUiTopShowPageArrowsId, topShowPageTabs);
+    topShowPanicInit = (bool) state.getProperty (kUiTopShowPanicInitId, topShowPanicInit);
+    topShowPresetActions = (bool) state.getProperty (kUiTopShowPresetActionsId, topShowPresetActions);
+    topShowQuickAssign = (bool) state.getProperty (kUiTopShowQuickAssignId, topShowQuickAssign);
+    topShowIntent = (bool) state.getProperty (kUiTopShowIntentId, topShowIntent);
+    topShowLanguage = (bool) state.getProperty (kUiTopShowLanguageId, topShowLanguage);
+    topShowSafety = (bool) state.getProperty (kUiTopShowSafetyId, topShowSafety);
+    topShowClipIndicators = (bool) state.getProperty (kUiTopShowClipIndicatorsId, topShowClipIndicators);
+}
+
+void IndustrialEnergySynthAudioProcessorEditor::storeTopBarVisibilityToState()
+{
+    auto& state = audioProcessor.getAPVTS().state;
+    state.setProperty (kUiTopShowPageArrowsId, topShowPageTabs, nullptr);
+    state.setProperty (kUiTopShowPanicInitId, topShowPanicInit, nullptr);
+    state.setProperty (kUiTopShowPresetActionsId, topShowPresetActions, nullptr);
+    state.setProperty (kUiTopShowQuickAssignId, topShowQuickAssign, nullptr);
+    state.setProperty (kUiTopShowIntentId, topShowIntent, nullptr);
+    state.setProperty (kUiTopShowLanguageId, topShowLanguage, nullptr);
+    state.setProperty (kUiTopShowSafetyId, topShowSafety, nullptr);
+    state.setProperty (kUiTopShowClipIndicatorsId, topShowClipIndicators, nullptr);
+}
+
 void IndustrialEnergySynthAudioProcessorEditor::layoutToneEqIn (juce::Rectangle<int> bounds)
 {
     auto r = bounds;
@@ -5535,6 +5874,95 @@ void IndustrialEnergySynthAudioProcessorEditor::openToneEqWindow()
     toneEqWindow->toFront (true);
 }
 
+void IndustrialEnergySynthAudioProcessorEditor::openFutureHubWindow()
+{
+    struct FutureHubWindow final : public juce::DocumentWindow
+    {
+        FutureHubWindow (const juce::String& name, juce::Colour bg, int buttons)
+            : juce::DocumentWindow (name, bg, buttons, true)
+        {
+            setUsingNativeTitleBar (true);
+        }
+
+        void closeButtonPressed() override
+        {
+            setVisible (false);
+        }
+    };
+
+    const auto title = isRussian() ? juce::String::fromUTF8 (u8"R&D Хаб: Заглушки Serum-уровня")
+                                   : juce::String ("R&D Hub: Serum-Level Stubs");
+
+    if (futureHubWindow == nullptr)
+    {
+        ies::ui::FutureHubContext hubContext;
+        hubContext.apvts = &audioProcessor.getAPVTS();
+        hubContext.presetManager = presetManager.get();
+        hubContext.onPresetSetChanged = [safeThis = juce::Component::SafePointer<IndustrialEnergySynthAudioProcessorEditor> (this)]
+        {
+            if (safeThis == nullptr)
+                return;
+            safeThis->rebuildPresetMenu();
+            safeThis->loadMacroNamesFromState();
+            safeThis->loadLabChordFromState();
+            safeThis->loadFxCustomOrderFromProcessor();
+            safeThis->loadTopBarVisibilityFromState();
+            safeThis->storeFxCustomOrderToState();
+            safeThis->refreshLabels();
+            safeThis->refreshTooltips();
+            safeThis->updateEnabledStates();
+            safeThis->resized();
+        };
+        hubContext.onStatus = [safeThis = juce::Component::SafePointer<IndustrialEnergySynthAudioProcessorEditor> (this)] (const juce::String& message)
+        {
+            if (safeThis == nullptr)
+                return;
+            safeThis->statusLabel.setText (message, juce::dontSendNotification);
+        };
+        hubContext.loadInitPreset = [safeThis = juce::Component::SafePointer<IndustrialEnergySynthAudioProcessorEditor> (this)]
+        {
+            if (safeThis == nullptr)
+                return;
+            safeThis->resetAllParamsKeepLanguage();
+        };
+        hubContext.getFactoryPresetNames = [safeThis = juce::Component::SafePointer<IndustrialEnergySynthAudioProcessorEditor> (this)]() -> juce::StringArray
+        {
+            juce::StringArray names;
+            if (safeThis == nullptr)
+                return names;
+
+            const auto ru = safeThis->isRussian();
+            for (int i = 0; i < getNumFactoryPresets(); ++i)
+                names.add (ru ? juce::String::fromUTF8 (kFactoryPresets[i].nameRu) : juce::String (kFactoryPresets[i].nameEn));
+            return names;
+        };
+        hubContext.loadFactoryPresetByIndex = [safeThis = juce::Component::SafePointer<IndustrialEnergySynthAudioProcessorEditor> (this)] (int index)
+        {
+            if (safeThis == nullptr)
+                return;
+            safeThis->applyFactoryPreset (index);
+        };
+
+        futureHubWindow = std::make_unique<FutureHubWindow> (title,
+                                                             juce::Colour (0xff0b0f16),
+                                                             juce::DocumentWindow::closeButton);
+        futureHubWindow->setLookAndFeel (&lnf);
+        futureHubWindow->setResizable (true, true);
+        futureHubWindow->setResizeLimits (1080, 680, 2400, 1600);
+        futureHubWindow->setAlwaysOnTop (true);
+        futureHubWindow->setContentOwned (new ies::ui::FutureHubComponent (std::move (hubContext)), true);
+        futureHubWindow->centreWithSize (1320, 820);
+    }
+    else
+    {
+        futureHubWindow->setName (title);
+        futureHubWindow->setAlwaysOnTop (true);
+    }
+
+    futureHubWindow->setVisible (true);
+    futureHubWindow->toFront (true);
+}
+
 int IndustrialEnergySynthAudioProcessorEditor::getLanguageIndex() const
 {
     // ComboBoxAttachment sets selectedId; item index is fine as long as IDs are 1..N in order.
@@ -5580,6 +6008,8 @@ void IndustrialEnergySynthAudioProcessorEditor::setUiPage (int newPageIndex)
     setTabVisual (pageLabButton, uiPage == pageLab);
     setTabVisual (pageFxButton, uiPage == pageFx);
     setTabVisual (pageSeqButton, uiPage == pageSeq);
+    pagePrevButton.setEnabled (uiPage != pageSynth);
+    pageNextButton.setEnabled (uiPage != pageSeq);
 
     if (uiPage == pageLab)
     {
@@ -5614,7 +6044,10 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     initButton.setVisible (true);
     panicButton.setVisible (true);
     helpButton.setVisible (true);
+    futureHubButton.setVisible (true);
     menuButton.setVisible (true);
+    pagePrevButton.setVisible (true);
+    pageNextButton.setVisible (true);
     pageSynthButton.setVisible (true);
     pageModButton.setVisible (true);
     pageLabButton.setVisible (true);
@@ -5845,32 +6278,35 @@ void IndustrialEnergySynthAudioProcessorEditor::applyUiPageVisibility()
     fxXtraEnable.setVisible (showFx);
     fxGlobalMix.setVisible (showFx);
     fxGlobalMorph.setVisible (showFx);
-    fxGlobalOrder.setVisible (showFx);
-    fxGlobalRoute.setVisible (showFx);
-    fxGlobalOversample.setVisible (showFx);
-    fxGlobalDestroyPlacement.setVisible (showFx);
-    fxGlobalTonePlacement.setVisible (showFx);
-    fxRouteMapTitle.setVisible (showFx);
-    fxRouteMapBody.setVisible (showFx);
+    fxGlobalOrder.setVisible (false);
+    fxGlobalRoute.setVisible (false);
+    fxGlobalOversample.setVisible (false);
+    fxGlobalDestroyPlacement.setVisible (false);
+    fxGlobalTonePlacement.setVisible (false);
+    fxRouteMapTitle.setVisible (showFx && fxRouteSectionExpanded);
+    fxRouteMapBody.setVisible (showFx && fxRouteSectionExpanded);
     fxDetailBasicButton.setVisible (showFx);
     fxDetailAdvancedButton.setVisible (showFx);
-    fxOrderUpButton.setVisible (showFx);
-    fxOrderDownButton.setVisible (showFx);
-    fxOrderResetButton.setVisible (showFx);
-    fxQuickSubtleButton.setVisible (showFx);
-    fxQuickWideButton.setVisible (showFx);
-    fxQuickHardButton.setVisible (showFx);
-    fxQuickRandomButton.setVisible (showFx);
-    fxQuickUndoButton.setVisible (showFx);
-    fxQuickStoreAButton.setVisible (showFx);
-    fxQuickStoreBButton.setVisible (showFx);
-    fxQuickRecallAButton.setVisible (showFx);
-    fxQuickRecallBButton.setVisible (showFx);
-    fxQuickMorphLabel.setVisible (showFx);
-    fxQuickMorphSlider.setVisible (showFx);
-    fxQuickMorphAuto.setVisible (showFx);
-    fxQuickMorphApplyButton.setVisible (showFx);
-    fxQuickSwapButton.setVisible (showFx);
+    fxOrderUpButton.setVisible (false);
+    fxOrderDownButton.setVisible (false);
+    fxOrderResetButton.setVisible (false);
+    fxSectionQuickButton.setVisible (showFx);
+    fxSectionMorphButton.setVisible (showFx);
+    fxSectionRouteButton.setVisible (showFx);
+    fxQuickSubtleButton.setVisible (showFx && fxQuickSectionExpanded);
+    fxQuickWideButton.setVisible (showFx && fxQuickSectionExpanded);
+    fxQuickHardButton.setVisible (showFx && fxQuickSectionExpanded);
+    fxQuickRandomButton.setVisible (showFx && fxQuickSectionExpanded);
+    fxQuickUndoButton.setVisible (showFx && fxQuickSectionExpanded);
+    fxQuickStoreAButton.setVisible (showFx && fxQuickSectionExpanded);
+    fxQuickStoreBButton.setVisible (showFx && fxQuickSectionExpanded);
+    fxQuickRecallAButton.setVisible (showFx && fxQuickSectionExpanded);
+    fxQuickRecallBButton.setVisible (showFx && fxQuickSectionExpanded);
+    fxQuickMorphLabel.setVisible (showFx && fxMorphSectionExpanded);
+    fxQuickMorphSlider.setVisible (showFx && fxMorphSectionExpanded);
+    fxQuickMorphAuto.setVisible (showFx && fxMorphSectionExpanded);
+    fxQuickMorphApplyButton.setVisible (showFx && fxMorphSectionExpanded);
+    fxQuickSwapButton.setVisible (showFx && fxMorphSectionExpanded);
     fxChorusMix.setVisible (showFx && selectedFxBlock == fxChorus);
     fxChorusRate.setVisible (showFx && selectedFxBlock == fxChorus);
     fxChorusDepth.setVisible (showFx && selectedFxBlock == fxChorus);
@@ -6142,36 +6578,31 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshFxRouteMap()
     juce::String routeTxt = (routeMode == (int) params::fx::global::routeParallel)
                                 ? (isRu ? juce::String::fromUTF8 (u8"Параллельно") : juce::String ("Parallel"))
                                 : (isRu ? juce::String::fromUTF8 (u8"Последовательно") : juce::String ("Serial"));
-    juce::String destroyTxt = (destroyPlacementMode == (int) params::fx::global::postFilter)
-                                  ? (isRu ? juce::String::fromUTF8 (u8"Destroy: после Filter") : juce::String ("Destroy: post Filter"))
-                                  : (isRu ? juce::String::fromUTF8 (u8"Destroy: до Filter") : juce::String ("Destroy: pre Filter"));
-    juce::String toneTxt = (tonePlacementMode == (int) params::fx::global::preFilter)
-                               ? (isRu ? juce::String::fromUTF8 (u8"Tone: до Filter") : juce::String ("Tone: pre Filter"))
-                               : (isRu ? juce::String::fromUTF8 (u8"Tone: после Filter") : juce::String ("Tone: post Filter"));
-    juce::String shaperTxt = (shaperPlacementMode == (int) params::shaper::postDestroy)
-                                 ? (isRu ? juce::String::fromUTF8 (u8"Shaper: после Destroy") : juce::String ("Shaper: post Destroy"))
-                                 : (isRu ? juce::String::fromUTF8 (u8"Shaper: до Destroy") : juce::String ("Shaper: pre Destroy"));
-
     fxRouteMapTitle.setText ((isRu ? juce::String::fromUTF8 (u8"Маршрут FX") : juce::String ("FX Route")) + "  •  " + orderTxt + " / " + routeTxt,
                              juce::dontSendNotification);
 
     juce::String body;
     body << (isRu ? juce::String::fromUTF8 (u8"Цепь: ") : juce::String ("Chain: "));
-    body << chainNames.joinIntoString ("  >  ");
-    body << "\n";
+    body << chainNames.joinIntoString (">");
+    body << "  |  ";
     if (routeMode == (int) params::fx::global::routeParallel)
-        body << (isRu ? juce::String::fromUTF8 (u8"Поток: IN -> (FX Chain || Xtra) -> Blend -> OUT")
-                      : juce::String ("Flow: IN -> (FX Chain || Xtra) -> Blend -> OUT"));
+        body << (isRu ? juce::String::fromUTF8 (u8"Поток: IN>(FX||Xtra)>OUT")
+                      : juce::String ("Flow: IN>(FX||Xtra)>OUT"));
     else
-        body << (isRu ? juce::String::fromUTF8 (u8"Поток: IN -> FX Chain -> Xtra -> OUT")
-                      : juce::String ("Flow: IN -> FX Chain -> Xtra -> OUT"));
-    body << "\n";
-    body << destroyTxt << "  |  " << toneTxt << "  |  " << shaperTxt;
+        body << (isRu ? juce::String::fromUTF8 (u8"Поток: IN>FX>Xtra>OUT")
+                      : juce::String ("Flow: IN>FX>Xtra>OUT"));
+    body << "  |  ";
+    body << (isRu ? juce::String::fromUTF8 (u8"D=") : juce::String ("D="))
+         << ((destroyPlacementMode == (int) params::fx::global::postFilter) ? "postF" : "preF")
+         << " | T="
+         << ((tonePlacementMode == (int) params::fx::global::preFilter) ? "preF" : "postF")
+         << " | S="
+         << ((shaperPlacementMode == (int) params::shaper::postDestroy) ? "postD" : "preD");
 
     if (fxRackDragActive && fxRackDragEngineBlock >= 0)
     {
         const auto dragName = blockName (fxRackDragEngineBlock);
-        body << "\n";
+        body << "  |  ";
         body << (isRu ? juce::String::fromUTF8 (u8"Перетаскивание: ")
                       : juce::String ("Drag: "));
         body << dragName << " -> " << juce::String (fxRackDragTargetPos + 1);
@@ -6308,6 +6739,7 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
 
     initButton.setButtonText (ies::ui::tr (ies::ui::Key::init, langIdx));
     panicButton.setButtonText (ies::ui::tr (ies::ui::Key::panic, langIdx));
+    futureHubButton.setButtonText ("R&D");
 
     preset.setLabelText (ies::ui::tr (ies::ui::Key::preset, langIdx));
     presetPrev.setButtonText ("<");
@@ -6586,6 +7018,14 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     fxOrderUpButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Выше") : juce::String ("Up"));
     fxOrderDownButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Ниже") : juce::String ("Down"));
     fxOrderResetButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Сброс") : juce::String ("Reset"));
+    const auto sectionTitle = [langIdx] (bool expanded, const juce::String& en, const char* ruUtf8)
+    {
+        const auto arrow = expanded ? juce::String::fromUTF8 (u8"▾ ") : juce::String::fromUTF8 (u8"▸ ");
+        return arrow + ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (ruUtf8) : en);
+    };
+    fxSectionQuickButton.setButtonText (sectionTitle (fxQuickSectionExpanded, "Quick", u8"Быстро"));
+    fxSectionMorphButton.setButtonText (sectionTitle (fxMorphSectionExpanded, "Morph", u8"Морф"));
+    fxSectionRouteButton.setButtonText (sectionTitle (fxRouteSectionExpanded, "Route", u8"Роутинг"));
     fxQuickSubtleButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Мягко") : juce::String ("Subtle"));
     fxQuickWideButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Широко") : juce::String ("Wide"));
     fxQuickHardButton.setButtonText ((langIdx == (int) params::ui::ru) ? juce::String::fromUTF8 (u8"Жёстко") : juce::String ("Hard"));
@@ -6785,6 +7225,9 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
     spectrumFreeze.setButtonText (ies::ui::tr (ies::ui::Key::toneAnalyzerFreeze, langIdx));
     if (toneEqWindow != nullptr)
         toneEqWindow->setName (ies::ui::tr (ies::ui::Key::tone, langIdx));
+    if (futureHubWindow != nullptr)
+        futureHubWindow->setName (isRussian() ? juce::String::fromUTF8 (u8"R&D Хаб: Заглушки Serum-уровня")
+                                              : juce::String ("R&D Hub: Serum-Level Stubs"));
 
     outGain.setLabelText (ies::ui::tr (ies::ui::Key::gain, langIdx));
 
@@ -6806,6 +7249,8 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
 
     panicButton.setTooltip (T ("All Notes Off (use if something gets stuck).",
                                u8"Снять все ноты (если что-то зависло)."));
+    futureHubButton.setTooltip (T ("Open R&D Hub with roadmap stubs: Wavetable/Granular, Mod drag-drop, MSEG, Voicing, FX Pro, Presets, UI Production and Workflow.",
+                                   u8"Открыть R&D Хаб с заготовками roadmap: Wavetable/Granular, Mod drag-drop, MSEG, Voicing, FX Pro, Presets, UI Production и Workflow."));
 
     presetPrev.setTooltip (T ("Previous preset.", u8"Предыдущий пресет."));
     presetNext.setTooltip (T ("Next preset.", u8"Следующий пресет."));
@@ -6816,19 +7261,21 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
                                          u8"Intent Layer: фокус Bass/Lead/Drone. Подсвечивает релевантные контролы и даёт быстрые подсказки."));
     intentMode.getLabel().setTooltip (intentMode.getCombo().getTooltip());
 
-    menuButton.setTooltip (T ("Overflow MENU: pages, presets, language, intent and quick actions.",
-                              u8"MENU: страницы, пресеты, язык, цель и быстрые действия."));
+    menuButton.setTooltip (T ("Main tree menu: navigation, FX switches, top bar layout, presets, language, intent and quick actions.",
+                              u8"Главное древовидное MENU: навигация, FX-переключатели, компоновка верхней панели, пресеты, язык, цель и быстрые действия."));
+    pagePrevButton.setTooltip (T ("Previous page.", u8"Предыдущая страница."));
+    pageNextButton.setTooltip (T ("Next page.", u8"Следующая страница."));
 
-    pageSynthButton.setTooltip (T ("Show Synth page (oscillators and filter core).",
-                                   u8"Показать страницу синта (осцилляторы и базовый фильтр)."));
-    pageModButton.setTooltip (T ("Show Mod page (Macros, LFOs, Mod Matrix, drag-and-drop modulation).",
-                                 u8"Показать страницу модуляции (макросы, LFO, матрица, drag-and-drop модуляция)."));
-    pageLabButton.setTooltip (T ("Show Lab page (Destroy, big Tone EQ, Shaper + Envelopes, keyboard).",
-                                 u8"Показать страницу Lab (Destroy, большой Tone EQ, Shaper + огибающие, клавиатура)."));
-    pageFxButton.setTooltip (T ("Show FX page (rack + selected block controls).",
-                                u8"Показать страницу FX (цепочка + параметры выбранного блока)."));
-    pageSeqButton.setTooltip (T ("Show Seq page (Arp).",
-                                 u8"Показать страницу Сек (арпеджиатор)."));
+    pageSynthButton.setTooltip (T ("Show Synth page (MENU > Navigate > Synth).",
+                                   u8"Показать страницу Synth (MENU > Навигация > Синт)."));
+    pageModButton.setTooltip (T ("Show Mod page (MENU > Navigate > Mod).",
+                                 u8"Показать страницу Mod (MENU > Навигация > Мод)."));
+    pageLabButton.setTooltip (T ("Show Lab page (MENU > Navigate > Lab).",
+                                 u8"Показать страницу Lab (MENU > Навигация > Лаб)."));
+    pageFxButton.setTooltip (T ("Show FX page (MENU > Navigate > FX).",
+                                u8"Показать страницу FX (MENU > Навигация > FX)."));
+    pageSeqButton.setTooltip (T ("Show Seq page (MENU > Navigate > Seq).",
+                                 u8"Показать страницу Seq (MENU > Навигация > Сек)."));
     lastTouchedLabel.setTooltip (T ("Last touched modulation destination knob.",
                                     u8"Последняя тронутая ручка-цель для модуляции."));
     quickAssignMacro1.setTooltip (T ("Assign Macro 1 to the last touched destination.",
@@ -7092,6 +7539,12 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshTooltips()
                                      u8"Сдвинуть выбранный FX-блок ниже в пользовательском порядке."));
     fxOrderResetButton.setTooltip (T ("Reset Custom order to default: Chorus > Delay > Reverb > Dist > Phaser > Octaver.",
                                       u8"Сбросить пользовательский порядок к умолчанию: Chorus > Delay > Reverb > Dist > Phaser > Octaver."));
+    fxSectionQuickButton.setTooltip (T ("Collapse/expand quick FX actions section.",
+                                        u8"Свернуть/развернуть секцию быстрых действий FX."));
+    fxSectionMorphButton.setTooltip (T ("Collapse/expand A/B morph section.",
+                                        u8"Свернуть/развернуть секцию A/B морфа."));
+    fxSectionRouteButton.setTooltip (T ("Collapse/expand route map section.",
+                                        u8"Свернуть/развернуть секцию карты роутинга."));
     fxQuickSubtleButton.setTooltip (T ("Apply quick 'Subtle' preset for the selected FX block (intent-aware).",
                                        u8"Применить быстрый пресет «Мягко» для выбранного FX-блока (с учётом Intent)."));
     fxQuickWideButton.setTooltip (T ("Apply quick 'Wide' preset for the selected FX block (intent-aware).",
@@ -8010,6 +8463,70 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
 {
     updateEnabledStates();
 
+    bool needsFxRelayout = false;
+    auto animateSection = [&needsFxRelayout] (float& value, bool expanded)
+    {
+        const float target = expanded ? 1.0f : 0.0f;
+        const float delta = target - value;
+        if (std::abs (delta) <= 0.001f)
+            return;
+
+        value += delta * 0.30f;
+        if (std::abs (target - value) < 0.02f)
+            value = target;
+        needsFxRelayout = true;
+    };
+
+    animateSection (fxQuickSectionAnim, fxQuickSectionExpanded);
+    animateSection (fxMorphSectionAnim, fxMorphSectionExpanded);
+    animateSection (fxRouteSectionAnim, fxRouteSectionExpanded);
+    if (needsFxRelayout && uiPage == pageFx)
+        resized();
+
+    // UI animation phase (20 Hz): shared pulse for cockpit-like highlight sweeps.
+    uiAnimPhase += 0.022f;
+    if (uiAnimPhase >= 1.0f)
+        uiAnimPhase -= 1.0f;
+
+    auto setAnimPhase = [this] (juce::Component& c, float offset)
+    {
+        float p = std::fmod (uiAnimPhase + offset, 1.0f);
+        if (p < 0.0f)
+            p += 1.0f;
+        c.getProperties().set ("uiAnimPhase", (double) p);
+    };
+    auto setAnimPhaseAndRepaint = [&] (juce::Component& c, float offset)
+    {
+        setAnimPhase (c, offset);
+        if (c.isVisible())
+            c.repaint();
+    };
+
+    // Top bar motion accents.
+    setAnimPhaseAndRepaint (menuButton, 0.03f);
+    setAnimPhaseAndRepaint (futureHubButton, 0.09f);
+    setAnimPhaseAndRepaint (pagePrevButton, 0.17f);
+    setAnimPhaseAndRepaint (pageNextButton, 0.31f);
+    setAnimPhaseAndRepaint (helpButton, 0.47f);
+    setAnimPhaseAndRepaint (preset, 0.58f);
+    setAnimPhaseAndRepaint (intentMode, 0.69f);
+    setAnimPhaseAndRepaint (language, 0.81f);
+
+    // FX section controls (animated collapse headers).
+    setAnimPhaseAndRepaint (fxSectionQuickButton, 0.12f);
+    setAnimPhaseAndRepaint (fxSectionMorphButton, 0.37f);
+    setAnimPhaseAndRepaint (fxSectionRouteButton, 0.63f);
+
+    // Keep option windows static (no top-down panel glow animation).
+    // We still animate focused controls (buttons/knobs) for readability.
+
+    // Keep hovered knob/button animated even when value is static.
+    if (hovered != nullptr)
+    {
+        setAnimPhase (*hovered, 0.77f);
+        hovered->repaint();
+    }
+
     if (fxQuickGlowCount > 0)
     {
         fxQuickGlowAmount = juce::jmax (0.0f, fxQuickGlowAmount - 0.10f);
@@ -8689,6 +9206,7 @@ void IndustrialEnergySynthAudioProcessorEditor::loadPresetByComboSelection()
     loadMacroNamesFromState();
     loadLabChordFromState();
     loadFxCustomOrderFromProcessor();
+    loadTopBarVisibilityFromState();
     storeFxCustomOrderToState();
     fxQuickUndoHistory.clear();
     for (auto& s : fxQuickSnapshotAByBlock) s.clear();
@@ -9094,7 +9612,6 @@ void IndustrialEnergySynthAudioProcessorEditor::applyFxQuickRandomSafe()
     pushFxQuickUndoSnapshot();
 
     static thread_local juce::Random rng ((int64) juce::Time::currentTimeMillis());
-    const auto rnd = [&rng] () { return rng.nextFloat() * 2.0f - 1.0f; };
     const auto apply = [this] (const char* id, float value) { setParamValue (id, value); };
 
     std::array<juce::Slider*, 16> touched {};
@@ -9109,7 +9626,8 @@ void IndustrialEnergySynthAudioProcessorEditor::applyFxQuickRandomSafe()
     };
     const auto jitter = [&] (const char* id, juce::Slider& slider, float amount, float minV, float maxV)
     {
-        const float v = juce::jlimit (minV, maxV, (float) slider.getValue() + rnd() * amount);
+        const float randomBipolar = rng.nextFloat() * 2.0f - 1.0f;
+        const float v = juce::jlimit (minV, maxV, (float) slider.getValue() + randomBipolar * amount);
         apply (id, v);
         markTouched (slider);
     };
@@ -10593,6 +11111,18 @@ void IndustrialEnergySynthAudioProcessorEditor::mouseExit (const juce::MouseEven
 
 bool IndustrialEnergySynthAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
 {
+    const bool tabDown = juce::KeyPress::isKeyCurrentlyDown (juce::KeyPress::tabKey);
+    if (tabDown && key.getKeyCode() == juce::KeyPress::leftKey)
+    {
+        setUiPage ((int) uiPage - 1);
+        return true;
+    }
+    if (tabDown && key.getKeyCode() == juce::KeyPress::rightKey)
+    {
+        setUiPage ((int) uiPage + 1);
+        return true;
+    }
+
     if (! shouldCaptureComputerKeyboard())
         return false;
 

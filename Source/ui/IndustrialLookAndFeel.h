@@ -41,6 +41,19 @@ public:
                        int buttonW, int buttonH,
                        juce::ComboBox&) override;
 
+    void drawPopupMenuBackground (juce::Graphics&, int width, int height) override;
+    void drawPopupMenuItem (juce::Graphics&,
+                            const juce::Rectangle<int>& area,
+                            bool isSeparator,
+                            bool isActive,
+                            bool isHighlighted,
+                            bool isTicked,
+                            bool hasSubMenu,
+                            const juce::String& text,
+                            const juce::String& shortcutKeyText,
+                            const juce::Drawable* icon,
+                            const juce::Colour* textColourToUse) override;
+
     void drawGroupComponentOutline (juce::Graphics&,
                                     int width, int height,
                                     const juce::String& text,
