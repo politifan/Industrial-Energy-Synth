@@ -291,7 +291,8 @@ enum Source
     srcNote = 8,
     srcFilterEnv = 9,
     srcAmpEnv = 10,
-    srcRandom = 11
+    srcRandom = 11,
+    srcMseg = 12
 };
 
 enum Dest
@@ -643,6 +644,7 @@ inline constexpr const char* language = "ui.language"; // choice: EN, RU
 inline constexpr const char* analyzerSource = "ui.analyzerSource"; // choice: Post, Pre
 inline constexpr const char* analyzerFreeze = "ui.analyzerFreeze"; // bool
 inline constexpr const char* analyzerAveraging = "ui.analyzerAveraging"; // choice: Fast, Medium, Smooth
+inline constexpr const char* msegOut = "ui.msegOut"; // float 0..1, live output bus for MSEG source
 
 // Lab keyboard helpers (UI-only workflow; they affect only the on-screen Lab keyboard preview).
 inline constexpr const char* labKeyboardMode = "ui.labKeyboardMode"; // choice: Poly, Mono

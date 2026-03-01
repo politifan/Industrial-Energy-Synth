@@ -24,6 +24,8 @@ static const juce::Identifier kVoicingLegato { "ui.voicing.legato" };
 static const juce::Identifier kVoicingMonoGlideEnable { "ui.voicing.monoGlideEnable" };
 static const juce::Identifier kVoicingMonoGlideMs { "ui.voicing.monoGlideMs" };
 
+static const juce::Identifier kOscPrepSelectedOsc { "ui.oscprep.selectedOsc" };
+
 static const juce::Identifier kMsegPoints { "ui.mseg.points" };
 static const juce::Identifier kMsegMode { "ui.mseg.mode" };
 static const juce::Identifier kMsegRate { "ui.mseg.rate" };
@@ -119,6 +121,42 @@ static void setupKnob (KnobWithLabel& k, double minV, double maxV, double value,
     auto& s = k.getSlider();
     s.setRange (minV, maxV, step);
     s.setValue (value, juce::dontSendNotification);
+}
+
+static void setupComboFromArray (ComboWithLabel& c, const juce::StringArray& items, int selectedIndex = 0)
+{
+    auto& box = c.getCombo();
+    box.clear (juce::dontSendNotification);
+    for (int i = 0; i < items.size(); ++i)
+        box.addItem (items[i], i + 1);
+    box.setSelectedId (juce::jmax (1, selectedIndex + 1), juce::dontSendNotification);
+}
+
+static juce::StringArray makeModSourceNames()
+{
+    return juce::StringArray { "Off", "LFO 1", "LFO 2", "Macro 1", "Macro 2", "Mod Wheel",
+                               "Aftertouch", "Velocity", "Note", "Filter Env", "Amp Env",
+                               "Random", "MSEG" };
+}
+
+static juce::StringArray makeModDestinationNames()
+{
+    return juce::StringArray {
+        "Off",
+        "Osc1 Level", "Osc2 Level", "Osc3 Level",
+        "Filter Cutoff", "Filter Resonance",
+        "Fold Amount", "Clip Amount", "Mod Amount", "Crush Mix",
+        "Shaper Drive", "Shaper Mix",
+        "FX Chorus Rate", "FX Chorus Depth", "FX Chorus Mix",
+        "FX Delay Time", "FX Delay Feedback", "FX Delay Mix",
+        "FX Reverb Size", "FX Reverb Damp", "FX Reverb Mix",
+        "FX Dist Drive", "FX Dist Tone", "FX Dist Mix",
+        "FX Phaser Rate", "FX Phaser Depth", "FX Phaser Feedback", "FX Phaser Mix",
+        "FX Octaver Amount", "FX Octaver Mix",
+        "Xtra Flanger", "Xtra Tremolo", "Xtra Autopan", "Xtra Saturator", "Xtra Clipper",
+        "Xtra Width", "Xtra Tilt", "Xtra Gate", "Xtra LoFi", "Xtra Doubler", "Xtra Mix",
+        "FX Morph"
+    };
 }
 
 static juce::StringArray splitPipe (const juce::String& s)
@@ -804,6 +842,810 @@ private:
     }
 };
 
+class OscPrepPage final : public juce::Component
+{
+public:
+    explicit OscPrepPage (FutureHubContext c) : context (std::move (c))
+    {
+        title.setText ("OSC Prep (live APVTS control surface)", juce::dontSendNotification);
+        title.setJustificationType (juce::Justification::centredLeft);
+        title.setColour (juce::Label::textColourId, juce::Colour (0xffeef4ff));
+        addAndMakeVisible (title);
+
+        groupMain.setText ("Oscillator");
+        addAndMakeVisible (groupMain);
+        groupQuick.setText ("Quick Character");
+        addAndMakeVisible (groupQuick);
+
+        oscSelect.setLabelText ("Osc");
+        oscSelect.setLayout (ComboWithLabel::Layout::labelTop);
+        setupCombo (oscSelect, { "Osc 1", "Osc 2", "Osc 3" }, 1);
+        addAndMakeVisible (oscSelect);
+
+        wave.setLabelText ("Wave");
+        wave.setLayout (ComboWithLabel::Layout::labelTop);
+        setupCombo (wave, { "Saw", "Square", "Triangle", "Sine", "Pulse 25", "Pulse 12", "DoubleSaw",
+                            "Metal", "Folded", "Stairs", "NotchTri", "Syncish", "Noise", "Draw" }, 1);
+        addAndMakeVisible (wave);
+
+        sync.setButtonText ("Osc2 Sync");
+        addAndMakeVisible (sync);
+
+        level.setLabelText ("Level");
+        coarse.setLabelText ("Coarse");
+        fine.setLabelText ("Fine");
+        detune.setLabelText ("Detune");
+        setupKnob (level, 0.0, 1.0, 0.8, 0.01);
+        setupKnob (coarse, -24.0, 24.0, 0.0, 1.0);
+        setupKnob (fine, -100.0, 100.0, 0.0, 0.1);
+        setupKnob (detune, 0.0, 1.0, 0.0, 0.01);
+        addAndMakeVisible (level);
+        addAndMakeVisible (coarse);
+        addAndMakeVisible (fine);
+        addAndMakeVisible (detune);
+
+        quickInit.setButtonText ("Init");
+        quickBright.setButtonText ("Bright");
+        quickMetal.setButtonText ("Metal");
+        quickNoisy.setButtonText ("Noisy");
+        quickDraw.setButtonText ("Draw");
+        for (auto* b : { &quickInit, &quickBright, &quickMetal, &quickNoisy, &quickDraw })
+            addAndMakeVisible (*b);
+
+        loadState();
+        bindCallbacks();
+        syncFromParams();
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced (8);
+        title.setBounds (r.removeFromTop (24));
+        r.removeFromTop (6);
+
+        auto top = r.removeFromTop (juce::jmax (200, r.getHeight() / 2));
+        r.removeFromTop (8);
+        auto bottom = r;
+
+        groupMain.setBounds (top);
+        groupQuick.setBounds (bottom);
+
+        {
+            auto a = groupMain.getBounds().reduced (8, 22);
+            auto row1 = a.removeFromTop (44);
+            const int c = (row1.getWidth() - 16) / 3;
+            oscSelect.setBounds (row1.removeFromLeft (c));
+            row1.removeFromLeft (8);
+            wave.setBounds (row1.removeFromLeft (c));
+            row1.removeFromLeft (8);
+            sync.setBounds (row1);
+
+            a.removeFromTop (8);
+            auto row2 = a.removeFromTop (110);
+            const int k = (row2.getWidth() - 24) / 4;
+            level.setBounds (row2.removeFromLeft (k));
+            row2.removeFromLeft (8);
+            coarse.setBounds (row2.removeFromLeft (k));
+            row2.removeFromLeft (8);
+            fine.setBounds (row2.removeFromLeft (k));
+            row2.removeFromLeft (8);
+            detune.setBounds (row2.removeFromLeft (k));
+        }
+
+        {
+            auto a = groupQuick.getBounds().reduced (8, 22);
+            auto row = a.removeFromTop (30);
+            const int bw = (row.getWidth() - 32) / 5;
+            quickInit.setBounds (row.removeFromLeft (bw));
+            row.removeFromLeft (8);
+            quickBright.setBounds (row.removeFromLeft (bw));
+            row.removeFromLeft (8);
+            quickMetal.setBounds (row.removeFromLeft (bw));
+            row.removeFromLeft (8);
+            quickNoisy.setBounds (row.removeFromLeft (bw));
+            row.removeFromLeft (8);
+            quickDraw.setBounds (row.removeFromLeft (bw));
+        }
+    }
+
+private:
+    FutureHubContext context;
+    juce::Label title;
+    juce::GroupComponent groupMain;
+    juce::GroupComponent groupQuick;
+    ComboWithLabel oscSelect;
+    ComboWithLabel wave;
+    juce::ToggleButton sync;
+    KnobWithLabel level;
+    KnobWithLabel coarse;
+    KnobWithLabel fine;
+    KnobWithLabel detune;
+    juce::TextButton quickInit;
+    juce::TextButton quickBright;
+    juce::TextButton quickMetal;
+    juce::TextButton quickNoisy;
+    juce::TextButton quickDraw;
+    bool isSyncing = false;
+
+    int currentOsc() const noexcept
+    {
+        return juce::jlimit (0, 2, oscSelect.getCombo().getSelectedItemIndex());
+    }
+
+    const char* waveId() const noexcept
+    {
+        switch (currentOsc())
+        {
+            case 0: return params::osc1::wave;
+            case 1: return params::osc2::wave;
+            case 2: return params::osc3::wave;
+            default: return params::osc1::wave;
+        }
+    }
+    const char* levelId() const noexcept
+    {
+        switch (currentOsc())
+        {
+            case 0: return params::osc1::level;
+            case 1: return params::osc2::level;
+            case 2: return params::osc3::level;
+            default: return params::osc1::level;
+        }
+    }
+    const char* coarseId() const noexcept
+    {
+        switch (currentOsc())
+        {
+            case 0: return params::osc1::coarse;
+            case 1: return params::osc2::coarse;
+            case 2: return params::osc3::coarse;
+            default: return params::osc1::coarse;
+        }
+    }
+    const char* fineId() const noexcept
+    {
+        switch (currentOsc())
+        {
+            case 0: return params::osc1::fine;
+            case 1: return params::osc2::fine;
+            case 2: return params::osc3::fine;
+            default: return params::osc1::fine;
+        }
+    }
+    const char* detuneId() const noexcept
+    {
+        switch (currentOsc())
+        {
+            case 0: return params::osc1::detune;
+            case 1: return params::osc2::detune;
+            case 2: return params::osc3::detune;
+            default: return params::osc1::detune;
+        }
+    }
+
+    void loadState()
+    {
+        const int osc = (int) getStateProp (context, kOscPrepSelectedOsc, 0);
+        oscSelect.getCombo().setSelectedItemIndex (juce::jlimit (0, 2, osc), juce::dontSendNotification);
+    }
+
+    void storeState()
+    {
+        setStateProp (context, kOscPrepSelectedOsc, oscSelect.getCombo().getSelectedItemIndex());
+    }
+
+    void syncFromParams()
+    {
+        isSyncing = true;
+
+        wave.getCombo().setSelectedItemIndex ((int) std::lround (getParamActual (context, waveId(), 0.0f)),
+                                              juce::dontSendNotification);
+        level.getSlider().setValue (getParamActual (context, levelId(), 0.8f), juce::dontSendNotification);
+        coarse.getSlider().setValue (getParamActual (context, coarseId(), 0.0f), juce::dontSendNotification);
+        fine.getSlider().setValue (getParamActual (context, fineId(), 0.0f), juce::dontSendNotification);
+        detune.getSlider().setValue (getParamActual (context, detuneId(), 0.0f), juce::dontSendNotification);
+        sync.setVisible (currentOsc() == 1);
+        sync.setToggleState (getParamActual (context, params::osc2::sync, 0.0f) >= 0.5f, juce::dontSendNotification);
+
+        isSyncing = false;
+    }
+
+    void applyQuick (int waveIdx, float lv, float crs, float fn, float det, bool keepSync = true)
+    {
+        setParamChoiceIndex (context, waveId(), waveIdx, 13);
+        setParamActual (context, levelId(), lv);
+        setParamActual (context, coarseId(), crs);
+        setParamActual (context, fineId(), fn);
+        setParamActual (context, detuneId(), det);
+        if (! keepSync && currentOsc() == 1)
+            setParamActual (context, params::osc2::sync, 0.0f);
+        syncFromParams();
+        if (context.onPresetSetChanged != nullptr)
+            context.onPresetSetChanged();
+    }
+
+    void bindCallbacks()
+    {
+        oscSelect.getCombo().onChange = [this]
+        {
+            storeState();
+            syncFromParams();
+        };
+
+        wave.getCombo().onChange = [this]
+        {
+            if (isSyncing)
+                return;
+            setParamChoiceIndex (context, waveId(), wave.getCombo().getSelectedItemIndex(), 13);
+        };
+        level.getSlider().onValueChange = [this]
+        {
+            if (isSyncing)
+                return;
+            setParamActual (context, levelId(), (float) level.getSlider().getValue());
+        };
+        coarse.getSlider().onValueChange = [this]
+        {
+            if (isSyncing)
+                return;
+            setParamActual (context, coarseId(), (float) coarse.getSlider().getValue());
+        };
+        fine.getSlider().onValueChange = [this]
+        {
+            if (isSyncing)
+                return;
+            setParamActual (context, fineId(), (float) fine.getSlider().getValue());
+        };
+        detune.getSlider().onValueChange = [this]
+        {
+            if (isSyncing)
+                return;
+            setParamActual (context, detuneId(), (float) detune.getSlider().getValue());
+        };
+        sync.onClick = [this]
+        {
+            if (currentOsc() != 1)
+                return;
+            setParamActual (context, params::osc2::sync, sync.getToggleState() ? 1.0f : 0.0f);
+        };
+
+        quickInit.onClick = [this]
+        {
+            applyQuick (0, 0.80f, 0.0f, 0.0f, 0.0f, false);
+            setStatus (context, "OSC Prep: Init.");
+        };
+        quickBright.onClick = [this]
+        {
+            applyQuick (1, 0.72f, 12.0f, 5.0f, 0.08f);
+            setStatus (context, "OSC Prep: Bright.");
+        };
+        quickMetal.onClick = [this]
+        {
+            applyQuick (7, 0.70f, 0.0f, 0.0f, 0.24f);
+            setStatus (context, "OSC Prep: Metal.");
+        };
+        quickNoisy.onClick = [this]
+        {
+            applyQuick (12, 0.55f, -12.0f, 0.0f, 0.36f);
+            setStatus (context, "OSC Prep: Noisy.");
+        };
+        quickDraw.onClick = [this]
+        {
+            applyQuick (13, 0.75f, 0.0f, 0.0f, 0.12f);
+            setStatus (context, "OSC Prep: Draw.");
+        };
+    }
+};
+
+class ModRoutingPage final : public juce::Component
+{
+public:
+    explicit ModRoutingPage (FutureHubContext c)
+        : context (std::move (c)),
+          srcNames (makeModSourceNames()),
+          dstNames (makeModDestinationNames())
+    {
+        title.setText ("Mod Matrix Pro (fast slot routing)", juce::dontSendNotification);
+        title.setJustificationType (juce::Justification::centredLeft);
+        title.setColour (juce::Label::textColourId, juce::Colour (0xffeef4ff));
+        addAndMakeVisible (title);
+
+        groupTools.setText ("Tools");
+        addAndMakeVisible (groupTools);
+        groupSlots.setText ("Slots");
+        addAndMakeVisible (groupSlots);
+
+        toolSource.setLabelText ("Fill Src");
+        toolSource.setLayout (ComboWithLabel::Layout::labelTop);
+        setupComboFromArray (toolSource, srcNames, (int) params::mod::srcLfo1);
+        addAndMakeVisible (toolSource);
+
+        toolDestination.setLabelText ("Insert Dst");
+        toolDestination.setLayout (ComboWithLabel::Layout::labelTop);
+        setupComboFromArray (toolDestination, dstNames, (int) params::mod::dstFilterCutoff);
+        addAndMakeVisible (toolDestination);
+
+        toolDepth.setLabelText ("Depth");
+        setupKnob (toolDepth, -1.0, 1.0, 0.35, 0.001);
+        addAndMakeVisible (toolDepth);
+
+        applyAllButton.setButtonText ("Apply Src->All");
+        insertButton.setButtonText ("Insert Slot");
+        clearAllButton.setButtonText ("Clear");
+        refreshButton.setButtonText ("Refresh");
+        for (auto* b : { &applyAllButton, &insertButton, &clearAllButton, &refreshButton })
+            addAndMakeVisible (*b);
+
+        for (int i = 0; i < params::mod::numSlots; ++i)
+        {
+            srcSlots[(size_t) i].setLabelText ("S" + juce::String (i + 1) + " Src");
+            srcSlots[(size_t) i].setLayout (ComboWithLabel::Layout::labelTop);
+            setupComboFromArray (srcSlots[(size_t) i], srcNames, (int) params::mod::srcOff);
+            addAndMakeVisible (srcSlots[(size_t) i]);
+
+            dstSlots[(size_t) i].setLabelText ("S" + juce::String (i + 1) + " Dst");
+            dstSlots[(size_t) i].setLayout (ComboWithLabel::Layout::labelTop);
+            setupComboFromArray (dstSlots[(size_t) i], dstNames, (int) params::mod::dstOff);
+            addAndMakeVisible (dstSlots[(size_t) i]);
+
+            depthSlots[(size_t) i].setLabelText ("S" + juce::String (i + 1) + " Depth");
+            setupKnob (depthSlots[(size_t) i], -1.0, 1.0, 0.0, 0.001);
+            addAndMakeVisible (depthSlots[(size_t) i]);
+        }
+
+        bindCallbacks();
+        syncFromParams();
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced (8);
+        title.setBounds (r.removeFromTop (24));
+        r.removeFromTop (6);
+
+        const int toolH = juce::jlimit (96, 124, r.getHeight() / 5);
+        groupTools.setBounds (r.removeFromTop (toolH));
+        r.removeFromTop (6);
+        groupSlots.setBounds (r);
+
+        {
+            auto a = groupTools.getBounds().reduced (8, 22);
+            auto row = a.removeFromTop (juce::jmax (40, a.getHeight()));
+            const int gap = 8;
+            const int buttonW = juce::jlimit (80, 120, row.getWidth() / 8);
+            const int depthW = juce::jlimit (96, 132, row.getWidth() / 8);
+            const int sourceW = juce::jlimit (160, 260, row.getWidth() / 4);
+            const int destW = juce::jlimit (170, 280, row.getWidth() / 4);
+
+            toolSource.setBounds (row.removeFromLeft (sourceW));
+            row.removeFromLeft (gap);
+            toolDestination.setBounds (row.removeFromLeft (destW));
+            row.removeFromLeft (gap);
+            toolDepth.setBounds (row.removeFromLeft (depthW));
+            row.removeFromLeft (gap);
+            applyAllButton.setBounds (row.removeFromLeft (buttonW + 20));
+            row.removeFromLeft (gap);
+            insertButton.setBounds (row.removeFromLeft (buttonW + 6));
+            row.removeFromLeft (gap);
+            clearAllButton.setBounds (row.removeFromLeft (buttonW));
+            row.removeFromLeft (gap);
+            refreshButton.setBounds (row.removeFromLeft (buttonW));
+        }
+
+        {
+            auto a = groupSlots.getBounds().reduced (8, 22);
+            const int gap = 8;
+            const int cols = 4;
+            const int rows = 2;
+            const int cellW = (a.getWidth() - gap * (cols - 1)) / cols;
+            const int cellH = (a.getHeight() - gap * (rows - 1)) / rows;
+
+            for (int i = 0; i < params::mod::numSlots; ++i)
+            {
+                const int row = i / cols;
+                const int col = i % cols;
+                auto cell = juce::Rectangle<int> (a.getX() + col * (cellW + gap),
+                                                  a.getY() + row * (cellH + gap),
+                                                  cellW,
+                                                  cellH);
+                const int topH = juce::jlimit (34, 40, cell.getHeight() / 4);
+                const int midH = juce::jlimit (34, 40, cell.getHeight() / 4);
+                srcSlots[(size_t) i].setBounds (cell.removeFromTop (topH));
+                cell.removeFromTop (4);
+                dstSlots[(size_t) i].setBounds (cell.removeFromTop (midH));
+                cell.removeFromTop (4);
+                depthSlots[(size_t) i].setBounds (cell);
+            }
+        }
+    }
+
+private:
+    FutureHubContext context;
+    juce::Label title;
+    juce::GroupComponent groupTools;
+    juce::GroupComponent groupSlots;
+    juce::StringArray srcNames;
+    juce::StringArray dstNames;
+
+    ComboWithLabel toolSource;
+    ComboWithLabel toolDestination;
+    KnobWithLabel toolDepth;
+    juce::TextButton applyAllButton;
+    juce::TextButton insertButton;
+    juce::TextButton clearAllButton;
+    juce::TextButton refreshButton;
+
+    std::array<ComboWithLabel, (size_t) params::mod::numSlots> srcSlots {};
+    std::array<ComboWithLabel, (size_t) params::mod::numSlots> dstSlots {};
+    std::array<KnobWithLabel, (size_t) params::mod::numSlots> depthSlots {};
+    bool isSyncing = false;
+
+    void setSlot (int slotIndex, int src, int dst, float depth)
+    {
+        if (slotIndex < 0 || slotIndex >= params::mod::numSlots)
+            return;
+
+        const auto i = (size_t) slotIndex;
+        const int clampedSrc = juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMseg, src);
+        const int clampedDst = juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstLast, dst);
+        const float clampedDepth = juce::jlimit (-1.0f, 1.0f, depth);
+
+        setParamChoiceIndex (context, kModSlotSrcIds[i], clampedSrc, (int) params::mod::srcMseg);
+        setParamChoiceIndex (context, kModSlotDstIds[i], clampedDst, (int) params::mod::dstLast);
+        setParamActual (context, kModSlotDepthIds[i], clampedDepth);
+    }
+
+    void syncFromParams()
+    {
+        isSyncing = true;
+        for (int i = 0; i < params::mod::numSlots; ++i)
+        {
+            const auto idx = (size_t) i;
+            const int src = juce::jlimit ((int) params::mod::srcOff,
+                                          (int) params::mod::srcMseg,
+                                          (int) std::lround (getParamActual (context, kModSlotSrcIds[idx], 0.0f)));
+            const int dst = juce::jlimit ((int) params::mod::dstOff,
+                                          (int) params::mod::dstLast,
+                                          (int) std::lround (getParamActual (context, kModSlotDstIds[idx], 0.0f)));
+            srcSlots[idx].getCombo().setSelectedId (src + 1, juce::dontSendNotification);
+            dstSlots[idx].getCombo().setSelectedId (dst + 1, juce::dontSendNotification);
+            depthSlots[idx].getSlider().setValue (getParamActual (context, kModSlotDepthIds[idx], 0.0f), juce::dontSendNotification);
+        }
+        isSyncing = false;
+    }
+
+    void bindCallbacks()
+    {
+        for (int i = 0; i < params::mod::numSlots; ++i)
+        {
+            const auto idx = (size_t) i;
+            srcSlots[idx].getCombo().onChange = [this, idx]
+            {
+                if (isSyncing)
+                    return;
+                setParamChoiceIndex (context,
+                                     kModSlotSrcIds[idx],
+                                     srcSlots[idx].getCombo().getSelectedItemIndex(),
+                                     (int) params::mod::srcMseg);
+            };
+
+            dstSlots[idx].getCombo().onChange = [this, idx]
+            {
+                if (isSyncing)
+                    return;
+                setParamChoiceIndex (context,
+                                     kModSlotDstIds[idx],
+                                     dstSlots[idx].getCombo().getSelectedItemIndex(),
+                                     (int) params::mod::dstLast);
+            };
+
+            depthSlots[idx].getSlider().onValueChange = [this, idx]
+            {
+                if (isSyncing)
+                    return;
+                setParamActual (context,
+                                kModSlotDepthIds[idx],
+                                (float) depthSlots[idx].getSlider().getValue());
+            };
+        }
+
+        refreshButton.onClick = [this]
+        {
+            syncFromParams();
+            setStatus (context, "Mod Matrix Pro: slots synced from APVTS.");
+        };
+
+        clearAllButton.onClick = [this]
+        {
+            for (int i = 0; i < params::mod::numSlots; ++i)
+                setSlot (i, (int) params::mod::srcOff, (int) params::mod::dstOff, 0.0f);
+
+            syncFromParams();
+            if (context.onPresetSetChanged != nullptr)
+                context.onPresetSetChanged();
+            setStatus (context, "Mod Matrix Pro: all slots cleared.");
+        };
+
+        applyAllButton.onClick = [this]
+        {
+            const int src = toolSource.getCombo().getSelectedItemIndex();
+            const float dep = (float) toolDepth.getSlider().getValue();
+            int updated = 0;
+
+            for (int i = 0; i < params::mod::numSlots; ++i)
+            {
+                const auto idx = (size_t) i;
+                const int dst = dstSlots[idx].getCombo().getSelectedItemIndex();
+                if (dst == (int) params::mod::dstOff)
+                    continue;
+
+                setSlot (i, src, dst, dep);
+                ++updated;
+            }
+
+            syncFromParams();
+            if (context.onPresetSetChanged != nullptr)
+                context.onPresetSetChanged();
+            setStatus (context, "Mod Matrix Pro: source applied to " + juce::String (updated) + " active slots.");
+        };
+
+        insertButton.onClick = [this]
+        {
+            const int src = toolSource.getCombo().getSelectedItemIndex();
+            const int dst = toolDestination.getCombo().getSelectedItemIndex();
+            const float dep = (float) toolDepth.getSlider().getValue();
+            if (dst == (int) params::mod::dstOff)
+            {
+                setStatus (context, "Mod Matrix Pro: choose destination first.");
+                return;
+            }
+
+            int target = params::mod::numSlots - 1;
+            for (int i = 0; i < params::mod::numSlots; ++i)
+            {
+                const auto idx = (size_t) i;
+                if (dstSlots[idx].getCombo().getSelectedItemIndex() == (int) params::mod::dstOff)
+                {
+                    target = i;
+                    break;
+                }
+            }
+
+            setSlot (target, src, dst, dep);
+            syncFromParams();
+            if (context.onPresetSetChanged != nullptr)
+                context.onPresetSetChanged();
+            setStatus (context,
+                       "Mod Matrix Pro: inserted slot " + juce::String (target + 1) + " (" + dstNames[dst] + ").");
+        };
+    }
+};
+
+class FxProPage final : public juce::Component,
+                        private juce::Timer
+{
+public:
+    explicit FxProPage (FutureHubContext c) : context (std::move (c))
+    {
+        title.setText ("FX Pro Routing (live global controls)", juce::dontSendNotification);
+        title.setJustificationType (juce::Justification::centredLeft);
+        title.setColour (juce::Label::textColourId, juce::Colour (0xffeef4ff));
+        addAndMakeVisible (title);
+
+        groupMain.setText ("Global");
+        addAndMakeVisible (groupMain);
+        groupSummary.setText ("Routing Summary");
+        addAndMakeVisible (groupSummary);
+
+        order.setLabelText ("Order");
+        order.setLayout (ComboWithLabel::Layout::labelTop);
+        setupCombo (order, { "Order A", "Order B", "Custom" }, 1);
+        addAndMakeVisible (order);
+
+        route.setLabelText ("Route");
+        route.setLayout (ComboWithLabel::Layout::labelTop);
+        setupCombo (route, { "Serial", "Parallel" }, 1);
+        addAndMakeVisible (route);
+
+        oversample.setLabelText ("OS");
+        oversample.setLayout (ComboWithLabel::Layout::labelTop);
+        setupCombo (oversample, { "Off", "2x", "4x" }, 1);
+        addAndMakeVisible (oversample);
+
+        destroyPlacement.setLabelText ("Destroy Pos");
+        destroyPlacement.setLayout (ComboWithLabel::Layout::labelTop);
+        setupCombo (destroyPlacement, { "Pre Filter", "Post Filter" }, 1);
+        addAndMakeVisible (destroyPlacement);
+
+        tonePlacement.setLabelText ("Tone Pos");
+        tonePlacement.setLayout (ComboWithLabel::Layout::labelTop);
+        setupCombo (tonePlacement, { "Pre Filter", "Post Filter" }, 2);
+        addAndMakeVisible (tonePlacement);
+
+        mix.setLabelText ("FX Mix");
+        morph.setLabelText ("FX Morph");
+        setupKnob (mix, 0.0, 1.0, 1.0, 0.001);
+        setupKnob (morph, 0.0, 1.0, 0.0, 0.001);
+        addAndMakeVisible (mix);
+        addAndMakeVisible (morph);
+
+        summary.setMultiLine (true);
+        summary.setReadOnly (true);
+        summary.setScrollbarsShown (true);
+        summary.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff0e1623));
+        summary.setColour (juce::TextEditor::outlineColourId, juce::Colour (0xff3f4f62));
+        summary.setColour (juce::TextEditor::textColourId, juce::Colour (0xffd7e5f9));
+        addAndMakeVisible (summary);
+
+        bindCallbacks();
+        syncFromParams();
+        updateSummary();
+        startTimerHz (12);
+    }
+
+    ~FxProPage() override
+    {
+        stopTimer();
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced (8);
+        title.setBounds (r.removeFromTop (24));
+        r.removeFromTop (6);
+
+        const int topH = juce::jlimit (156, 214, r.getHeight() / 3);
+        groupMain.setBounds (r.removeFromTop (topH));
+        r.removeFromTop (8);
+        groupSummary.setBounds (r);
+
+        {
+            auto a = groupMain.getBounds().reduced (8, 22);
+            auto row1 = a.removeFromTop (42);
+            const int gap = 8;
+            const int cw = (row1.getWidth() - gap * 4) / 5;
+            order.setBounds (row1.removeFromLeft (cw));
+            row1.removeFromLeft (gap);
+            route.setBounds (row1.removeFromLeft (cw));
+            row1.removeFromLeft (gap);
+            oversample.setBounds (row1.removeFromLeft (cw));
+            row1.removeFromLeft (gap);
+            destroyPlacement.setBounds (row1.removeFromLeft (cw));
+            row1.removeFromLeft (gap);
+            tonePlacement.setBounds (row1.removeFromLeft (cw));
+
+            a.removeFromTop (8);
+            auto row2 = a.removeFromTop (96);
+            const int knobW = juce::jlimit (120, 180, row2.getWidth() / 5);
+            mix.setBounds (row2.removeFromLeft (knobW));
+            row2.removeFromLeft (12);
+            morph.setBounds (row2.removeFromLeft (knobW));
+        }
+
+        summary.setBounds (groupSummary.getBounds().reduced (8, 22));
+    }
+
+private:
+    FutureHubContext context;
+    juce::Label title;
+    juce::GroupComponent groupMain;
+    juce::GroupComponent groupSummary;
+    ComboWithLabel order;
+    ComboWithLabel route;
+    ComboWithLabel oversample;
+    ComboWithLabel destroyPlacement;
+    ComboWithLabel tonePlacement;
+    KnobWithLabel mix;
+    KnobWithLabel morph;
+    juce::TextEditor summary;
+    bool isSyncing = false;
+
+    void timerCallback() override
+    {
+        updateSummary();
+    }
+
+    void setChoice (const char* id, int index, int maxIndex)
+    {
+        setParamChoiceIndex (context, id, index, maxIndex);
+    }
+
+    void syncFromParams()
+    {
+        isSyncing = true;
+        order.getCombo().setSelectedItemIndex ((int) std::lround (getParamActual (context, params::fx::global::order, 0.0f)), juce::dontSendNotification);
+        route.getCombo().setSelectedItemIndex ((int) std::lround (getParamActual (context, params::fx::global::route, 0.0f)), juce::dontSendNotification);
+        oversample.getCombo().setSelectedItemIndex ((int) std::lround (getParamActual (context, params::fx::global::oversample, 0.0f)), juce::dontSendNotification);
+        destroyPlacement.getCombo().setSelectedItemIndex ((int) std::lround (getParamActual (context, params::fx::global::destroyPlacement, 0.0f)), juce::dontSendNotification);
+        tonePlacement.getCombo().setSelectedItemIndex ((int) std::lround (getParamActual (context, params::fx::global::tonePlacement, 1.0f)), juce::dontSendNotification);
+        mix.getSlider().setValue (getParamActual (context, params::fx::global::mix, 1.0f), juce::dontSendNotification);
+        morph.getSlider().setValue (getParamActual (context, params::fx::global::morph, 0.0f), juce::dontSendNotification);
+        isSyncing = false;
+    }
+
+    void bindCallbacks()
+    {
+        order.getCombo().onChange = [this]
+        {
+            if (isSyncing)
+                return;
+            setChoice (params::fx::global::order, order.getCombo().getSelectedItemIndex(), (int) params::fx::global::orderCustom);
+            setStatus (context, "FX Pro: order updated.");
+        };
+        route.getCombo().onChange = [this]
+        {
+            if (isSyncing)
+                return;
+            setChoice (params::fx::global::route, route.getCombo().getSelectedItemIndex(), (int) params::fx::global::routeParallel);
+        };
+        oversample.getCombo().onChange = [this]
+        {
+            if (isSyncing)
+                return;
+            setChoice (params::fx::global::oversample, oversample.getCombo().getSelectedItemIndex(), (int) params::fx::global::os4x);
+        };
+        destroyPlacement.getCombo().onChange = [this]
+        {
+            if (isSyncing)
+                return;
+            setChoice (params::fx::global::destroyPlacement, destroyPlacement.getCombo().getSelectedItemIndex(), (int) params::fx::global::postFilter);
+        };
+        tonePlacement.getCombo().onChange = [this]
+        {
+            if (isSyncing)
+                return;
+            setChoice (params::fx::global::tonePlacement, tonePlacement.getCombo().getSelectedItemIndex(), (int) params::fx::global::postFilter);
+        };
+        mix.getSlider().onValueChange = [this]
+        {
+            if (isSyncing)
+                return;
+            setParamActual (context, params::fx::global::mix, (float) mix.getSlider().getValue());
+        };
+        morph.getSlider().onValueChange = [this]
+        {
+            if (isSyncing)
+                return;
+            setParamActual (context, params::fx::global::morph, (float) morph.getSlider().getValue());
+        };
+    }
+
+    void updateSummary()
+    {
+        const int orderIdx = juce::jlimit (0, 2, (int) std::lround (getParamActual (context, params::fx::global::order, 0.0f)));
+        const int routeIdx = juce::jlimit (0, 1, (int) std::lround (getParamActual (context, params::fx::global::route, 0.0f)));
+        const int osIdx = juce::jlimit (0, 2, (int) std::lround (getParamActual (context, params::fx::global::oversample, 0.0f)));
+        const int destroyIdx = juce::jlimit (0, 1, (int) std::lround (getParamActual (context, params::fx::global::destroyPlacement, 0.0f)));
+        const int toneIdx = juce::jlimit (0, 1, (int) std::lround (getParamActual (context, params::fx::global::tonePlacement, 1.0f)));
+        const float mixV = getParamActual (context, params::fx::global::mix, 1.0f);
+        const float morphV = getParamActual (context, params::fx::global::morph, 0.0f);
+
+        const juce::String orderText = (orderIdx == (int) params::fx::global::orderFixedB ? "Order B"
+                                            : (orderIdx == (int) params::fx::global::orderCustom ? "Custom" : "Order A"));
+        const juce::String routeText = routeIdx == (int) params::fx::global::routeParallel ? "Parallel" : "Serial";
+        const juce::String osText = (osIdx == (int) params::fx::global::os2x ? "2x"
+                                 : (osIdx == (int) params::fx::global::os4x ? "4x" : "Off"));
+        const juce::String destroyText = destroyIdx == (int) params::fx::global::postFilter ? "Post Filter" : "Pre Filter";
+        const juce::String toneText = toneIdx == (int) params::fx::global::postFilter ? "Post Filter" : "Pre Filter";
+
+        const juce::String txt =
+            "Order: " + orderText + "\n"
+            "Route: " + routeText + "\n"
+            "Oversampling: " + osText + "\n"
+            "Destroy placement: " + destroyText + "\n"
+            "Tone placement: " + toneText + "\n"
+            "FX Mix: " + juce::String (mixV, 3) + "\n"
+            "FX Morph: " + juce::String (morphV, 3) + "\n\n"
+            "Next:\n"
+            "- Add split graph (serial/parallel branches)\n"
+            "- Add per-block pre/post lane indicators\n"
+            "- Add A/B topology compare presets";
+
+        if (summary.getText() != txt)
+            summary.setText (txt, juce::dontSendNotification);
+    }
+};
+
 class MsegPage final : public juce::Component,
                        private juce::Timer
 {
@@ -845,7 +1687,7 @@ public:
 
         destination.setLabelText ("Apply Target");
         destination.setLayout (ComboWithLabel::Layout::labelTop);
-        setupCombo (destination, { "Off", "Macro 1", "Macro 2", "FX Morph", "Shaper Drive", "Shaper Mix" }, 1);
+        setupCombo (destination, { "Off", "Macro 1", "Macro 2", "FX Morph", "Shaper Drive", "Shaper Mix", "MSEG Source" }, 1);
         addAndMakeVisible (destination);
 
         depth.setLabelText ("Apply Depth");
@@ -858,7 +1700,7 @@ public:
         appliedValueLabel.setColour (juce::Label::textColourId, juce::Colour (0xffaec1db));
         addAndMakeVisible (appliedValueLabel);
 
-        liveRun.setButtonText ("Live -> Macro 2");
+        liveRun.setButtonText ("Live -> MSEG Source");
         addAndMakeVisible (liveRun);
         routeDestination.setLabelText ("Route Dest");
         routeDestination.setLayout (ComboWithLabel::Layout::labelTop);
@@ -1047,7 +1889,7 @@ private:
             storeState();
             updateAppliedValueLabel();
             if (liveRun.getToggleState())
-                publishCurrentSampleToMacro2();
+                publishCurrentSampleToMsegSource();
         };
 
         randomizeButton.onClick = [this]
@@ -1079,11 +1921,11 @@ private:
         liveRun.onClick = [this]
         {
             if (! liveRun.getToggleState())
-                setStatus (context, "MSEG: live macro feed stopped.");
+                setStatus (context, "MSEG: live source feed stopped.");
             else
             {
-                publishCurrentSampleToMacro2();
-                setStatus (context, "MSEG: live feed -> Macro 2.");
+                publishCurrentSampleToMsegSource();
+                setStatus (context, "MSEG: live feed -> source bus.");
             }
             storeState();
         };
@@ -1137,6 +1979,9 @@ private:
             case 5:
                 ok = setParamActual (context, params::shaper::mix, norm01);
                 break;
+            case 6:
+                ok = setParamActual (context, params::ui::msegOut, norm01);
+                break;
             default:
                 break;
         }
@@ -1182,7 +2027,7 @@ private:
         {
             const auto src = (int) std::lround (getParamActual (context, kModSlotSrcIds[i], 0.0f));
             const auto d = (int) std::lround (getParamActual (context, kModSlotDstIds[i], 0.0f));
-            if (src == (int) params::mod::srcMacro2 && d == dst)
+            if (src == (int) params::mod::srcMseg && d == dst)
             {
                 targetSlot = i;
                 break;
@@ -1203,13 +2048,13 @@ private:
         if (targetSlot < 0)
             targetSlot = 0;
 
-        const bool okSrc = setParamChoiceIndex (context, kModSlotSrcIds[targetSlot], (int) params::mod::srcMacro2, (int) params::mod::srcRandom);
+        const bool okSrc = setParamChoiceIndex (context, kModSlotSrcIds[targetSlot], (int) params::mod::srcMseg, (int) params::mod::srcMseg);
         const bool okDst = setParamChoiceIndex (context, kModSlotDstIds[targetSlot], dst, (int) params::mod::dstLast);
         const bool okDepth = setParamActual (context, kModSlotDepthIds[targetSlot], (float) routeDepth.getSlider().getValue());
         if (okSrc && okDst && okDepth)
         {
-            publishCurrentSampleToMacro2();
-            setStatus (context, "MSEG route: Macro2 -> " + routeDestination.getCombo().getText()
+            publishCurrentSampleToMsegSource();
+            setStatus (context, "MSEG route: MSEG -> " + routeDestination.getCombo().getText()
                                + " (slot " + juce::String (targetSlot + 1) + ").");
             if (context.onPresetSetChanged != nullptr)
                 context.onPresetSetChanged();
@@ -1229,10 +2074,10 @@ private:
         for (int i = 0; i < params::mod::numSlots; ++i)
         {
             const auto src = (int) std::lround (getParamActual (context, kModSlotSrcIds[i], 0.0f));
-            if (src != (int) params::mod::srcMacro2)
+            if (src != (int) params::mod::srcMseg)
                 continue;
 
-            if (setParamChoiceIndex (context, kModSlotSrcIds[i], (int) params::mod::srcOff, (int) params::mod::srcRandom) &&
+            if (setParamChoiceIndex (context, kModSlotSrcIds[i], (int) params::mod::srcOff, (int) params::mod::srcMseg) &&
                 setParamChoiceIndex (context, kModSlotDstIds[i], (int) params::mod::dstOff, (int) params::mod::dstLast) &&
                 setParamActual (context, kModSlotDepthIds[i], 0.0f))
             {
@@ -1245,10 +2090,10 @@ private:
             context.onPresetSetChanged();
     }
 
-    void publishCurrentSampleToMacro2()
+    void publishCurrentSampleToMsegSource()
     {
         const float y = editor.sampleAt (juce::jlimit (0.0f, 1.0f, livePhase01));
-        setParamActual (context, params::macros::m2, y);
+        setParamActual (context, params::ui::msegOut, y);
     }
 
     float getLiveRateHz() const
@@ -1292,7 +2137,7 @@ private:
 
         phase.getSlider().setValue (juce::jlimit (0.0, 360.0, (double) livePhase01 * 360.0), juce::dontSendNotification);
         updateAppliedValueLabel();
-        publishCurrentSampleToMacro2();
+        publishCurrentSampleToMsegSource();
     }
 };
 
@@ -1903,14 +2748,11 @@ FutureHubComponent::FutureHubComponent (FutureHubContext contextIn)
     addAndMakeVisible (tabs);
     tabs.setTabBarDepth (30);
 
-    tabs.addTab ("OSC", juce::Colour (0xff16263a),
-                 new StubPage ("Wavetable / Granular / Spectral (next)", "This tab now acts as architecture reference.\nMain implementation started from Voicing + MSEG + Preset Browser."), true);
-    tabs.addTab ("MOD", juce::Colour (0xff1a223d),
-                 new StubPage ("Modulation 2.0 (next)", "Drag/drop routing is active in main UI.\nThis tab is reserved for expanded source shaping and destination coverage matrix."), true);
+    tabs.addTab ("OSC", juce::Colour (0xff16263a), new OscPrepPage (context), true);
+    tabs.addTab ("MOD", juce::Colour (0xff1a223d), new ModRoutingPage (context), true);
     tabs.addTab ("MSEG", juce::Colour (0xff1a2734), new MsegPage (context), true);
     tabs.addTab ("VOICING", juce::Colour (0xff1b2430), new VoicingPage (context), true);
-    tabs.addTab ("FX PRO", juce::Colour (0xff272016),
-                 new StubPage ("FX Pro Routing (next)", "Split/Mid-Side graphs and per-block stress QA will be extended here."), true);
+    tabs.addTab ("FX PRO", juce::Colour (0xff272016), new FxProPage (context), true);
     tabs.addTab ("BROWSER", juce::Colour (0xff202323), new PresetBrowserPage (context), true);
     tabs.addTab ("UI PROD", juce::Colour (0xff1e2422),
                  new StubPage ("UI Production QA (next)", "Typography/icon/theme packs and adaptive grid QA pipeline."), true);

@@ -1179,7 +1179,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         const auto dst = params->modSlotDst[(size_t) s] != nullptr ? (int) std::lround (params->modSlotDst[(size_t) s]->load()) : (int) params::mod::dstOff;
         const auto dep = params->modSlotDepth[(size_t) s] != nullptr ? params->modSlotDepth[(size_t) s]->load() : 0.0f;
 
-        slots[(size_t) s].src = juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, src);
+        slots[(size_t) s].src = juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMseg, src);
         slots[(size_t) s].dst = juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstLast, dst);
         slots[(size_t) s].depth = juce::jlimit (-1.0f, 1.0f, dep);
     }
@@ -1241,7 +1241,8 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
         ampEnvBuf[(size_t) i] = aEnv;
         filterEnvBuf[(size_t) i] = fEnv;
 
-        const auto randSrc = randomNoteValue; // unipolar 0..1, refreshed on note-on
+            const auto randSrc = randomNoteValue; // unipolar 0..1, refreshed on note-on
+            const auto msegSrc = params->uiMsegOut != nullptr ? juce::jlimit (0.0f, 1.0f, params->uiMsegOut->load()) : 0.0f;
 
         const auto l1 = lfo1.process(); // bipolar
         const auto l2 = lfo2.process(); // bipolar
@@ -1312,6 +1313,7 @@ void MonoSynthEngine::render (juce::AudioBuffer<float>& buffer, int startSample,
                 case params::mod::srcFilterEnv: srcVal = fEnv; break;
                 case params::mod::srcAmpEnv: srcVal = aEnv; break;
                 case params::mod::srcRandom: srcVal = randSrc; break;
+                case params::mod::srcMseg: srcVal = msegSrc; break;
             }
 
             const auto amt = srcVal * slot.depth;

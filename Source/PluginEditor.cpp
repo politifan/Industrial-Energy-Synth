@@ -2355,6 +2355,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
         src.addItem ("Filter Env", 10);
         src.addItem ("Amp Env", 11);
         src.addItem ("Random", 12);
+        src.addItem ("MSEG", 13);
         addAndMakeVisible (src);
         modSlotSrcAttachment[(size_t) i] = std::make_unique<APVTS::ComboBoxAttachment> (audioProcessor.getAPVTS(), kModSlotSrcIds[i], src);
 
@@ -2435,7 +2436,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                                                                                                      (int) params::mod::dstLast,
                                                                                                                      modSlotDst[(size_t) s].getSelectedItemIndex());
                                                                   const auto srcNow = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff,
-                                                                                                                          (int) params::mod::srcRandom,
+                                                                                                                          (int) params::mod::srcMseg,
                                                                                                                           modSlotSrc[(size_t) s].getSelectedItemIndex());
                                                                   if (dNow == wantDst && srcNow != params::mod::srcOff)
                                                                       return s;
@@ -2449,7 +2450,7 @@ IndustrialEnergySynthAudioProcessorEditor::IndustrialEnergySynthAudioProcessorEd
                                                                                                                  (int) params::mod::dstLast,
                                                                                                                  modSlotDst[(size_t) i].getSelectedItemIndex());
                                                               const auto srcNow = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff,
-                                                                                                                      (int) params::mod::srcRandom,
+                                                                                                                      (int) params::mod::srcMseg,
                                                                                                                       modSlotSrc[(size_t) i].getSelectedItemIndex());
                                                               if (dNow == wantDst && srcNow != params::mod::srcOff)
                                                                   return i;
@@ -7125,6 +7126,7 @@ void IndustrialEnergySynthAudioProcessorEditor::refreshLabels()
         modSlotSrc[(size_t) i].changeItemText (10, ies::ui::tr (ies::ui::Key::modSrcFilterEnv, langIdx));
         modSlotSrc[(size_t) i].changeItemText (11, ies::ui::tr (ies::ui::Key::modSrcAmpEnv, langIdx));
         modSlotSrc[(size_t) i].changeItemText (12, ies::ui::tr (ies::ui::Key::modSrcRandom, langIdx));
+        modSlotSrc[(size_t) i].changeItemText (13, "MSEG");
 
         // Destination menu
         modSlotDst[(size_t) i].changeItemText (1, ies::ui::tr (ies::ui::Key::modOff, langIdx));
@@ -8995,6 +8997,7 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
             float sumFEnv = 0.0f;
             float sumAEnv = 0.0f;
             float sumRand = 0.0f;
+            float sumMseg = 0.0f;
 
             for (int i = 0; i < params::mod::numSlots; ++i)
             {
@@ -9002,7 +9005,7 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
                 if (d != dst)
                     continue;
 
-                const auto src = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
+                const auto src = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMseg, modSlotSrc[(size_t) i].getSelectedItemIndex());
                 const auto dep = (float) modSlotDepth[(size_t) i].getValue();
 
                 switch (src)
@@ -9019,12 +9022,13 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
                     case params::mod::srcFilterEnv: sumFEnv += dep; break;
                     case params::mod::srcAmpEnv: sumAEnv += dep; break;
                     case params::mod::srcRandom: sumRand += dep; break;
+                    case params::mod::srcMseg: sumMseg += dep; break;
                     default: break;
                 }
             }
 
             struct Arc final { float depth; juce::Colour col; };
-            std::array<Arc, 11> arcs {};
+            std::array<Arc, 12> arcs {};
             int count = 0;
 
             auto addArc = [&] (float d, juce::Colour c)
@@ -9045,6 +9049,7 @@ void IndustrialEnergySynthAudioProcessorEditor::timerCallback()
             addArc (sumFEnv, colFEnv);
             addArc (sumAEnv, colAEnv);
             addArc (sumRand, colRand);
+            addArc (sumMseg, colMacro2.brighter (0.2f));
 
             bool changed = false;
             changed |= setIfChanged (s, "modArcCount", count);
@@ -10347,7 +10352,7 @@ void IndustrialEnergySynthAudioProcessorEditor::clearAllModForDest (params::mod:
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
         const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstLast, modSlotDst[(size_t) i].getSelectedItemIndex());
-        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
+        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMseg, modSlotSrc[(size_t) i].getSelectedItemIndex());
         if (d == dst && s != params::mod::srcOff)
             clearModSlot (i);
     }
@@ -10371,7 +10376,7 @@ void IndustrialEnergySynthAudioProcessorEditor::assignModulation (params::mod::S
 
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
-        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
+        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMseg, modSlotSrc[(size_t) i].getSelectedItemIndex());
         const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstLast, modSlotDst[(size_t) i].getSelectedItemIndex());
 
         if (s == src && d == dst)
@@ -10402,6 +10407,8 @@ void IndustrialEnergySynthAudioProcessorEditor::assignModulation (params::mod::S
             defDepth = 0.8f;
         else if (src == params::mod::srcRandom)
             defDepth = 0.5f;
+        else if (src == params::mod::srcMseg)
+            defDepth = 0.7f;
         setParamValue (kModSlotDepthIds[slot], defDepth);
     }
 
@@ -10430,6 +10437,7 @@ void IndustrialEnergySynthAudioProcessorEditor::assignModulation (params::mod::S
                 case params::mod::srcFilterEnv: return isRu ? juce::String::fromUTF8 (u8"Огиб. фильтра") : "Filter Env";
                 case params::mod::srcAmpEnv: return isRu ? juce::String::fromUTF8 (u8"Огиб. амплитуды") : "Amp Env";
                 case params::mod::srcRandom: return isRu ? juce::String::fromUTF8 (u8"Случайно") : "Random";
+                case params::mod::srcMseg: return "MSEG";
                 default: break;
             }
             return "Off";
@@ -10505,7 +10513,7 @@ void IndustrialEnergySynthAudioProcessorEditor::showModulationMenu (params::mod:
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
         const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstLast, modSlotDst[(size_t) i].getSelectedItemIndex());
-        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
+        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMseg, modSlotSrc[(size_t) i].getSelectedItemIndex());
         if (d == dst && s != params::mod::srcOff)
             matchingSlots.add (i);
     }
@@ -10880,14 +10888,14 @@ void IndustrialEnergySynthAudioProcessorEditor::setLastTouchedModDest (params::m
     }();
 
     float sumL1 = 0.0f, sumL2 = 0.0f, sumM1 = 0.0f, sumM2 = 0.0f, sumMW = 0.0f, sumAT = 0.0f, sumV = 0.0f, sumN = 0.0f;
-    float sumFE = 0.0f, sumAE = 0.0f, sumR = 0.0f;
+    float sumFE = 0.0f, sumAE = 0.0f, sumR = 0.0f, sumMS = 0.0f;
     for (int i = 0; i < params::mod::numSlots; ++i)
     {
         const auto d = (params::mod::Dest) juce::jlimit ((int) params::mod::dstOff, (int) params::mod::dstLast, modSlotDst[(size_t) i].getSelectedItemIndex());
         if (d != dst)
             continue;
 
-        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcRandom, modSlotSrc[(size_t) i].getSelectedItemIndex());
+        const auto s = (params::mod::Source) juce::jlimit ((int) params::mod::srcOff, (int) params::mod::srcMseg, modSlotSrc[(size_t) i].getSelectedItemIndex());
         const auto dep = (float) modSlotDepth[(size_t) i].getValue();
 
         switch (s)
@@ -10903,6 +10911,7 @@ void IndustrialEnergySynthAudioProcessorEditor::setLastTouchedModDest (params::m
             case params::mod::srcFilterEnv: sumFE += dep; break;
             case params::mod::srcAmpEnv: sumAE += dep; break;
             case params::mod::srcRandom: sumR += dep; break;
+            case params::mod::srcMseg: sumMS += dep; break;
             case params::mod::srcOff:    break;
         }
     }
@@ -10929,6 +10938,7 @@ void IndustrialEnergySynthAudioProcessorEditor::setLastTouchedModDest (params::m
     addPart (modInfo, "FE", sumFE);
     addPart (modInfo, "AE", sumAE);
     addPart (modInfo, "R", sumR);
+    addPart (modInfo, "MS", sumMS);
 
     auto targetText = (isRu ? juce::String::fromUTF8 (u8"Цель: ") : juce::String ("Target: ")) + dstName;
     if (modInfo.isNotEmpty())

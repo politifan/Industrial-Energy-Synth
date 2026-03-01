@@ -192,6 +192,7 @@ public:
 
         std::atomic<float>* macro1 = nullptr;
         std::atomic<float>* macro2 = nullptr;
+        std::atomic<float>* uiMsegOut = nullptr;
 
         std::array<std::atomic<float>*, (size_t) params::mod::numSlots> modSlotSrc {};
         std::array<std::atomic<float>*, (size_t) params::mod::numSlots> modSlotDst {};

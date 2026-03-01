@@ -9,8 +9,11 @@
 - **Качество**: стабильность в Reaper, быстрый UI, ноль аллокаций в аудио‑потоке, предсказуемая автомейшн‑кривая.
 
 ## Текущий статус (реализовано в коде)
+- (2026-03-01) R&D Hub v1.3: вкладка `OSC` переведена из stub в рабочий `OSC Prep` (выбор Osc1/2/3, wave/level/coarse/fine/detune, quick character кнопки `Init/Bright/Metal/Noisy/Draw`, live APVTS control).
+- (2026-03-01) R&D Hub v1.4: вкладка `MOD` переведена из stub в `Mod Matrix Pro` (редактирование 8 слотов Src/Dst/Depth, быстрые действия `Apply Src->All`, `Insert Slot`, `Clear`, `Refresh`).
+- (2026-03-01) R&D Hub v1.5: начат следующий раздел `FX PRO` (реальные global-контролы `order/route/OS/destroy/tone/mix/morph` + live routing summary вместо stub).
 - (2026-03-01) R&D Hub v1.1: страницы `VOICING/MSEG/BROWSER` доведены до рабочего состояния: live-хуки на `mono.*` (Legato/Glide), интерактивный MSEG c `Apply Target` (Macro1/2, FX Morph, Shaper Drive/Mix), Preset Browser получил `Save/Delete`, double-click load, draft-name persistence и A/B recall через `APVTS`.
-- (2026-03-01) R&D Hub v1.2: MSEG получил live-поток в `Macro 2` + one-click routing в слоты Mod Matrix (`Macro2 -> Dest`) и очистку таких маршрутов; Preset Browser расширен до unified списка `Init + Factory + User` с загрузкой всех типов.
+- (2026-03-01) R&D Hub v1.2: MSEG получил live-поток в отдельный источник `MSEG` (`ui.msegOut`) + one-click routing в слоты Mod Matrix (`MSEG -> Dest`) и очистку таких маршрутов; Preset Browser расширен до unified списка `Init + Factory + User` с загрузкой всех типов.
 - (2026-03-01) R&D Hub Stubs v1: добавлено отдельное окно `R&D Hub` (Osc/Mod/MSEG/Voicing/FX Pro/Presets/UI Prod/Workflow) с визуальными заготовками Serum‑уровня для следующего этапа разработки (без тяжёлого DSP).
 - (2026-03-01) UI Animation Pack v1: добавлены живые анимации top bar/панелей (phase-driven pulse), анимированные sweep/scanline акценты и более “железная” cockpit-стилизация кнопок/крутилок/тумблеров.
 - (2026-03-01) V2.5 FX Dense UI pass: уплотнена раскладка FX detail-панели (меньше пустоты, больше параметров на экран), уменьшены высоты служебных строк (Global/Placement/Route).

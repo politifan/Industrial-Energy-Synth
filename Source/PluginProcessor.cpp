@@ -922,6 +922,7 @@ IndustrialEnergySynthAudioProcessor::IndustrialEnergySynthAudioProcessor()
 
     paramPointers.macro1 = apvts.getRawParameterValue (params::macros::m1);
     paramPointers.macro2 = apvts.getRawParameterValue (params::macros::m2);
+    paramPointers.uiMsegOut = apvts.getRawParameterValue (params::ui::msegOut);
 
     static constexpr const char* slotSrcIds[params::mod::numSlots] =
     {
@@ -1609,6 +1610,10 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
                                                                      "Analyzer Averaging",
                                                                      juce::StringArray { "Fast", "Medium", "Smooth" },
                                                                      (int) params::ui::analyzerMedium));
+    uiGroup->addChild (std::make_unique<juce::AudioParameterFloat> (params::makeID (params::ui::msegOut),
+                                                                     "MSEG Out",
+                                                                     juce::NormalisableRange<float> (0.0f, 1.0f),
+                                                                     0.0f));
 
     // Lab keyboard workflow (preview-only).
     uiGroup->addChild (std::make_unique<juce::AudioParameterChoice> (params::makeID (params::ui::labKeyboardMode),
@@ -1718,7 +1723,7 @@ IndustrialEnergySynthAudioProcessor::APVTS::ParameterLayout IndustrialEnergySynt
     auto modGroup = std::make_unique<juce::AudioProcessorParameterGroup> ("mod", "Mod Matrix", "|");
     const auto modSrcChoices = juce::StringArray { "Off", "LFO 1", "LFO 2", "Macro 1", "Macro 2",
                                                    "Mod Wheel", "Aftertouch", "Velocity", "Note",
-                                                   "Filter Env", "Amp Env", "Random" };
+                                                   "Filter Env", "Amp Env", "Random", "MSEG" };
     const auto modDstChoices = juce::StringArray {
         "Off", "Osc1 Level", "Osc2 Level", "Osc3 Level", "Filter Cutoff", "Filter Reso",
         "Fold Amount", "Clip Amount", "Mod Amount", "Crush Mix",
