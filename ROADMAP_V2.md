@@ -19,6 +19,11 @@
 - (2026-03-01) R&D Hub v1.10: `WORKFLOW` получил mini undo/redo журнал (до 32 шагов, restore APVTS state, clear history).
 - (2026-03-01) R&D Hub v1.11: `UI PROD` получил quick cockpit presets (`Dark/Cockpit/Signal`) + экспорт/импорт UI профилей (`*.iesuip`).
 - (2026-03-01) R&D Hub v1.12: `FX PRO` snapshots A/B сохранены в `APVTS.state` (переживают reopen/reload); в Hub больше нет вкладок-заглушек — весь R&D набор рабочий (`OSC/MOD/MSEG/VOICING/FX PRO/BROWSER/UI PROD/WORKFLOW`).
+- (2026-03-01) R&D Hub v1.13: `FX PRO Routing Map` переработан в graph-editor стиль (UE5-like): карточки узлов с pin-портами, bezier-связи, major/minor сетка, drag узлов, выделение/hover.
+- (2026-03-01) R&D Hub v1.14: `UI PROD` импорт/экспорт переведён на `FileChooser::launchAsync` (совместимо с конфигом JUCE без modal loops).
+- (2026-03-01) R&D Hub v1.15: `FX PRO Routing Map` получил UE5-like fine controls: `Snap Grid`, `Compact Nodes`, `Flow Animation`, `MiniMap`, `Grid Density`, `Graph Zoom`, `Wire Tension`, `Flow Speed` + persistence в `APVTS.state` и расширенный routing summary.
+- (2026-03-01) R&D Hub v1.16: `FX PRO Routing Map` получил interaction pass: right-click context menus (node/background), node states (`bypass/solo/lock/reroute pin`), pan (Alt+LMB / MMB) и wheel shortcuts (`zoom`, `Shift=tension`, `Ctrl=flow`).
+- (2026-03-01) R&D Hub v1.17: `UI PROD` переработан в production layout (`Core/Material/Behavior/Design Notes`) + новый cockpit-preview рендер (deck+controls+meters, texture/bevel/shadow, scanlines/meter motion/screws, live phase animation).
 - (2026-03-01) R&D Hub v1.1: страницы `VOICING/MSEG/BROWSER` доведены до рабочего состояния: live-хуки на `mono.*` (Legato/Glide), интерактивный MSEG c `Apply Target` (Macro1/2, FX Morph, Shaper Drive/Mix), Preset Browser получил `Save/Delete`, double-click load, draft-name persistence и A/B recall через `APVTS`.
 - (2026-03-01) R&D Hub v1.2: MSEG получил live-поток в отдельный источник `MSEG` (`ui.msegOut`) + one-click routing в слоты Mod Matrix (`MSEG -> Dest`) и очистку таких маршрутов; Preset Browser расширен до unified списка `Init + Factory + User` с загрузкой всех типов.
 - (2026-03-01) R&D Hub Stubs v1: добавлено отдельное окно `R&D Hub` (Osc/Mod/MSEG/Voicing/FX Pro/Presets/UI Prod/Workflow) с визуальными заготовками Serum‑уровня для следующего этапа разработки (без тяжёлого DSP).
@@ -308,6 +313,8 @@
 - Обновлены tooltip-подсказки и визуальные mod-rings для FX/Xtra ручек.
 - Добавлен режим `Basic/Advanced` на FX-странице: compact essentials vs full control set для выбранного блока.
 - Для `V2.4 Routing UX` добавлены drag-reorder FX блоков в rack (режим `Custom`) и live `Routing Map` с отображением фактической цепи и serial/parallel flow.
+- Для `V2.4 Routing UX` добавлен QA-подчеклист graph-controls: проверка snap/zoom/tension/minimap/flow на resize, reopen проекта и при активной automation `fx.global.*`.
+- Для `UI PROD` добавлен QA-подчеклист material-preview: проверка `texture/bevel/shadow` и toggles `scanlines/motion/screws` в `Eco/Hi`, включая reopen/import/export профиля.
 
 ### 2026-02-12
 - Добавлен каркас `FXChain` (Chorus / Delay / Reverb / Distortion / Phaser / Octaver) с per-block mix + global FX mix.

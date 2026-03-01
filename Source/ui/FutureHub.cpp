@@ -55,6 +55,12 @@ static const juce::Identifier kUiProdAccent { "ui.prod.accent" };
 static const juce::Identifier kUiProdCompact { "ui.prod.compact" };
 static const juce::Identifier kUiProdHover { "ui.prod.hover" };
 static const juce::Identifier kUiProdSwitches { "ui.prod.switches" };
+static const juce::Identifier kUiProdTexture { "ui.prod.texture" };
+static const juce::Identifier kUiProdBevel { "ui.prod.bevel" };
+static const juce::Identifier kUiProdShadow { "ui.prod.shadow" };
+static const juce::Identifier kUiProdScanlines { "ui.prod.scanlines" };
+static const juce::Identifier kUiProdMeterMotion { "ui.prod.meterMotion" };
+static const juce::Identifier kUiProdScrews { "ui.prod.screws" };
 
 static const juce::Identifier kWorkflowAutoLearn { "ui.workflow.autoLearn" };
 static const juce::Identifier kWorkflowSafeRandom { "ui.workflow.safeRandom" };
@@ -65,6 +71,14 @@ static const juce::Identifier kFxProSnapA { "ui.fxpro.snapA" };
 static const juce::Identifier kFxProSnapB { "ui.fxpro.snapB" };
 static const juce::Identifier kFxProSnapAValid { "ui.fxpro.snapAValid" };
 static const juce::Identifier kFxProSnapBValid { "ui.fxpro.snapBValid" };
+static const juce::Identifier kFxProGraphSnap { "ui.fxpro.graph.snap" };
+static const juce::Identifier kFxProGraphCompact { "ui.fxpro.graph.compact" };
+static const juce::Identifier kFxProGraphFlow { "ui.fxpro.graph.flow" };
+static const juce::Identifier kFxProGraphMiniMap { "ui.fxpro.graph.minimap" };
+static const juce::Identifier kFxProGraphGridMode { "ui.fxpro.graph.gridMode" };
+static const juce::Identifier kFxProGraphZoom { "ui.fxpro.graph.zoom" };
+static const juce::Identifier kFxProGraphTension { "ui.fxpro.graph.tension" };
+static const juce::Identifier kFxProGraphFlowSpeed { "ui.fxpro.graph.flowSpeed" };
 
 static juce::var getStateProp (const FutureHubContext& context, const juce::Identifier& key, const juce::var& fallback)
 {
@@ -1423,16 +1437,83 @@ public:
     };
 
     std::function<void(Node)> onNodeClick;
+    std::function<void(Node, juce::Point<int>)> onNodeContext;
+    std::function<void(const RenderOptions&)> onRenderOptionsChanged;
+
+    struct RenderOptions final
+    {
+        bool snapToGrid = true;
+        bool compactNodes = false;
+        bool flowAnimation = true;
+        bool miniMap = true;
+        int gridMode = 1; // 0=fine, 1=medium, 2=coarse
+        float zoom = 1.0f; // 0.75 .. 1.35
+        float wireTension = 0.55f; // 0.20 .. 0.95
+        float flowSpeed = 0.45f; // 0.05 .. 1.50
+    };
 
     void setTopology (bool isParallel, bool isDestroyPost, bool isTonePost, int orderMode, int osMode)
     {
+        const bool same = topologyReady
+                          && parallel == isParallel
+                          && destroyPost == isDestroyPost
+                          && tonePost == isTonePost
+                          && order == orderMode
+                          && os == osMode;
+        if (same)
+            return;
+
         parallel = isParallel;
         destroyPost = isDestroyPost;
         tonePost = isTonePost;
         order = orderMode;
         os = osMode;
+        topologyReady = true;
         rebuildLayout();
         repaint();
+    }
+
+    void setRenderOptions (const RenderOptions& next)
+    {
+        const auto clampedGrid = juce::jlimit (0, 2, next.gridMode);
+        const auto clampedZoom = juce::jlimit (0.75f, 1.35f, next.zoom);
+        const auto clampedTension = juce::jlimit (0.20f, 0.95f, next.wireTension);
+        const auto clampedFlowSpeed = juce::jlimit (0.05f, 1.50f, next.flowSpeed);
+
+        const bool same = (options.snapToGrid == next.snapToGrid)
+                          && (options.compactNodes == next.compactNodes)
+                          && (options.flowAnimation == next.flowAnimation)
+                          && (options.miniMap == next.miniMap)
+                          && (options.gridMode == clampedGrid)
+                          && std::abs (options.zoom - clampedZoom) < 0.0001f
+                          && std::abs (options.wireTension - clampedTension) < 0.0001f
+                          && std::abs (options.flowSpeed - clampedFlowSpeed) < 0.0001f;
+        if (same)
+            return;
+
+        options.snapToGrid = next.snapToGrid;
+        options.compactNodes = next.compactNodes;
+        options.flowAnimation = next.flowAnimation;
+        options.miniMap = next.miniMap;
+        options.gridMode = clampedGrid;
+        options.zoom = clampedZoom;
+        options.wireTension = clampedTension;
+        options.flowSpeed = clampedFlowSpeed;
+
+        rebuildLayout();
+        repaint();
+        if (onRenderOptionsChanged != nullptr)
+            onRenderOptionsChanged (options);
+    }
+
+    void setFlowPhase (float phase01)
+    {
+        const auto wrapped = phase01 - std::floor (phase01);
+        if (std::abs (flowPhase - wrapped) < 0.001f)
+            return;
+        flowPhase = wrapped;
+        if (options.flowAnimation)
+            repaint();
     }
 
     void resized() override
@@ -1442,24 +1523,11 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        const auto area = getLocalBounds().toFloat();
-        juce::ColourGradient grad (juce::Colour (0xff101c2a), area.getTopLeft(), juce::Colour (0xff121722), area.getBottomRight(), false);
-        g.setGradientFill (grad);
-        g.fillRoundedRectangle (area.reduced (0.5f), 8.0f);
-        g.setColour (juce::Colour (0xff324255));
-        g.drawRoundedRectangle (area.reduced (0.5f), 8.0f, 1.0f);
-
-        g.setColour (juce::Colour (0x2a6ea7db));
-        for (int i = 1; i < 8; ++i)
-        {
-            const float x = area.getX() + area.getWidth() * (float) i / 8.0f;
-            g.drawVerticalLine ((int) std::lround (x), area.getY() + 10.0f, area.getBottom() - 10.0f);
-        }
-
+        drawGraphBackground (g);
         drawLinks (g);
         drawNodes (g);
 
-        g.setColour (juce::Colour (0xff97aecd));
+        g.setColour (juce::Colour (0xffa4bad8));
         g.setFont (11.0f);
         const juce::String orderText = order == (int) params::fx::global::orderFixedB ? "Order B"
                                         : (order == (int) params::fx::global::orderCustom ? "Custom" : "Order A");
@@ -1468,10 +1536,92 @@ public:
         g.drawText ("Route " + juce::String (parallel ? "Parallel" : "Serial")
                     + "   |   " + orderText
                     + "   |   OS " + osText
+                    + "   |   Grid " + juce::String (options.gridMode == 0 ? "Fine" : (options.gridMode == 2 ? "Coarse" : "Medium"))
                     + "   |   Click nodes to toggle topology",
                     getLocalBounds().reduced (10).removeFromBottom (20),
                     juce::Justification::centredRight,
                     true);
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        const int hit = hitNode (e.position);
+
+        if (e.mods.isPopupMenu())
+        {
+            if (hit >= 0)
+            {
+                selectedNode = hit;
+                showNodeContextMenu ((Node) hit);
+                if (onNodeContext != nullptr)
+                    onNodeContext ((Node) hit, e.getScreenPosition());
+            }
+            else
+            {
+                showBackgroundContextMenu();
+            }
+            repaint();
+            return;
+        }
+
+        const bool panGesture = e.mods.isMiddleButtonDown() || (e.mods.isAltDown() && e.mods.isLeftButtonDown());
+        if (panGesture)
+        {
+            panning = true;
+            panStartMouse = e.position;
+            panStartBounds = nodeBounds;
+            return;
+        }
+
+        if (! e.mods.isLeftButtonDown() || hit < 0)
+            return;
+
+        if (locked[(size_t) hit])
+        {
+            selectedNode = hit;
+            repaint();
+            return;
+        }
+
+        draggedNode = hit;
+        mouseDownHit = hit;
+        movedDuringDrag = false;
+        dragStartMouse = e.position;
+        dragStartBounds = nodeBounds[(size_t) hit];
+        selectedNode = hit;
+        repaint();
+    }
+
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (panning)
+        {
+            const auto delta = e.position - panStartMouse;
+            for (int i = 0; i < numNodes; ++i)
+            {
+                if (! visible[(size_t) i])
+                    continue;
+
+                auto next = panStartBounds[(size_t) i].translated (delta.x, delta.y);
+                next = clampNodeToGraph (next);
+                if (options.snapToGrid)
+                    next = snapNodeToGrid (next);
+                nodeBounds[(size_t) i] = next;
+            }
+            repaint();
+            return;
+        }
+
+        if (draggedNode < 0)
+            return;
+
+        auto next = dragStartBounds.translated (e.position.x - dragStartMouse.x, e.position.y - dragStartMouse.y);
+        next = clampNodeToGraph (next);
+        if (options.snapToGrid)
+            next = snapNodeToGrid (next);
+        movedDuringDrag = movedDuringDrag || (next.getPosition().getDistanceFrom (dragStartBounds.getPosition()) > 1.0f);
+        nodeBounds[(size_t) draggedNode] = next;
+        repaint();
     }
 
     void mouseMove (const juce::MouseEvent& e) override
@@ -1492,21 +1642,81 @@ public:
 
     void mouseUp (const juce::MouseEvent& e) override
     {
+        if (panning)
+        {
+            panning = false;
+            return;
+        }
+
         const int hit = hitNode (e.position);
+
+        if (draggedNode >= 0)
+        {
+            const int released = draggedNode;
+            draggedNode = -1;
+            if (! movedDuringDrag && released == mouseDownHit && onNodeClick != nullptr)
+                onNodeClick ((Node) released);
+            repaint();
+            return;
+        }
+
         if (hit >= 0 && onNodeClick != nullptr)
             onNodeClick ((Node) hit);
     }
 
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
+    {
+        if (std::abs (wheel.deltaY) < 0.0001f)
+            return;
+
+        auto next = options;
+        if (e.mods.isShiftDown())
+        {
+            next.wireTension = juce::jlimit (0.20f, 0.95f, next.wireTension + wheel.deltaY * 0.10f);
+        }
+        else if (e.mods.isCtrlDown())
+        {
+            next.flowSpeed = juce::jlimit (0.05f, 1.50f, next.flowSpeed + wheel.deltaY * 0.16f);
+        }
+        else
+        {
+            const float factor = 1.0f + wheel.deltaY * 0.18f;
+            next.zoom = juce::jlimit (0.75f, 1.35f, next.zoom * factor);
+        }
+        setRenderOptions (next);
+    }
+
 private:
+    RenderOptions options {};
     bool parallel = false;
     bool destroyPost = false;
     bool tonePost = true;
     int order = 0;
     int os = 0;
+    bool topologyReady = false;
     int hoveredNode = -1;
+    int selectedNode = -1;
+    int draggedNode = -1;
+    int mouseDownHit = -1;
+    bool movedDuringDrag = false;
+    bool panning = false;
+    bool isolateSolo = false;
+    juce::Point<float> dragStartMouse;
+    juce::Point<float> panStartMouse;
+    juce::Rectangle<float> dragStartBounds;
+    std::array<juce::Rectangle<float>, (size_t) numNodes> panStartBounds {};
+    juce::Rectangle<float> graphArea;
     std::array<juce::Rectangle<float>, (size_t) numNodes> nodeBounds {};
     std::array<bool, (size_t) numNodes> visible {};
+    std::array<bool, (size_t) numNodes> bypassed {};
+    std::array<bool, (size_t) numNodes> soloed {};
+    std::array<bool, (size_t) numNodes> locked {};
+    std::array<bool, (size_t) numNodes> rerouteEnabled {};
+    std::array<juce::Point<float>, (size_t) numNodes> reroutePoint {};
     std::vector<Node> serialChain;
+    float flowPhase = 0.0f;
+    int gridMinor = 28;
+    int gridMajor = 112;
 
     static juce::String nodeLabel (Node n)
     {
@@ -1532,9 +1742,176 @@ private:
         return -1;
     }
 
+    bool anySolo() const noexcept
+    {
+        for (bool s : soloed)
+            if (s)
+                return true;
+        return false;
+    }
+
+    bool isNodeActiveForDraw (Node n) const noexcept
+    {
+        const auto idx = (size_t) n;
+        if (! visible[idx])
+            return false;
+        if (bypassed[idx])
+            return false;
+        if (isolateSolo && anySolo() && ! soloed[idx])
+            return false;
+        return true;
+    }
+
     juce::Point<float> nodeCenter (Node n) const
     {
         return nodeBounds[(size_t) n].getCentre();
+    }
+
+    juce::Point<float> nodeInputPin (Node n) const
+    {
+        const auto b = nodeBounds[(size_t) n];
+        return { b.getX() + 3.0f, b.getCentreY() };
+    }
+
+    juce::Point<float> nodeOutputPin (Node n) const
+    {
+        const auto b = nodeBounds[(size_t) n];
+        return { b.getRight() - 3.0f, b.getCentreY() };
+    }
+
+    juce::Rectangle<float> clampNodeToGraph (juce::Rectangle<float> b) const
+    {
+        if (graphArea.isEmpty())
+            return b;
+        const auto lim = graphArea.reduced (4.0f);
+        if (b.getX() < lim.getX()) b.setX (lim.getX());
+        if (b.getY() < lim.getY()) b.setY (lim.getY());
+        if (b.getRight() > lim.getRight()) b.setX (lim.getRight() - b.getWidth());
+        if (b.getBottom() > lim.getBottom()) b.setY (lim.getBottom() - b.getHeight());
+        return b;
+    }
+
+    juce::Rectangle<float> snapNodeToGrid (juce::Rectangle<float> b) const
+    {
+        if (graphArea.isEmpty())
+            return b;
+
+        const float step = (float) juce::jmax (12, gridMinor);
+        const auto gx = graphArea.getX();
+        const auto gy = graphArea.getY();
+        const auto snappedX = gx + std::round ((b.getX() - gx) / step) * step;
+        const auto snappedY = gy + std::round ((b.getY() - gy) / step) * step;
+        b.setPosition (snappedX, snappedY);
+        return clampNodeToGraph (b);
+    }
+
+    void resetNodeLayout()
+    {
+        const auto prev = options;
+        options.snapToGrid = false;
+        rebuildLayout();
+        options = prev;
+        if (options.snapToGrid)
+            for (int i = 0; i < numNodes; ++i)
+                if (visible[(size_t) i])
+                    nodeBounds[(size_t) i] = snapNodeToGrid (nodeBounds[(size_t) i]);
+        repaint();
+    }
+
+    void centerOnNode (Node n)
+    {
+        if (! visible[(size_t) n])
+            return;
+        const auto target = graphArea.getCentre() - nodeBounds[(size_t) n].getCentre();
+        for (int i = 0; i < numNodes; ++i)
+        {
+            if (! visible[(size_t) i])
+                continue;
+            auto next = nodeBounds[(size_t) i].translated (target.x, target.y);
+            next = clampNodeToGraph (next);
+            if (options.snapToGrid)
+                next = snapNodeToGrid (next);
+            nodeBounds[(size_t) i] = next;
+        }
+    }
+
+    void showBackgroundContextMenu()
+    {
+        juce::PopupMenu m;
+        m.addItem (1, options.snapToGrid ? "Disable Snap Grid" : "Enable Snap Grid");
+        m.addItem (2, options.compactNodes ? "Standard Nodes" : "Compact Nodes");
+        m.addItem (3, options.miniMap ? "Hide MiniMap" : "Show MiniMap");
+        m.addItem (4, options.flowAnimation ? "Flow Animation Off" : "Flow Animation On");
+        m.addSeparator();
+        m.addItem (5, "Reset Graph Layout");
+        m.addItem (6, isolateSolo ? "Disable Solo Isolate" : "Enable Solo Isolate");
+
+        const int res = m.show();
+        auto next = options;
+        switch (res)
+        {
+            case 1: next.snapToGrid = ! next.snapToGrid; setRenderOptions (next); break;
+            case 2: next.compactNodes = ! next.compactNodes; setRenderOptions (next); break;
+            case 3: next.miniMap = ! next.miniMap; setRenderOptions (next); break;
+            case 4: next.flowAnimation = ! next.flowAnimation; setRenderOptions (next); break;
+            case 5: resetNodeLayout(); break;
+            case 6: isolateSolo = ! isolateSolo; repaint(); break;
+            default: break;
+        }
+    }
+
+    void showNodeContextMenu (Node n)
+    {
+        const auto idx = (size_t) n;
+        const bool canBypass = n != nodeIn && n != nodeOut;
+        juce::PopupMenu m;
+        m.addItem (1, canBypass, bypassed[idx] ? "Un-bypass Node" : "Bypass Node");
+        m.addItem (2, soloed[idx] ? "Unsolo Node" : "Solo Node");
+        m.addItem (3, locked[idx] ? "Unlock Position" : "Lock Position");
+        m.addItem (4, rerouteEnabled[idx] ? "Disable Reroute Pin" : "Enable Reroute Pin");
+        m.addSeparator();
+        m.addItem (5, "Center View on Node");
+        m.addItem (6, "Reset Graph Layout");
+        m.addSeparator();
+        m.addItem (7, "Apply Node Topology Action");
+        const int res = m.show();
+
+        switch (res)
+        {
+            case 1:
+                bypassed[idx] = ! bypassed[idx];
+                break;
+            case 2:
+                soloed[idx] = ! soloed[idx];
+                break;
+            case 3:
+                locked[idx] = ! locked[idx];
+                break;
+            case 4:
+            {
+                rerouteEnabled[idx] = ! rerouteEnabled[idx];
+                if (rerouteEnabled[idx])
+                {
+                    const auto c = nodeBounds[idx].getCentre();
+                    reroutePoint[idx] = { c.x + 36.0f, c.y - 28.0f };
+                }
+                break;
+            }
+            case 5:
+                centerOnNode (n);
+                break;
+            case 6:
+                resetNodeLayout();
+                break;
+            case 7:
+                if (onNodeClick != nullptr)
+                    onNodeClick (n);
+                break;
+            default:
+                break;
+        }
+
+        repaint();
     }
 
     void rebuildLayout()
@@ -1544,8 +1921,18 @@ private:
 
         auto area = getLocalBounds().toFloat().reduced (12.0f, 12.0f);
         area.removeFromBottom (24.0f);
-        const float yMain = area.getCentreY() - 16.0f;
-        const float yFx = juce::jmin (area.getBottom() - 18.0f, yMain + 54.0f);
+        graphArea = area;
+
+        switch (juce::jlimit (0, 2, options.gridMode))
+        {
+            case 0: gridMinor = 20; break;
+            case 2: gridMinor = 40; break;
+            default: gridMinor = 28; break;
+        }
+        gridMajor = gridMinor * 4;
+
+        const float yMain = area.getCentreY() - 24.0f;
+        const float yFx = juce::jmin (area.getBottom() - 20.0f, yMain + (options.compactNodes ? 68.0f : 92.0f) * options.zoom);
 
         serialChain.push_back (nodeIn);
         if (! destroyPost)
@@ -1562,8 +1949,10 @@ private:
             serialChain.push_back (nodeFx);
         serialChain.push_back (nodeOut);
 
-        const float w = 84.0f;
-        const float h = 30.0f;
+        const float baseW = options.compactNodes ? 110.0f : 128.0f;
+        const float baseH = options.compactNodes ? 46.0f : 56.0f;
+        const float w = baseW * options.zoom;
+        const float h = baseH * options.zoom;
         const int points = juce::jmax (2, (int) serialChain.size());
         for (int i = 0; i < points; ++i)
         {
@@ -1571,6 +1960,8 @@ private:
             const auto n = serialChain[(size_t) i];
             nodeBounds[(size_t) n] = { x - w * 0.5f, yMain - h * 0.5f, w, h };
             visible[(size_t) n] = true;
+            if (! rerouteEnabled[(size_t) n] || reroutePoint[(size_t) n].isOrigin())
+                reroutePoint[(size_t) n] = { x + w * 0.30f, yMain - h * 0.95f };
         }
 
         if (parallel)
@@ -1580,28 +1971,133 @@ private:
             const float x = (cShaper.x + cOut.x) * 0.5f;
             nodeBounds[(size_t) nodeFx] = { x - w * 0.5f, yFx - h * 0.5f, w, h };
             visible[(size_t) nodeFx] = true;
+            if (! rerouteEnabled[(size_t) nodeFx] || reroutePoint[(size_t) nodeFx].isOrigin())
+                reroutePoint[(size_t) nodeFx] = { x + w * 0.25f, yFx - h * 0.95f };
         }
+
+        if (options.snapToGrid)
+            for (int i = 0; i < numNodes; ++i)
+                if (visible[(size_t) i])
+                    nodeBounds[(size_t) i] = snapNodeToGrid (nodeBounds[(size_t) i]);
     }
 
     void drawConnector (juce::Graphics& g, juce::Point<float> a, juce::Point<float> b, juce::Colour c, float thickness = 2.0f) const
     {
+        const float dx = b.x - a.x;
+        const float cp = juce::jlimit (32.0f, 260.0f, std::abs (dx) * options.wireTension);
         juce::Path p;
         p.startNewSubPath (a);
-        p.lineTo (b);
+        p.cubicTo ({ a.x + cp, a.y }, { b.x - cp, b.y }, b);
         g.setColour (c);
         g.strokePath (p, juce::PathStrokeType (thickness, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+        if (! options.flowAnimation)
+            return;
+
+        const float pathLen = p.getLength();
+        if (pathLen <= 0.001f)
+            return;
+
+        constexpr int dotCount = 4;
+        for (int i = 0; i < dotCount; ++i)
+        {
+            const float phase = std::fmod (flowPhase * options.flowSpeed + (float) i / (float) dotCount, 1.0f);
+            const auto pt = p.getPointAlongPath (juce::jlimit (0.0f, pathLen, pathLen * phase));
+            g.setColour (c.brighter (0.55f).withAlpha (0.82f - 0.16f * (float) i));
+            const float r = juce::jmax (1.4f, thickness * (0.68f - 0.08f * (float) i));
+            g.fillEllipse (pt.x - r, pt.y - r, r * 2.0f, r * 2.0f);
+        }
+    }
+
+    void drawGraphBackground (juce::Graphics& g)
+    {
+        const auto area = getLocalBounds().toFloat();
+        juce::ColourGradient grad (juce::Colour (0xff0d141f), area.getTopLeft(), juce::Colour (0xff101b2a), area.getBottomRight(), false);
+        g.setGradientFill (grad);
+        g.fillRoundedRectangle (area.reduced (0.5f), 8.0f);
+        g.setColour (juce::Colour (0xff324255));
+        g.drawRoundedRectangle (area.reduced (0.5f), 8.0f, 1.0f);
+
+        if (graphArea.isEmpty())
+            return;
+
+        const int minor = juce::jmax (12, gridMinor);
+        const int major = juce::jmax (minor + 12, gridMajor);
+        for (int x = (int) graphArea.getX(); x <= (int) graphArea.getRight(); x += minor)
+        {
+            const bool isMajor = (x % major) == 0;
+            g.setColour (isMajor ? juce::Colour (0x2e5d7a97) : juce::Colour (0x16526a84));
+            g.drawVerticalLine (x, graphArea.getY(), graphArea.getBottom());
+        }
+        for (int y = (int) graphArea.getY(); y <= (int) graphArea.getBottom(); y += minor)
+        {
+            const bool isMajor = (y % major) == 0;
+            g.setColour (isMajor ? juce::Colour (0x2e5d7a97) : juce::Colour (0x16526a84));
+            g.drawHorizontalLine (y, graphArea.getX(), graphArea.getRight());
+        }
+
+        if (options.miniMap)
+        {
+            auto miniArea = graphArea;
+            auto mini = miniArea.removeFromBottom (56.0f).removeFromRight (152.0f).reduced (2.0f);
+            g.setColour (juce::Colour (0xcc0d1522));
+            g.fillRoundedRectangle (mini, 5.0f);
+            g.setColour (juce::Colour (0xff344a63));
+            g.drawRoundedRectangle (mini, 5.0f, 1.0f);
+
+            auto mapArea = getLocalBounds().toFloat().reduced (12.0f, 12.0f);
+            mapArea.removeFromBottom (24.0f);
+            const auto mapRect = mapArea.removeFromBottom (56.0f).removeFromRight (152.0f).reduced (6.0f);
+            for (int i = 0; i < numNodes; ++i)
+            {
+                if (! visible[(size_t) i])
+                    continue;
+
+                const auto src = nodeBounds[(size_t) i];
+                const float nx = juce::jmap (src.getX(), graphArea.getX(), graphArea.getRight(), mapRect.getX(), mapRect.getRight());
+                const float ny = juce::jmap (src.getY(), graphArea.getY(), graphArea.getBottom(), mapRect.getY(), mapRect.getBottom());
+                const float nw = juce::jmap (src.getWidth(), 0.0f, graphArea.getWidth(), 0.0f, mapRect.getWidth());
+                const float nh = juce::jmap (src.getHeight(), 0.0f, graphArea.getHeight(), 0.0f, mapRect.getHeight());
+                g.setColour (juce::Colour (0xff466487));
+                g.fillRoundedRectangle ({ nx, ny, juce::jlimit (6.0f, 18.0f, nw), juce::jlimit (4.0f, 10.0f, nh) }, 2.0f);
+            }
+
+            g.setColour (juce::Colour (0xff9ab8d7));
+            g.setFont (9.0f);
+            g.drawText ("MiniMap", mini.toNearestInt().removeFromTop (12), juce::Justification::centred, true);
+        }
     }
 
     void drawLinks (juce::Graphics& g)
     {
         for (size_t i = 1; i < serialChain.size(); ++i)
-            drawConnector (g, nodeCenter (serialChain[i - 1]), nodeCenter (serialChain[i]), juce::Colour (0xff42a5f5), 2.4f);
+        {
+            const auto from = serialChain[i - 1];
+            const auto to = serialChain[i];
+            if (! isNodeActiveForDraw (from) || ! isNodeActiveForDraw (to))
+                continue;
+
+            const auto col = (soloed[(size_t) from] || soloed[(size_t) to]) ? juce::Colour (0xffffd273)
+                                                                            : juce::Colour (0xff42a5f5);
+            if (rerouteEnabled[(size_t) from])
+            {
+                drawConnector (g, nodeOutputPin (from), reroutePoint[(size_t) from], col.withAlpha (0.85f), 1.9f);
+                drawConnector (g, reroutePoint[(size_t) from], nodeInputPin (to), col, 2.3f);
+            }
+            else
+            {
+                drawConnector (g, nodeOutputPin (from), nodeInputPin (to), col, 2.3f);
+            }
+        }
 
         if (parallel)
         {
-            drawConnector (g, nodeCenter (nodeShaper), nodeCenter (nodeOut), juce::Colour (0x8896c0d8), 1.8f);
-            drawConnector (g, nodeCenter (nodeShaper), nodeCenter (nodeFx), juce::Colour (0xff35d2a6), 2.2f);
-            drawConnector (g, nodeCenter (nodeFx), nodeCenter (nodeOut), juce::Colour (0xff35d2a6), 2.2f);
+            if (isNodeActiveForDraw (nodeShaper) && isNodeActiveForDraw (nodeOut))
+                drawConnector (g, nodeOutputPin (nodeShaper), nodeInputPin (nodeOut), juce::Colour (0x6a9bc8de), 1.6f);
+            if (isNodeActiveForDraw (nodeShaper) && isNodeActiveForDraw (nodeFx))
+                drawConnector (g, nodeOutputPin (nodeShaper), nodeInputPin (nodeFx), juce::Colour (0xff35d2a6), 2.1f);
+            if (isNodeActiveForDraw (nodeFx) && isNodeActiveForDraw (nodeOut))
+                drawConnector (g, nodeOutputPin (nodeFx), nodeInputPin (nodeOut), juce::Colour (0xff35d2a6), 2.1f);
         }
     }
 
@@ -1613,15 +2109,73 @@ private:
                 continue;
 
             const bool hot = hoveredNode == i;
+            const bool sel = selectedNode == i;
             auto b = nodeBounds[(size_t) i];
-            g.setColour (hot ? juce::Colour (0xff1f344a) : juce::Colour (0xff152638));
-            g.fillRoundedRectangle (b, 7.0f);
-            g.setColour (hot ? juce::Colour (0xff7ad6ff) : juce::Colour (0xff47617a));
-            g.drawRoundedRectangle (b, 7.0f, hot ? 1.8f : 1.1f);
+            const float headerH = options.compactNodes ? 15.0f : 18.0f;
+            auto header = b.removeFromTop (headerH);
+            const bool isBypassed = bypassed[(size_t) i];
+            const bool isSolo = soloed[(size_t) i];
+            const bool isLocked = locked[(size_t) i];
+            const bool active = isNodeActiveForDraw ((Node) i);
+
+            g.setColour (active ? juce::Colour (0xff111a28) : juce::Colour (0xff13171f));
+            g.fillRoundedRectangle (nodeBounds[(size_t) i], 7.0f);
+            g.setColour (isBypassed ? juce::Colour (0xff412a31)
+                                    : (hot ? juce::Colour (0xff22374c) : juce::Colour (0xff1a2b3d)));
+            g.fillRoundedRectangle (header, 6.0f);
+            juce::Colour border = sel ? juce::Colour (0xff95f0ff) : (hot ? juce::Colour (0xff7ad6ff) : juce::Colour (0xff47617a));
+            if (isSolo)
+                border = juce::Colour (0xffffd273);
+            else if (isBypassed)
+                border = juce::Colour (0xfff26d7d);
+            else if (isLocked)
+                border = juce::Colour (0xff9ec8ff);
+            g.setColour (border);
+            g.drawRoundedRectangle (nodeBounds[(size_t) i], 7.0f, sel ? 2.0f : (hot ? 1.6f : 1.0f));
+
+            const auto pinIn = nodeInputPin ((Node) i);
+            const auto pinOut = nodeOutputPin ((Node) i);
+            g.setColour (juce::Colour (0xff83a3bf));
+            g.fillEllipse (pinIn.x - 3.0f, pinIn.y - 3.0f, 6.0f, 6.0f);
+            g.fillEllipse (pinOut.x - 3.0f, pinOut.y - 3.0f, 6.0f, 6.0f);
 
             g.setColour (juce::Colour (0xffebf2fe));
-            g.setFont (juce::Font (11.5f, juce::Font::bold));
-            g.drawText (nodeLabel ((Node) i), b.toNearestInt(), juce::Justification::centred, true);
+            g.setFont (juce::Font (options.compactNodes ? 10.0f : 11.0f, juce::Font::bold));
+            g.drawText (nodeLabel ((Node) i),
+                        header.toNearestInt().reduced (6, 0),
+                        juce::Justification::centredLeft,
+                        true);
+
+            if (isLocked)
+            {
+                g.setColour (juce::Colour (0xff9ec8ff));
+                g.setFont (9.0f);
+                g.drawText ("LOCK", header.toNearestInt().reduced (6, 0), juce::Justification::centredRight, true);
+            }
+            if (isBypassed)
+            {
+                g.setColour (juce::Colour (0xfff26d7d));
+                const auto c = nodeBounds[(size_t) i].toNearestInt();
+                g.drawLine ((float) c.getX() + 6.0f, (float) c.getBottom() - 6.0f,
+                            (float) c.getRight() - 6.0f, (float) c.getY() + 6.0f, 1.3f);
+            }
+
+            if (! options.compactNodes)
+            {
+                g.setColour (juce::Colour (0xff9ab2d0));
+                g.setFont (10.0f);
+                g.drawText ("L" + juce::String (i + 1), nodeBounds[(size_t) i].toNearestInt().reduced (8, 20),
+                            juce::Justification::centredLeft, true);
+            }
+
+            if (rerouteEnabled[(size_t) i])
+            {
+                const auto rp = reroutePoint[(size_t) i];
+                g.setColour (juce::Colour (0xff84d8ff).withAlpha (0.85f));
+                g.fillEllipse (rp.x - 4.0f, rp.y - 4.0f, 8.0f, 8.0f);
+                g.setColour (juce::Colour (0xff1f2b3a));
+                g.drawEllipse (rp.x - 4.0f, rp.y - 4.0f, 8.0f, 8.0f, 1.0f);
+            }
         }
     }
 };
@@ -1697,6 +2251,64 @@ public:
 
         addAndMakeVisible (graph);
         graph.onNodeClick = [this] (FxRoutingGraph::Node n) { handleGraphNodeClick (n); };
+        graph.onNodeContext = [this] (FxRoutingGraph::Node n, juce::Point<int>)
+        {
+            juce::String name = "Node";
+            switch (n)
+            {
+                case FxRoutingGraph::nodeIn: name = "IN"; break;
+                case FxRoutingGraph::nodeDestroy: name = "Destroy"; break;
+                case FxRoutingGraph::nodeFilter: name = "Filter"; break;
+                case FxRoutingGraph::nodeTone: name = "Tone"; break;
+                case FxRoutingGraph::nodeShaper: name = "Shaper"; break;
+                case FxRoutingGraph::nodeFx: name = "FX"; break;
+                case FxRoutingGraph::nodeOut: name = "OUT"; break;
+                default: break;
+            }
+            setStatus (context, "FX Pro: context menu opened for " + name + ".");
+        };
+        graph.onRenderOptionsChanged = [this] (const FxRoutingGraph::RenderOptions& opt)
+        {
+            if (isSyncingGraphUi)
+                return;
+
+            isSyncingGraphUi = true;
+            graphSnap.setToggleState (opt.snapToGrid, juce::dontSendNotification);
+            graphCompact.setToggleState (opt.compactNodes, juce::dontSendNotification);
+            graphFlow.setToggleState (opt.flowAnimation, juce::dontSendNotification);
+            graphMiniMap.setToggleState (opt.miniMap, juce::dontSendNotification);
+            graphGrid.getCombo().setSelectedItemIndex (juce::jlimit (0, 2, opt.gridMode), juce::dontSendNotification);
+            graphZoom.getSlider().setValue (opt.zoom, juce::dontSendNotification);
+            graphTension.getSlider().setValue (opt.wireTension, juce::dontSendNotification);
+            graphFlowSpeed.getSlider().setValue (opt.flowSpeed, juce::dontSendNotification);
+            isSyncingGraphUi = false;
+            storeGraphUiState();
+            updateSummary();
+        };
+
+        graphGrid.setLabelText ("Grid");
+        graphGrid.setLayout (ComboWithLabel::Layout::labelTop);
+        setupCombo (graphGrid, { "Fine", "Medium", "Coarse" }, 2);
+        addAndMakeVisible (graphGrid);
+
+        graphZoom.setLabelText ("Zoom");
+        setupKnob (graphZoom, 0.75, 1.35, 1.0, 0.01);
+        addAndMakeVisible (graphZoom);
+
+        graphTension.setLabelText ("Wire");
+        setupKnob (graphTension, 0.20, 0.95, 0.55, 0.01);
+        addAndMakeVisible (graphTension);
+
+        graphFlowSpeed.setLabelText ("Flow");
+        setupKnob (graphFlowSpeed, 0.05, 1.50, 0.45, 0.01);
+        addAndMakeVisible (graphFlowSpeed);
+
+        graphSnap.setButtonText ("Snap Grid");
+        graphCompact.setButtonText ("Compact Nodes");
+        graphFlow.setButtonText ("Flow Animation");
+        graphMiniMap.setButtonText ("MiniMap");
+        for (auto* b : { &graphSnap, &graphCompact, &graphFlow, &graphMiniMap })
+            addAndMakeVisible (*b);
 
         summary.setMultiLine (true);
         summary.setReadOnly (true);
@@ -1709,6 +2321,8 @@ public:
         bindCallbacks();
         syncFromParams();
         loadSnapshotsFromState();
+        loadGraphUiState();
+        applyGraphRenderOptions();
         updateSummary();
         startTimerHz (15);
     }
@@ -1728,7 +2342,7 @@ public:
         groupMain.setBounds (r.removeFromTop (topH));
         r.removeFromTop (8);
 
-        const int graphH = juce::jlimit (170, 280, r.getHeight() * 3 / 5);
+        const int graphH = juce::jlimit (240, 380, r.getHeight() * 3 / 5);
         groupGraph.setBounds (r.removeFromTop (graphH));
         r.removeFromTop (8);
         groupSummary.setBounds (r);
@@ -1770,7 +2384,35 @@ public:
             swapAB.setBounds (row3.removeFromLeft (bw));
         }
 
-        graph.setBounds (groupGraph.getBounds().reduced (8, 22));
+        {
+            auto gArea = groupGraph.getBounds().reduced (8, 22);
+            auto toggleRow = gArea.removeFromTop (24);
+            const int togGap = 10;
+            const int togW = (toggleRow.getWidth() - togGap * 3) / 4;
+            graphSnap.setBounds (toggleRow.removeFromLeft (togW));
+            toggleRow.removeFromLeft (togGap);
+            graphCompact.setBounds (toggleRow.removeFromLeft (togW));
+            toggleRow.removeFromLeft (togGap);
+            graphFlow.setBounds (toggleRow.removeFromLeft (togW));
+            toggleRow.removeFromLeft (togGap);
+            graphMiniMap.setBounds (toggleRow.removeFromLeft (togW));
+
+            gArea.removeFromTop (6);
+            auto toolRow = gArea.removeFromTop (72);
+            const int gap = 8;
+            const int comboW = juce::jlimit (120, 160, toolRow.getWidth() / 5);
+            graphGrid.setBounds (toolRow.removeFromLeft (comboW));
+            toolRow.removeFromLeft (gap);
+            const int knobW = juce::jlimit (94, 132, (toolRow.getWidth() - gap * 2) / 3);
+            graphZoom.setBounds (toolRow.removeFromLeft (knobW));
+            toolRow.removeFromLeft (gap);
+            graphTension.setBounds (toolRow.removeFromLeft (knobW));
+            toolRow.removeFromLeft (gap);
+            graphFlowSpeed.setBounds (toolRow.removeFromLeft (knobW));
+
+            gArea.removeFromTop (6);
+            graph.setBounds (gArea);
+        }
         summary.setBounds (groupSummary.getBounds().reduced (8, 22));
     }
 
@@ -1792,18 +2434,33 @@ private:
     juce::TextButton recallA;
     juce::TextButton recallB;
     juce::TextButton swapAB;
+    ComboWithLabel graphGrid;
+    KnobWithLabel graphZoom;
+    KnobWithLabel graphTension;
+    KnobWithLabel graphFlowSpeed;
+    juce::ToggleButton graphSnap;
+    juce::ToggleButton graphCompact;
+    juce::ToggleButton graphFlow;
+    juce::ToggleButton graphMiniMap;
     FxRoutingGraph graph;
     juce::TextEditor summary;
     bool isSyncing = false;
+    bool isSyncingGraphUi = false;
     bool hasA = false;
     bool hasB = false;
     Snapshot snapA;
     Snapshot snapB;
+    double flowPhase = 0.0;
 
     void timerCallback() override
     {
         updateSummary();
         refreshGraph();
+        const double speed = juce::jlimit (0.05, 1.50, graphFlowSpeed.getSlider().getValue());
+        flowPhase += 0.014 * speed;
+        while (flowPhase >= 1.0)
+            flowPhase -= 1.0;
+        graph.setFlowPhase ((float) flowPhase);
     }
 
     void setChoice (const char* id, int index, int maxIndex)
@@ -1823,6 +2480,51 @@ private:
                            toneIdx == (int) params::fx::global::postFilter,
                            orderIdx,
                            osIdx);
+    }
+
+    void applyGraphRenderOptions()
+    {
+        if (isSyncingGraphUi)
+            return;
+
+        FxRoutingGraph::RenderOptions opt;
+        opt.snapToGrid = graphSnap.getToggleState();
+        opt.compactNodes = graphCompact.getToggleState();
+        opt.flowAnimation = graphFlow.getToggleState();
+        opt.miniMap = graphMiniMap.getToggleState();
+        opt.gridMode = graphGrid.getCombo().getSelectedItemIndex();
+        opt.zoom = (float) graphZoom.getSlider().getValue();
+        opt.wireTension = (float) graphTension.getSlider().getValue();
+        opt.flowSpeed = (float) graphFlowSpeed.getSlider().getValue();
+        graph.setRenderOptions (opt);
+    }
+
+    void storeGraphUiState()
+    {
+        setStateProp (context, kFxProGraphSnap, graphSnap.getToggleState());
+        setStateProp (context, kFxProGraphCompact, graphCompact.getToggleState());
+        setStateProp (context, kFxProGraphFlow, graphFlow.getToggleState());
+        setStateProp (context, kFxProGraphMiniMap, graphMiniMap.getToggleState());
+        setStateProp (context, kFxProGraphGridMode, graphGrid.getCombo().getSelectedItemIndex());
+        setStateProp (context, kFxProGraphZoom, graphZoom.getSlider().getValue());
+        setStateProp (context, kFxProGraphTension, graphTension.getSlider().getValue());
+        setStateProp (context, kFxProGraphFlowSpeed, graphFlowSpeed.getSlider().getValue());
+    }
+
+    void loadGraphUiState()
+    {
+        graphSnap.setToggleState ((bool) getStateProp (context, kFxProGraphSnap, true), juce::dontSendNotification);
+        graphCompact.setToggleState ((bool) getStateProp (context, kFxProGraphCompact, false), juce::dontSendNotification);
+        graphFlow.setToggleState ((bool) getStateProp (context, kFxProGraphFlow, true), juce::dontSendNotification);
+        graphMiniMap.setToggleState ((bool) getStateProp (context, kFxProGraphMiniMap, true), juce::dontSendNotification);
+        graphGrid.getCombo().setSelectedItemIndex (juce::jlimit (0, 2, (int) getStateProp (context, kFxProGraphGridMode, 1)),
+                                                   juce::dontSendNotification);
+        graphZoom.getSlider().setValue (juce::jlimit (0.75, 1.35, (double) getStateProp (context, kFxProGraphZoom, 1.0)),
+                                        juce::dontSendNotification);
+        graphTension.getSlider().setValue (juce::jlimit (0.20, 0.95, (double) getStateProp (context, kFxProGraphTension, 0.55)),
+                                           juce::dontSendNotification);
+        graphFlowSpeed.getSlider().setValue (juce::jlimit (0.05, 1.50, (double) getStateProp (context, kFxProGraphFlowSpeed, 0.45)),
+                                             juce::dontSendNotification);
     }
 
     void syncFromParams()
@@ -1888,6 +2590,46 @@ private:
             if (isSyncing)
                 return;
             setParamActual (context, params::fx::global::morph, (float) morph.getSlider().getValue());
+        };
+        graphSnap.onClick = [this]
+        {
+            applyGraphRenderOptions();
+            storeGraphUiState();
+        };
+        graphCompact.onClick = [this]
+        {
+            applyGraphRenderOptions();
+            storeGraphUiState();
+        };
+        graphFlow.onClick = [this]
+        {
+            applyGraphRenderOptions();
+            storeGraphUiState();
+        };
+        graphMiniMap.onClick = [this]
+        {
+            applyGraphRenderOptions();
+            storeGraphUiState();
+        };
+        graphGrid.getCombo().onChange = [this]
+        {
+            applyGraphRenderOptions();
+            storeGraphUiState();
+        };
+        graphZoom.getSlider().onValueChange = [this]
+        {
+            applyGraphRenderOptions();
+            storeGraphUiState();
+        };
+        graphTension.getSlider().onValueChange = [this]
+        {
+            applyGraphRenderOptions();
+            storeGraphUiState();
+        };
+        graphFlowSpeed.getSlider().onValueChange = [this]
+        {
+            applyGraphRenderOptions();
+            storeGraphUiState();
         };
 
         storeA.onClick = [this]
@@ -2102,6 +2844,9 @@ private:
                                  : (osIdx == (int) params::fx::global::os4x ? "4x" : "Off"));
         const juce::String destroyText = destroyIdx == (int) params::fx::global::postFilter ? "Post Filter" : "Pre Filter";
         const juce::String toneText = toneIdx == (int) params::fx::global::postFilter ? "Post Filter" : "Pre Filter";
+        const juce::String gridText = graphGrid.getCombo().getText();
+        const juce::String graphModeText = graphCompact.getToggleState() ? "Compact" : "Standard";
+        const juce::String flowText = graphFlow.getToggleState() ? "Animated" : "Static";
 
         const juce::String txt =
             "Order: " + orderText + "\n"
@@ -2111,6 +2856,13 @@ private:
             "Tone placement: " + toneText + "\n"
             "FX Mix: " + juce::String (mixV, 3) + "\n"
             "FX Morph: " + juce::String (morphV, 3) + "\n\n"
+            "Graph View: " + graphModeText + " / " + flowText + "\n"
+            "Graph Grid: " + gridText
+            + " | Snap " + juce::String (graphSnap.getToggleState() ? "On" : "Off")
+            + " | MiniMap " + juce::String (graphMiniMap.getToggleState() ? "On" : "Off") + "\n"
+            "Graph Zoom: " + juce::String (graphZoom.getSlider().getValue(), 2)
+            + " | Wire: " + juce::String (graphTension.getSlider().getValue(), 2)
+            + " | Flow Speed: " + juce::String (graphFlowSpeed.getSlider().getValue(), 2) + "\n\n"
             "Snapshots: A=" + juce::String (hasA ? "set" : "empty")
             + " | B=" + juce::String (hasB ? "set" : "empty") + "\n"
             "Snapshot controls: Store/Recall/Swap in Global panel.\n\n"
@@ -2119,7 +2871,12 @@ private:
             "- Tone: toggle pre/post filter\n"
             "- Filter: cycle order A/B/Custom\n"
             "- Shaper: cycle OS Off/2x/4x\n"
-            "- FX: toggle serial/parallel route";
+            "- FX: toggle serial/parallel route\n\n"
+            "Graph shortcuts:\n"
+            "- Right-click node: bypass/solo/lock/reroute/focus\n"
+            "- Right-click background: snap/compact/minimap/reset\n"
+            "- Alt+LMB or MMB drag: pan\n"
+            "- Wheel: zoom | Shift+Wheel: wire | Ctrl+Wheel: flow";
 
         if (summary.getText() != txt)
             summary.setText (txt, juce::dontSendNotification);
@@ -3558,97 +4315,282 @@ class UiProdPreview final : public juce::Component
 {
 public:
     void setModel (int themeMode, int animMode, float contrastAmount, float densityAmount, float accentAmount,
-                   bool compact, bool strongHover, bool switches)
+                   float textureAmount, float bevelAmount, float shadowAmount,
+                   bool compact, bool strongHover, bool switches,
+                   bool scanlineOn, bool meterMotionOn, bool screwsOn)
     {
         theme = themeMode;
         anim = animMode;
         contrast = contrastAmount;
         density = densityAmount;
         accent = accentAmount;
+        texture = textureAmount;
+        bevel = bevelAmount;
+        shadow = shadowAmount;
         compactHeaders = compact;
         strongButtonHover = strongHover;
         cockpitSwitches = switches;
+        scanlines = scanlineOn;
+        meterMotion = meterMotionOn;
+        screws = screwsOn;
+        repaint();
+    }
+
+    void setMotionPhase (float p01) noexcept
+    {
+        phase01 = p01 - std::floor (p01);
         repaint();
     }
 
     void paint (juce::Graphics& g) override
     {
         const auto r = getLocalBounds().toFloat();
-        const float base = juce::jmap (contrast, 0.0f, 1.0f, 0.08f, 0.24f);
-        auto bgA = juce::Colour::fromFloatRGBA (base, base + 0.02f, base + 0.04f, 1.0f);
-        auto bgB = juce::Colour::fromFloatRGBA (base * 0.75f, base * 0.9f, base * 1.2f, 1.0f);
+        const float base = juce::jmap (contrast, 0.0f, 1.0f, 0.07f, 0.24f);
+        auto bgA = juce::Colour::fromFloatRGBA (base * 0.85f, base + 0.02f, base + 0.05f, 1.0f);
+        auto bgB = juce::Colour::fromFloatRGBA (base * 0.62f, base * 0.85f, base * 1.30f, 1.0f);
         if (theme == 1)
         {
-            bgA = juce::Colour (0xff2a2f37);
-            bgB = juce::Colour (0xff1f242b);
+            bgA = juce::Colour (0xff2d343d);
+            bgB = juce::Colour (0xff1d232d);
         }
         else if (theme == 2)
         {
-            bgA = juce::Colour (0xff1b222a);
-            bgB = juce::Colour (0xff121920);
+            bgA = juce::Colour (0xff19242e);
+            bgB = juce::Colour (0xff0f1822);
         }
 
         juce::ColourGradient bg (bgA, r.getTopLeft(), bgB, r.getBottomRight(), false);
         g.setGradientFill (bg);
         g.fillRoundedRectangle (r.reduced (0.5f), 10.0f);
-        g.setColour (juce::Colour (0xff45576d));
+        g.setColour (juce::Colour (0xff44566f));
         g.drawRoundedRectangle (r.reduced (0.5f), 10.0f, 1.0f);
 
-        const float glowAlpha = juce::jmap (accent, 0.0f, 1.0f, 0.15f, 0.55f);
-        const auto accentCol = juce::Colour::fromFloatRGBA (0.18f, 0.88f, 0.80f, glowAlpha);
+        const float glowAlpha = juce::jmap (accent, 0.0f, 1.0f, 0.20f, 0.72f);
+        const auto accentCol = juce::Colour::fromFloatRGBA (0.15f, 0.92f, 0.83f, glowAlpha);
+        auto panelInset = r.reduced (10.0f);
+        g.setColour (juce::Colour (0x88212d3a));
+        g.fillRoundedRectangle (panelInset, 8.0f);
+
+        auto topStrip = panelInset.removeFromTop (26.0f);
+        g.setColour (juce::Colour (0xcc152131));
+        g.fillRoundedRectangle (topStrip, 6.0f);
         g.setColour (accentCol);
-        g.fillRoundedRectangle (r.withHeight (24.0f).reduced (8.0f, 2.0f), 6.0f);
+        g.fillRoundedRectangle (topStrip.withWidth (topStrip.getWidth() * juce::jmap (accent, 0.0f, 1.0f, 0.28f, 0.80f))
+                                         .reduced (6.0f, 4.0f), 4.0f);
+        g.setColour (juce::Colour (0xffe8eefb));
+        g.setFont (10.5f);
+        g.drawText ("UI PROD PREVIEW :: COCKPIT MATERIAL LAYER", topStrip.toNearestInt().reduced (10, 0),
+                    juce::Justification::centredLeft, true);
 
-        auto content = r.reduced (12.0f);
-        const int rows = juce::jlimit (2, 6, (int) std::lround (juce::jmap (density, 0.0f, 1.0f, 3.0f, 6.0f)));
-        const float rowGap = compactHeaders ? 4.0f : 7.0f;
-        const float rowH = (content.getHeight() - 30.0f - rowGap * (float) (rows - 1)) / (float) rows;
-        content.removeFromTop (28.0f);
+        auto content = panelInset.reduced (0.0f, 6.0f);
+        auto leftCol = content.removeFromLeft (content.getWidth() * 0.58f);
+        content.removeFromLeft (10.0f);
+        auto rightCol = content;
 
-        for (int i = 0; i < rows; ++i)
+        drawDeckPanel (g, leftCol.removeFromTop (leftCol.getHeight() * 0.56f), accentCol);
+        leftCol.removeFromTop (8.0f);
+        drawControlsPanel (g, leftCol, accentCol);
+        drawMetersPanel (g, rightCol, accentCol);
+
+        if (scanlines)
         {
-            auto row = content.removeFromTop (rowH);
-            content.removeFromTop (rowGap);
+            g.setColour (juce::Colour (0x143ad5dc));
+            for (float y = r.getY() + 12.0f; y < r.getBottom() - 8.0f; y += 8.0f)
+                g.drawHorizontalLine ((int) y, r.getX() + 6.0f, r.getRight() - 6.0f);
+        }
 
-            auto rail = row.removeFromLeft (juce::jmax (70.0f, row.getWidth() * 0.35f));
-            auto knob = row.removeFromRight (juce::jmin (48.0f, row.getHeight()));
-            row.removeFromRight (8.0f);
-            auto toggle = row.removeFromRight (juce::jmin (52.0f, row.getWidth()));
-
-            g.setColour (juce::Colour (0xff1f2b3a));
-            g.fillRoundedRectangle (rail.reduced (0.0f, rowH * 0.25f), 4.0f);
-            g.setColour (accentCol.withAlpha (0.8f));
-            g.fillRoundedRectangle (rail.withWidth (rail.getWidth() * juce::jmap (accent, 0.0f, 1.0f, 0.35f, 0.88f))
-                                         .reduced (0.0f, rowH * 0.25f), 4.0f);
-
-            g.setColour (juce::Colour (0xff1a2230));
-            g.fillEllipse (knob);
-            g.setColour (strongButtonHover ? juce::Colour (0xff9ce7ff) : juce::Colour (0xff5f7694));
-            g.drawEllipse (knob, strongButtonHover ? 1.8f : 1.1f);
-
-            if (cockpitSwitches)
+        if (texture > 0.03f)
+        {
+            const int dots = juce::jlimit (40, 220, (int) std::lround (juce::jmap (texture, 0.0f, 1.0f, 48.0f, 210.0f)));
+            g.setColour (juce::Colour (0x26b0bfd5));
+            for (int i = 0; i < dots; ++i)
             {
-                g.setColour (juce::Colour (0xff263243));
-                g.fillRoundedRectangle (toggle, 3.0f);
-                g.setColour (accentCol);
-                g.fillRoundedRectangle (toggle.removeFromTop (toggle.getHeight() * 0.48f), 3.0f);
-            }
-            else
-            {
-                g.setColour (juce::Colour (0xff223043));
-                g.fillRoundedRectangle (toggle.reduced (6.0f, 4.0f), 5.0f);
+                const float px = r.getX() + std::fmod ((13.0f * (float) i) + phase01 * 127.0f, juce::jmax (1.0f, r.getWidth() - 4.0f));
+                const float py = r.getY() + std::fmod ((29.0f * (float) i) + phase01 * 93.0f, juce::jmax (1.0f, r.getHeight() - 4.0f));
+                g.fillRect (juce::Rectangle<float> (px, py, 1.0f, 1.0f));
             }
         }
 
         if (anim == 1)
         {
-            g.setColour (accentCol.withAlpha (0.25f));
-            for (int i = 0; i < 4; ++i)
+            g.setColour (accentCol.withAlpha (0.20f));
+            for (int i = 0; i < 5; ++i)
             {
-                const float x = r.getX() + r.getWidth() * (float) (i + 1) / 5.0f;
-                g.drawVerticalLine ((int) std::lround (x), r.getY() + 8.0f, r.getBottom() - 8.0f);
+                const float x = r.getX() + r.getWidth() * (float) (i + 1) / 6.0f;
+                g.drawVerticalLine ((int) std::lround (x), r.getY() + 10.0f, r.getBottom() - 10.0f);
             }
         }
+
+        if (screws)
+            drawScrews (g, r.reduced (6.0f));
+    }
+
+private:
+    void drawDeckPanel (juce::Graphics& g, juce::Rectangle<float> area, juce::Colour accentCol)
+    {
+        g.setColour (juce::Colour (0xff182231).withAlpha (0.92f));
+        g.fillRoundedRectangle (area, 8.0f);
+        g.setColour (juce::Colour (0xff4c607a).withAlpha (0.85f));
+        g.drawRoundedRectangle (area, 8.0f, 1.0f);
+
+        auto top = area.reduced (8.0f);
+        auto tabs = top.removeFromTop (20.0f);
+        for (int i = 0; i < 4; ++i)
+        {
+            auto t = tabs.removeFromLeft (tabs.getWidth() / (4 - i)).reduced (3.0f, 2.0f);
+            const bool active = (i == (int) std::floor (phase01 * 3.99f));
+            g.setColour (active ? accentCol.withAlpha (0.8f) : juce::Colour (0xff243247));
+            g.fillRoundedRectangle (t, 3.0f);
+            g.setColour (juce::Colour (0xffdce7f6).withAlpha (active ? 0.95f : 0.74f));
+            g.setFont (9.5f);
+            g.drawText ("P" + juce::String (i + 1), t.toNearestInt(), juce::Justification::centred, true);
+        }
+
+        top.removeFromTop (8.0f);
+        auto lane = top.removeFromTop (juce::jmax (42.0f, top.getHeight() * 0.55f));
+        auto wave = lane.reduced (6.0f, 4.0f);
+        g.setColour (juce::Colour (0xff121a27));
+        g.fillRoundedRectangle (wave, 6.0f);
+        g.setColour (juce::Colour (0xff2f435b));
+        g.drawRoundedRectangle (wave, 6.0f, 1.0f);
+
+        juce::Path p;
+        const int samples = 56;
+        for (int i = 0; i < samples; ++i)
+        {
+            const float t = (float) i / (float) (samples - 1);
+            const float x = wave.getX() + t * wave.getWidth();
+            const float wobble = std::sin ((t * 8.0f + phase01 * 4.0f) * juce::MathConstants<float>::twoPi) * (0.20f + 0.18f * accent);
+            const float yNorm = 0.5f + wobble * (0.6f + 0.25f * density);
+            const float y = wave.getY() + juce::jlimit (0.07f, 0.93f, yNorm) * wave.getHeight();
+            if (i == 0) p.startNewSubPath (x, y); else p.lineTo (x, y);
+        }
+        g.setColour (accentCol.withAlpha (0.95f));
+        g.strokePath (p, juce::PathStrokeType (2.0f));
+
+        auto knobs = top.reduced (2.0f);
+        const int count = juce::jlimit (3, 7, (int) std::lround (juce::jmap (density, 0.0f, 1.0f, 4.0f, 7.0f)));
+        for (int i = 0; i < count; ++i)
+        {
+            auto slot = knobs.removeFromLeft (knobs.getWidth() / (count - i)).reduced (3.0f, 1.0f);
+            auto k = slot.removeFromTop (juce::jmin (slot.getWidth(), slot.getHeight() * 0.84f));
+            g.setColour (juce::Colour (0xff111a28));
+            g.fillEllipse (k);
+            g.setColour (juce::Colour (0xff3b4e68));
+            g.drawEllipse (k, 1.1f + bevel * 1.6f);
+            const float ang = juce::jmap (std::sin ((phase01 + (float) i * 0.11f) * juce::MathConstants<float>::twoPi), -1.0f, 1.0f, -2.3f, 2.3f);
+            auto c = k.getCentre();
+            auto pt = juce::Point<float> (c.x + std::cos (ang) * (k.getWidth() * 0.30f),
+                                          c.y + std::sin (ang) * (k.getHeight() * 0.30f));
+            g.setColour (accentCol.withAlpha (0.88f));
+            g.drawLine (c.x, c.y, pt.x, pt.y, 1.7f);
+        }
+    }
+
+    void drawControlsPanel (juce::Graphics& g, juce::Rectangle<float> area, juce::Colour accentCol)
+    {
+        g.setColour (juce::Colour (0xff131c2a).withAlpha (0.95f));
+        g.fillRoundedRectangle (area, 8.0f);
+        g.setColour (juce::Colour (0xff40546e));
+        g.drawRoundedRectangle (area, 8.0f, 1.0f);
+
+        auto c = area.reduced (8.0f);
+        const int rows = juce::jlimit (2, 6, (int) std::lround (juce::jmap (density, 0.0f, 1.0f, 3.0f, 6.0f)));
+        const float rowGap = compactHeaders ? 4.0f : 7.0f;
+        const float rowH = (c.getHeight() - rowGap * (float) (rows - 1)) / (float) rows;
+        for (int i = 0; i < rows; ++i)
+        {
+            auto row = c.removeFromTop (rowH);
+            if (i < rows - 1)
+                c.removeFromTop (rowGap);
+
+            auto labelBox = row.removeFromLeft (juce::jmax (66.0f, row.getWidth() * 0.22f));
+            row.removeFromLeft (6.0f);
+            auto slider = row.removeFromLeft (juce::jmax (80.0f, row.getWidth() * 0.50f));
+            row.removeFromLeft (8.0f);
+            auto sw = row.removeFromLeft (juce::jmax (44.0f, row.getWidth() * 0.22f));
+
+            g.setColour (juce::Colour (0xffd7e4f6).withAlpha (0.75f));
+            g.setFont (9.5f);
+            g.drawText ("CTRL " + juce::String (i + 1), labelBox.toNearestInt(), juce::Justification::centredLeft, true);
+
+            g.setColour (juce::Colour (0xff1f2c3d));
+            g.fillRoundedRectangle (slider.reduced (0.0f, rowH * 0.28f), 4.0f);
+            const float pulse = meterMotion ? (0.56f + 0.22f * std::sin ((phase01 + (float) i * 0.14f) * juce::MathConstants<float>::twoPi)) : 0.62f;
+            const float fill = juce::jlimit (0.18f, 0.96f, pulse * juce::jmap (accent, 0.0f, 1.0f, 0.68f, 1.06f));
+            g.setColour (accentCol.withAlpha (0.85f));
+            g.fillRoundedRectangle (slider.withWidth (slider.getWidth() * fill).reduced (0.0f, rowH * 0.28f), 4.0f);
+
+            if (cockpitSwitches)
+            {
+                g.setColour (juce::Colour (0xff202f42));
+                g.fillRoundedRectangle (sw, 3.0f);
+                auto lever = sw.reduced (5.0f, 4.0f);
+                const bool on = (i % 2) == 0;
+                g.setColour (on ? accentCol.withAlpha (0.9f) : juce::Colour (0xff2f4259));
+                g.fillRoundedRectangle (on ? lever.removeFromTop (lever.getHeight() * 0.48f) : lever.removeFromBottom (lever.getHeight() * 0.48f), 3.0f);
+            }
+            else
+            {
+                g.setColour (juce::Colour (0xff223043));
+                g.fillRoundedRectangle (sw.reduced (6.0f, 4.0f), 5.0f);
+            }
+        }
+    }
+
+    void drawMetersPanel (juce::Graphics& g, juce::Rectangle<float> area, juce::Colour accentCol)
+    {
+        g.setColour (juce::Colour (0xff131d2b).withAlpha (0.96f));
+        g.fillRoundedRectangle (area, 8.0f);
+        g.setColour (juce::Colour (0xff42556f));
+        g.drawRoundedRectangle (area, 8.0f, 1.0f);
+
+        auto a = area.reduced (10.0f);
+        auto label = a.removeFromTop (18.0f);
+        g.setColour (juce::Colour (0xffd6e5f9));
+        g.setFont (10.0f);
+        g.drawText ("METER BRIDGE", label.toNearestInt(), juce::Justification::centredLeft, true);
+
+        a.removeFromTop (6.0f);
+        const int bars = juce::jlimit (4, 10, (int) std::lround (juce::jmap (density, 0.0f, 1.0f, 5.0f, 10.0f)));
+        for (int i = 0; i < bars; ++i)
+        {
+            auto row = a.removeFromTop ((a.getHeight() - 4.0f * (float) (bars - i - 1)) / (float) (bars - i));
+            if (i < bars - 1)
+                a.removeFromTop (4.0f);
+
+            auto bar = row.removeFromLeft (row.getWidth() * 0.72f).reduced (0.0f, 2.0f);
+            row.removeFromLeft (8.0f);
+            auto lamp = row.removeFromLeft (juce::jmin (18.0f, row.getWidth() * 0.22f)).reduced (2.0f);
+
+            g.setColour (juce::Colour (0xff1f2b3b));
+            g.fillRoundedRectangle (bar, 3.0f);
+            const float m = meterMotion ? (0.50f + 0.40f * std::abs (std::sin ((phase01 + (float) i * 0.19f) * juce::MathConstants<float>::twoPi)))
+                                        : (0.52f + 0.03f * (float) i);
+            g.setColour (accentCol.withAlpha (0.9f));
+            g.fillRoundedRectangle (bar.withWidth (bar.getWidth() * juce::jlimit (0.05f, 1.0f, m)), 3.0f);
+
+            g.setColour (juce::Colour (0xff172131));
+            g.fillEllipse (lamp);
+            g.setColour (accentCol.withAlpha (0.78f + 0.18f * std::sin ((phase01 + (float) i * 0.11f) * juce::MathConstants<float>::twoPi)));
+            g.drawEllipse (lamp, 1.0f + shadow * 1.5f);
+        }
+    }
+
+    void drawScrews (juce::Graphics& g, juce::Rectangle<float> frame)
+    {
+        auto draw = [&g] (juce::Point<float> p)
+        {
+            g.setColour (juce::Colour (0xff0f1520));
+            g.fillEllipse (p.x - 4.0f, p.y - 4.0f, 8.0f, 8.0f);
+            g.setColour (juce::Colour (0xff7087a5));
+            g.drawEllipse (p.x - 4.0f, p.y - 4.0f, 8.0f, 8.0f, 1.0f);
+            g.drawLine (p.x - 2.2f, p.y, p.x + 2.2f, p.y, 0.9f);
+        };
+        draw (frame.getTopLeft() + juce::Point<float> (6.0f, 6.0f));
+        draw (frame.getTopRight() + juce::Point<float> (-6.0f, 6.0f));
+        draw (frame.getBottomLeft() + juce::Point<float> (6.0f, -6.0f));
+        draw (frame.getBottomRight() + juce::Point<float> (-6.0f, -6.0f));
     }
 
 private:
@@ -3657,12 +4599,20 @@ private:
     float contrast = 0.55f;
     float density = 0.45f;
     float accent = 0.50f;
+    float texture = 0.52f;
+    float bevel = 0.44f;
+    float shadow = 0.40f;
     bool compactHeaders = false;
     bool strongButtonHover = true;
     bool cockpitSwitches = true;
+    bool scanlines = false;
+    bool meterMotion = true;
+    bool screws = true;
+    float phase01 = 0.0f;
 };
 
-class UiProdPage final : public juce::Component
+class UiProdPage final : public juce::Component,
+                         private juce::Timer
 {
 public:
     explicit UiProdPage (FutureHubContext c) : context (std::move (c))
@@ -3672,10 +4622,16 @@ public:
         title.setColour (juce::Label::textColourId, juce::Colour (0xffeef4ff));
         addAndMakeVisible (title);
 
-        controlsGroup.setText ("Controls");
+        controlsGroup.setText ("Core");
         addAndMakeVisible (controlsGroup);
+        materialGroup.setText ("Material");
+        addAndMakeVisible (materialGroup);
+        behaviorGroup.setText ("Behavior");
+        addAndMakeVisible (behaviorGroup);
         previewGroup.setText ("Preview");
         addAndMakeVisible (previewGroup);
+        planGroup.setText ("Design Notes");
+        addAndMakeVisible (planGroup);
 
         theme.setLabelText ("Theme");
         theme.setLayout (ComboWithLabel::Layout::labelTop);
@@ -3697,12 +4653,28 @@ public:
         addAndMakeVisible (density);
         addAndMakeVisible (accent);
 
+        texture.setLabelText ("Texture");
+        bevel.setLabelText ("Bevel");
+        shadow.setLabelText ("Shadow");
+        setupKnob (texture, 0.0, 1.0, 0.52, 0.01);
+        setupKnob (bevel, 0.0, 1.0, 0.44, 0.01);
+        setupKnob (shadow, 0.0, 1.0, 0.40, 0.01);
+        addAndMakeVisible (texture);
+        addAndMakeVisible (bevel);
+        addAndMakeVisible (shadow);
+
         compactHeader.setButtonText ("Compact Header");
         strongHover.setButtonText ("Strong Hover");
         cockpitSwitches.setButtonText ("Cockpit Switches");
         addAndMakeVisible (compactHeader);
         addAndMakeVisible (strongHover);
         addAndMakeVisible (cockpitSwitches);
+        scanlines.setButtonText ("Scanlines");
+        meterMotion.setButtonText ("Meter Motion");
+        screwDetails.setButtonText ("Screw Details");
+        addAndMakeVisible (scanlines);
+        addAndMakeVisible (meterMotion);
+        addAndMakeVisible (screwDetails);
 
         presetDarkTech.setButtonText ("Dark");
         presetCockpit.setButtonText ("Cockpit");
@@ -3719,10 +4691,24 @@ public:
         addAndMakeVisible (importProfileButton);
 
         addAndMakeVisible (preview);
+        plan.setMultiLine (true);
+        plan.setReadOnly (true);
+        plan.setScrollbarsShown (false);
+        plan.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff0e1623));
+        plan.setColour (juce::TextEditor::outlineColourId, juce::Colour (0xff3f4f62));
+        plan.setColour (juce::TextEditor::textColourId, juce::Colour (0xffd7e5f9));
+        addAndMakeVisible (plan);
 
         loadState();
         bindCallbacks();
         updatePreview();
+        updatePlanText();
+        startTimerHz (30);
+    }
+
+    ~UiProdPage() override
+    {
+        stopTimer();
     }
 
     void resized() override
@@ -3731,11 +4717,24 @@ public:
         title.setBounds (r.removeFromTop (24));
         r.removeFromTop (6);
 
-        auto left = r.removeFromLeft (juce::jmax (340, r.getWidth() / 3));
+        auto left = r.removeFromLeft (juce::jmax (360, r.getWidth() / 3));
         r.removeFromLeft (8);
         auto right = r;
-        controlsGroup.setBounds (left);
-        previewGroup.setBounds (right);
+
+        auto leftTop = left.removeFromTop (juce::jmax (226, left.getHeight() / 3));
+        left.removeFromTop (8);
+        auto leftMid = left.removeFromTop (juce::jmax (186, left.getHeight() / 2));
+        left.removeFromTop (8);
+        auto leftBottom = left;
+
+        controlsGroup.setBounds (leftTop);
+        materialGroup.setBounds (leftMid);
+        behaviorGroup.setBounds (leftBottom);
+
+        auto previewArea = right.removeFromTop (juce::jmax (260, right.getHeight() * 3 / 4));
+        right.removeFromTop (8);
+        previewGroup.setBounds (previewArea);
+        planGroup.setBounds (right);
 
         {
             auto a = controlsGroup.getBounds().reduced (8, 22);
@@ -3753,13 +4752,6 @@ public:
             density.setBounds (row2.removeFromLeft (k));
             row2.removeFromLeft (8);
             accent.setBounds (row2);
-            a.removeFromTop (10);
-
-            compactHeader.setBounds (a.removeFromTop (24));
-            a.removeFromTop (4);
-            strongHover.setBounds (a.removeFromTop (24));
-            a.removeFromTop (4);
-            cockpitSwitches.setBounds (a.removeFromTop (24));
             a.removeFromTop (8);
             auto presetRow = a.removeFromTop (28);
             const int pg = 6;
@@ -3769,6 +4761,17 @@ public:
             presetCockpit.setBounds (presetRow.removeFromLeft (pw));
             presetRow.removeFromLeft (pg);
             presetSignal.setBounds (presetRow.removeFromLeft (pw));
+        }
+
+        {
+            auto a = materialGroup.getBounds().reduced (8, 22);
+            auto row = a.removeFromTop (98);
+            const int k = (row.getWidth() - 16) / 3;
+            texture.setBounds (row.removeFromLeft (k));
+            row.removeFromLeft (8);
+            bevel.setBounds (row.removeFromLeft (k));
+            row.removeFromLeft (8);
+            shadow.setBounds (row);
 
             a.removeFromTop (6);
             auto ioRow = a.removeFromTop (28);
@@ -3781,22 +4784,47 @@ public:
             applyButton.setBounds (a.removeFromTop (28));
         }
 
+        {
+            auto a = behaviorGroup.getBounds().reduced (8, 22);
+            compactHeader.setBounds (a.removeFromTop (24));
+            a.removeFromTop (4);
+            strongHover.setBounds (a.removeFromTop (24));
+            a.removeFromTop (4);
+            cockpitSwitches.setBounds (a.removeFromTop (24));
+            a.removeFromTop (4);
+            scanlines.setBounds (a.removeFromTop (24));
+            a.removeFromTop (4);
+            meterMotion.setBounds (a.removeFromTop (24));
+            a.removeFromTop (4);
+            screwDetails.setBounds (a.removeFromTop (24));
+        }
+
         preview.setBounds (previewGroup.getBounds().reduced (8, 22));
+        plan.setBounds (planGroup.getBounds().reduced (8, 22));
     }
 
 private:
     FutureHubContext context;
     juce::Label title;
     juce::GroupComponent controlsGroup;
+    juce::GroupComponent materialGroup;
+    juce::GroupComponent behaviorGroup;
     juce::GroupComponent previewGroup;
+    juce::GroupComponent planGroup;
     ComboWithLabel theme;
     ComboWithLabel animationQuality;
     KnobWithLabel contrast;
     KnobWithLabel density;
     KnobWithLabel accent;
+    KnobWithLabel texture;
+    KnobWithLabel bevel;
+    KnobWithLabel shadow;
     juce::ToggleButton compactHeader;
     juce::ToggleButton strongHover;
     juce::ToggleButton cockpitSwitches;
+    juce::ToggleButton scanlines;
+    juce::ToggleButton meterMotion;
+    juce::ToggleButton screwDetails;
     juce::TextButton presetDarkTech;
     juce::TextButton presetCockpit;
     juce::TextButton presetSignal;
@@ -3804,8 +4832,11 @@ private:
     juce::TextButton exportProfileButton;
     juce::TextButton importProfileButton;
     UiProdPreview preview;
+    juce::TextEditor plan;
+    std::unique_ptr<juce::FileChooser> profileChooser;
+    double phase = 0.0;
 
-    static constexpr int profileVersion = 1;
+    static constexpr int profileVersion = 2;
 
     void storeState()
     {
@@ -3814,9 +4845,15 @@ private:
         setStateProp (context, kUiProdContrast, contrast.getSlider().getValue());
         setStateProp (context, kUiProdDensity, density.getSlider().getValue());
         setStateProp (context, kUiProdAccent, accent.getSlider().getValue());
+        setStateProp (context, kUiProdTexture, texture.getSlider().getValue());
+        setStateProp (context, kUiProdBevel, bevel.getSlider().getValue());
+        setStateProp (context, kUiProdShadow, shadow.getSlider().getValue());
         setStateProp (context, kUiProdCompact, compactHeader.getToggleState());
         setStateProp (context, kUiProdHover, strongHover.getToggleState());
         setStateProp (context, kUiProdSwitches, cockpitSwitches.getToggleState());
+        setStateProp (context, kUiProdScanlines, scanlines.getToggleState());
+        setStateProp (context, kUiProdMeterMotion, meterMotion.getToggleState());
+        setStateProp (context, kUiProdScrews, screwDetails.getToggleState());
     }
 
     void loadState()
@@ -3826,9 +4863,15 @@ private:
         contrast.getSlider().setValue ((double) getStateProp (context, kUiProdContrast, 0.58), juce::dontSendNotification);
         density.getSlider().setValue ((double) getStateProp (context, kUiProdDensity, 0.45), juce::dontSendNotification);
         accent.getSlider().setValue ((double) getStateProp (context, kUiProdAccent, 0.5), juce::dontSendNotification);
+        texture.getSlider().setValue ((double) getStateProp (context, kUiProdTexture, 0.52), juce::dontSendNotification);
+        bevel.getSlider().setValue ((double) getStateProp (context, kUiProdBevel, 0.44), juce::dontSendNotification);
+        shadow.getSlider().setValue ((double) getStateProp (context, kUiProdShadow, 0.40), juce::dontSendNotification);
         compactHeader.setToggleState ((bool) getStateProp (context, kUiProdCompact, false), juce::dontSendNotification);
         strongHover.setToggleState ((bool) getStateProp (context, kUiProdHover, true), juce::dontSendNotification);
         cockpitSwitches.setToggleState ((bool) getStateProp (context, kUiProdSwitches, true), juce::dontSendNotification);
+        scanlines.setToggleState ((bool) getStateProp (context, kUiProdScanlines, false), juce::dontSendNotification);
+        meterMotion.setToggleState ((bool) getStateProp (context, kUiProdMeterMotion, true), juce::dontSendNotification);
+        screwDetails.setToggleState ((bool) getStateProp (context, kUiProdScrews, true), juce::dontSendNotification);
     }
 
     void updatePreview()
@@ -3838,79 +4881,167 @@ private:
                           (float) contrast.getSlider().getValue(),
                           (float) density.getSlider().getValue(),
                           (float) accent.getSlider().getValue(),
+                          (float) texture.getSlider().getValue(),
+                          (float) bevel.getSlider().getValue(),
+                          (float) shadow.getSlider().getValue(),
                           compactHeader.getToggleState(),
                           strongHover.getToggleState(),
-                          cockpitSwitches.getToggleState());
+                          cockpitSwitches.getToggleState(),
+                          scanlines.getToggleState(),
+                          meterMotion.getToggleState(),
+                          screwDetails.getToggleState());
+        preview.setMotionPhase ((float) phase);
+        updatePlanText();
     }
 
     void applyPreset (int themeIdx, int animIdx, float contrastV, float densityV, float accentV,
-                      bool compactV, bool hoverV, bool switchesV)
+                      float textureV, float bevelV, float shadowV,
+                      bool compactV, bool hoverV, bool switchesV,
+                      bool scanV, bool motionV, bool screwsV)
     {
         theme.getCombo().setSelectedItemIndex (juce::jlimit (0, 2, themeIdx), juce::dontSendNotification);
         animationQuality.getCombo().setSelectedItemIndex (juce::jlimit (0, 1, animIdx), juce::dontSendNotification);
         contrast.getSlider().setValue (juce::jlimit (0.0, 1.0, (double) contrastV), juce::dontSendNotification);
         density.getSlider().setValue (juce::jlimit (0.0, 1.0, (double) densityV), juce::dontSendNotification);
         accent.getSlider().setValue (juce::jlimit (0.0, 1.0, (double) accentV), juce::dontSendNotification);
+        texture.getSlider().setValue (juce::jlimit (0.0, 1.0, (double) textureV), juce::dontSendNotification);
+        bevel.getSlider().setValue (juce::jlimit (0.0, 1.0, (double) bevelV), juce::dontSendNotification);
+        shadow.getSlider().setValue (juce::jlimit (0.0, 1.0, (double) shadowV), juce::dontSendNotification);
         compactHeader.setToggleState (compactV, juce::dontSendNotification);
         strongHover.setToggleState (hoverV, juce::dontSendNotification);
         cockpitSwitches.setToggleState (switchesV, juce::dontSendNotification);
+        scanlines.setToggleState (scanV, juce::dontSendNotification);
+        meterMotion.setToggleState (motionV, juce::dontSendNotification);
+        screwDetails.setToggleState (screwsV, juce::dontSendNotification);
         storeState();
         updatePreview();
     }
 
     void exportProfile()
     {
-        juce::File defaultFile = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
-                                    .getChildFile ("IES_UI_PROFILE.iesuip");
-        juce::FileChooser chooser ("Export UI profile", defaultFile, "*.iesuip;*.xml");
-        if (! chooser.browseForFileToSave (true))
-            return;
+        auto defaultFile = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                               .getChildFile ("IES_UI_PROFILE.iesuip");
+        profileChooser = std::make_unique<juce::FileChooser> ("Export UI profile", defaultFile, "*.iesuip;*.xml");
+        const auto flags = juce::FileBrowserComponent::saveMode
+                           | juce::FileBrowserComponent::canSelectFiles
+                           | juce::FileBrowserComponent::warnAboutOverwriting;
+        const auto safeThis = juce::Component::SafePointer<UiProdPage> (this);
+        profileChooser->launchAsync (flags, [safeThis] (const juce::FileChooser& chooser)
+        {
+            if (safeThis == nullptr)
+                return;
 
-        auto file = chooser.getResult();
-        if (file.getFileExtension().isEmpty())
-            file = file.withFileExtension (".iesuip");
+            auto file = chooser.getResult();
+            safeThis->profileChooser.reset();
 
-        juce::XmlElement xml ("IES_UI_PROFILE");
-        xml.setAttribute ("version", profileVersion);
-        xml.setAttribute ("theme", theme.getCombo().getSelectedItemIndex());
-        xml.setAttribute ("anim", animationQuality.getCombo().getSelectedItemIndex());
-        xml.setAttribute ("contrast", (double) contrast.getSlider().getValue());
-        xml.setAttribute ("density", (double) density.getSlider().getValue());
-        xml.setAttribute ("accent", (double) accent.getSlider().getValue());
-        xml.setAttribute ("compact", compactHeader.getToggleState() ? 1 : 0);
-        xml.setAttribute ("hover", strongHover.getToggleState() ? 1 : 0);
-        xml.setAttribute ("switches", cockpitSwitches.getToggleState() ? 1 : 0);
+            if (file == juce::File())
+                return;
+            if (file.getFileExtension().isEmpty())
+                file = file.withFileExtension (".iesuip");
 
-        if (file.replaceWithText (xml.toString()))
-            setStatus (context, "UI PROD: profile exported to " + file.getFileName());
-        else
-            setStatus (context, "UI PROD: export failed.");
+            juce::XmlElement xml ("IES_UI_PROFILE");
+            xml.setAttribute ("version", UiProdPage::profileVersion);
+            xml.setAttribute ("theme", safeThis->theme.getCombo().getSelectedItemIndex());
+            xml.setAttribute ("anim", safeThis->animationQuality.getCombo().getSelectedItemIndex());
+            xml.setAttribute ("contrast", (double) safeThis->contrast.getSlider().getValue());
+            xml.setAttribute ("density", (double) safeThis->density.getSlider().getValue());
+            xml.setAttribute ("accent", (double) safeThis->accent.getSlider().getValue());
+            xml.setAttribute ("texture", (double) safeThis->texture.getSlider().getValue());
+            xml.setAttribute ("bevel", (double) safeThis->bevel.getSlider().getValue());
+            xml.setAttribute ("shadow", (double) safeThis->shadow.getSlider().getValue());
+            xml.setAttribute ("compact", safeThis->compactHeader.getToggleState() ? 1 : 0);
+            xml.setAttribute ("hover", safeThis->strongHover.getToggleState() ? 1 : 0);
+            xml.setAttribute ("switches", safeThis->cockpitSwitches.getToggleState() ? 1 : 0);
+            xml.setAttribute ("scanlines", safeThis->scanlines.getToggleState() ? 1 : 0);
+            xml.setAttribute ("meterMotion", safeThis->meterMotion.getToggleState() ? 1 : 0);
+            xml.setAttribute ("screws", safeThis->screwDetails.getToggleState() ? 1 : 0);
+
+            if (file.replaceWithText (xml.toString()))
+                setStatus (safeThis->context, "UI PROD: profile exported to " + file.getFileName());
+            else
+                setStatus (safeThis->context, "UI PROD: export failed.");
+        });
     }
 
     void importProfile()
     {
-        juce::FileChooser chooser ("Import UI profile", juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), "*.iesuip;*.xml");
-        if (! chooser.browseForFileToOpen())
-            return;
-
-        const auto file = chooser.getResult();
-        std::unique_ptr<juce::XmlElement> xml (juce::XmlDocument::parse (file));
-        if (xml == nullptr || ! xml->hasTagName ("IES_UI_PROFILE"))
+        profileChooser = std::make_unique<juce::FileChooser> ("Import UI profile",
+                                                               juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                                                               "*.iesuip;*.xml");
+        const auto flags = juce::FileBrowserComponent::openMode
+                           | juce::FileBrowserComponent::canSelectFiles;
+        const auto safeThis = juce::Component::SafePointer<UiProdPage> (this);
+        profileChooser->launchAsync (flags, [safeThis] (const juce::FileChooser& chooser)
         {
-            setStatus (context, "UI PROD: invalid profile file.");
-            return;
-        }
+            if (safeThis == nullptr)
+                return;
 
-        applyPreset (xml->getIntAttribute ("theme", 0),
-                     xml->getIntAttribute ("anim", 0),
-                     (float) xml->getDoubleAttribute ("contrast", 0.58),
-                     (float) xml->getDoubleAttribute ("density", 0.45),
-                     (float) xml->getDoubleAttribute ("accent", 0.5),
-                     xml->getBoolAttribute ("compact", false),
-                     xml->getBoolAttribute ("hover", true),
-                     xml->getBoolAttribute ("switches", true));
+            const auto file = chooser.getResult();
+            safeThis->profileChooser.reset();
 
-        setStatus (context, "UI PROD: profile imported from " + file.getFileName() + ".");
+            if (file == juce::File())
+                return;
+
+            std::unique_ptr<juce::XmlElement> xml (juce::XmlDocument::parse (file));
+            if (xml == nullptr || ! xml->hasTagName ("IES_UI_PROFILE"))
+            {
+                setStatus (safeThis->context, "UI PROD: invalid profile file.");
+                return;
+            }
+
+            safeThis->applyPreset (xml->getIntAttribute ("theme", 0),
+                                   xml->getIntAttribute ("anim", 0),
+                                   (float) xml->getDoubleAttribute ("contrast", 0.58),
+                                   (float) xml->getDoubleAttribute ("density", 0.45),
+                                   (float) xml->getDoubleAttribute ("accent", 0.5),
+                                   (float) xml->getDoubleAttribute ("texture", 0.52),
+                                   (float) xml->getDoubleAttribute ("bevel", 0.44),
+                                   (float) xml->getDoubleAttribute ("shadow", 0.40),
+                                   xml->getBoolAttribute ("compact", false),
+                                   xml->getBoolAttribute ("hover", true),
+                                   xml->getBoolAttribute ("switches", true),
+                                   xml->getBoolAttribute ("scanlines", false),
+                                   xml->getBoolAttribute ("meterMotion", true),
+                                   xml->getBoolAttribute ("screws", true));
+
+            setStatus (safeThis->context, "UI PROD: profile imported from " + file.getFileName() + ".");
+        });
+    }
+
+    void timerCallback() override
+    {
+        phase += (animationQuality.getCombo().getSelectedItemIndex() == 0 ? 0.006 : 0.016);
+        while (phase >= 1.0)
+            phase -= 1.0;
+        preview.setMotionPhase ((float) phase);
+    }
+
+    void updatePlanText()
+    {
+        const juce::String txt =
+            "Material Profile\n"
+            "- Theme: " + theme.getCombo().getText() + "\n"
+            "- Animation: " + animationQuality.getCombo().getText() + "\n"
+            "- Contrast/Density/Accent: "
+            + juce::String ((float) contrast.getSlider().getValue(), 2) + " / "
+            + juce::String ((float) density.getSlider().getValue(), 2) + " / "
+            + juce::String ((float) accent.getSlider().getValue(), 2) + "\n"
+            "- Texture/Bevel/Shadow: "
+            + juce::String ((float) texture.getSlider().getValue(), 2) + " / "
+            + juce::String ((float) bevel.getSlider().getValue(), 2) + " / "
+            + juce::String ((float) shadow.getSlider().getValue(), 2) + "\n\n"
+            "Switch Pack\n"
+            "- Compact: " + juce::String (compactHeader.getToggleState() ? "On" : "Off")
+            + " | Hover: " + juce::String (strongHover.getToggleState() ? "Strong" : "Normal")
+            + " | Cockpit: " + juce::String (cockpitSwitches.getToggleState() ? "On" : "Off") + "\n"
+            "- Scanlines: " + juce::String (scanlines.getToggleState() ? "On" : "Off")
+            + " | Motion: " + juce::String (meterMotion.getToggleState() ? "On" : "Off")
+            + " | Screws: " + juce::String (screwDetails.getToggleState() ? "On" : "Off") + "\n\n"
+            "Use presets for fast direction, then refine with Material knobs.\n"
+            "Export profile when style is locked.";
+
+        if (plan.getText() != txt)
+            plan.setText (txt, juce::dontSendNotification);
     }
 
     void bindCallbacks()
@@ -3925,7 +5056,8 @@ private:
             storeState();
             updatePreview();
         };
-        for (auto* s : { &contrast.getSlider(), &density.getSlider(), &accent.getSlider() })
+        for (auto* s : { &contrast.getSlider(), &density.getSlider(), &accent.getSlider(),
+                         &texture.getSlider(), &bevel.getSlider(), &shadow.getSlider() })
             s->onValueChange = [this]
             {
                 storeState();
@@ -3947,20 +5079,35 @@ private:
             storeState();
             updatePreview();
         };
+        scanlines.onClick = [this]
+        {
+            storeState();
+            updatePreview();
+        };
+        meterMotion.onClick = [this]
+        {
+            storeState();
+            updatePreview();
+        };
+        screwDetails.onClick = [this]
+        {
+            storeState();
+            updatePreview();
+        };
 
         presetDarkTech.onClick = [this]
         {
-            applyPreset (0, 0, 0.58f, 0.45f, 0.50f, false, true, true);
+            applyPreset (0, 0, 0.58f, 0.45f, 0.50f, 0.45f, 0.36f, 0.34f, false, true, true, false, true, false);
             setStatus (context, "UI PROD: Dark preset.");
         };
         presetCockpit.onClick = [this]
         {
-            applyPreset (1, 1, 0.72f, 0.62f, 0.62f, true, true, true);
+            applyPreset (1, 1, 0.72f, 0.62f, 0.62f, 0.72f, 0.70f, 0.58f, true, true, true, true, true, true);
             setStatus (context, "UI PROD: Cockpit preset.");
         };
         presetSignal.onClick = [this]
         {
-            applyPreset (2, 1, 0.67f, 0.55f, 0.78f, false, true, false);
+            applyPreset (2, 1, 0.67f, 0.55f, 0.78f, 0.58f, 0.44f, 0.52f, false, true, false, true, true, true);
             setStatus (context, "UI PROD: Signal preset.");
         };
         exportProfileButton.onClick = [this] { exportProfile(); };
@@ -3974,7 +5121,8 @@ private:
                        + theme.getCombo().getText()
                        + ", anim=" + animationQuality.getCombo().getText()
                        + ", contrast=" + juce::String ((float) contrast.getSlider().getValue(), 2)
-                       + ", density=" + juce::String ((float) density.getSlider().getValue(), 2) + ".");
+                       + ", density=" + juce::String ((float) density.getSlider().getValue(), 2)
+                       + ", texture=" + juce::String ((float) texture.getSlider().getValue(), 2) + ".");
         };
     }
 };
